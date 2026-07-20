@@ -216,3 +216,21 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+secrets/
+
+# Local market data and logs
+data/
+logs/
+*.db
+
+# Private key files
+*.key
+*.pem
+
+# macOS
+.DS_Store
