@@ -1,2 +1,3 @@
-def main() -> None:
-    print("Hello from world-quant-system!")
+from world_quant_system.app import main
+
+__all__ = ["main"]
