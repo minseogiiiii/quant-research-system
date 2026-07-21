@@ -18,9 +18,7 @@ class Quote:
             raise ValueError("Price must be greater than zero.")
 
         if self.timestamp.tzinfo is None:
-            raise ValueError(
-                "Timestamp must include timezone information."
-            )
+            raise ValueError("Timestamp must include timezone information.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +35,4 @@ class Position:
             raise ValueError("Quantity cannot be negative.")
 
         if self.average_price < Decimal("0"):
-            raise ValueError(
-                "Average price cannot be negative."
-            )
+            raise ValueError("Average price cannot be negative.")

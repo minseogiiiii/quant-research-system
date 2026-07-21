@@ -44,14 +44,8 @@ async def build_demo_report(
 
     return "\n".join(
         [
-            (
-                "Execution mode: "
-                f"{app_settings.execution_mode.value.upper()}"
-            ),
-            (
-                "Broker provider: "
-                f"{app_settings.broker_provider.value.upper()}"
-            ),
+            (f"Execution mode: {app_settings.execution_mode.value.upper()}"),
+            (f"Broker provider: {app_settings.broker_provider.value.upper()}"),
             "Live trading: DISABLED",
             "",
             "Samsung Electronics",

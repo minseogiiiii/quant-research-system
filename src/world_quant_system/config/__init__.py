@@ -28,12 +28,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def block_live_trading(self) -> "Settings":
-        if (
-            self.kis_env == TradingEnvironment.LIVE
-            or self.live_trading_enabled
-        ):
-            raise ValueError(
-                "Live trading is disabled during this development stage."
-            )
+        if self.kis_env == TradingEnvironment.LIVE or self.live_trading_enabled:
+            raise ValueError("Live trading is disabled during this development stage.")
 
         return self
