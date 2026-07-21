@@ -110,9 +110,7 @@ async def test_request_headers_override_defaults() -> None:
         headers={"Accept": "application/problem+json"},
     )
 
-    assert transport.requests[0].headers["Accept"] == (
-        "application/problem+json"
-    )
+    assert transport.requests[0].headers["Accept"] == ("application/problem+json")
 
 
 @pytest.mark.asyncio
@@ -255,3 +253,20 @@ async def test_client_rejects_full_url_path() -> None:
         match="must not contain a full URL",
     ):
         await client.get("https://malicious.example/prices")
+
+
+@pytest.mark.asyncio
+async def test_request_headers_override_defaults_case_insensitively() -> None:
+    transport = StubTransport([TossResponse(status_code=204)])
+    client = TossHttpClient(
+        "https://example.test",
+        transport=transport,
+        default_headers={"Accept": "application/json"},
+    )
+
+    await client.get(
+        "/prices",
+        headers={"accept": "application/problem+json"},
+    )
+
+    assert transport.requests[0].headers == {"accept": "application/problem+json"}

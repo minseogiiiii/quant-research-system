@@ -48,23 +48,29 @@ Live trading: DISABLED
 ./scripts/check.sh
 ```
 
-The check script performs a locked sync, forces the local project package to be
-reinstalled, verifies imports from outside the repository, compiles source and
-tests, runs pytest, Ruff, mypy, validates the network kill switch, and checks
-both application entry points.
+The run and check scripts use non-editable installation and force the local
+project package to be reinstalled, preventing stale source code from remaining
+inside `.venv`. The check script also verifies imports from outside the
+repository, compiles source and tests, runs pytest, Ruff, mypy, validates the
+network kill switch, and checks both application entry points.
 
 ## Current Toss adapter scope
 
-The Toss adapter currently provides only:
+The Toss adapter currently provides:
 
-- immutable request and response models
+- request and response models with secret-safe representations
 - typed, sanitized exception classes
 - an injected transport protocol
 - a default `NoNetworkTransport` that always refuses requests
 - deterministic HTTP status-to-error mapping
+- a networkless `TossTokenManager` with single-flight refresh
+- optional managed Bearer authentication in `TossHttpClient`
+- one controlled retry after a 401 response
+- token-aware invalidation that cannot delete a newer concurrent token
 
-There is no real HTTP implementation, OAuth flow, account access, or order
-execution.
+There is no real HTTP transport, credential-bearing OAuth issuer, account
+access, or order execution. All authentication integration tests use injected
+fakes and make no network calls.
 
 ## Security rules
 

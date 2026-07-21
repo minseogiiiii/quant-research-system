@@ -13,6 +13,7 @@ unset UV_INDEX UV_INDEX_URL UV_EXTRA_INDEX_URL UV_DEFAULT_INDEX
 uv sync \
     --locked \
     --no-editable \
+    --reinstall-package world-quant-system \
     --default-index https://pypi.org/simple
 
 exec "$ROOT_DIR/.venv/bin/python" -m world_quant_system

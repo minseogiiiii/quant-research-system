@@ -180,10 +180,7 @@ async def test_concurrent_callers_share_one_issuance() -> None:
     issuer = BlockingIssuer()
     manager = TossTokenManager(issuer)
 
-    tasks = [
-        asyncio.create_task(manager.get_token())
-        for _ in range(100)
-    ]
+    tasks = [asyncio.create_task(manager.get_token()) for _ in range(100)]
     await issuer.started.wait()
 
     assert issuer.call_count == 1
@@ -222,9 +219,7 @@ async def test_force_refresh_replaces_cached_token() -> None:
 
 @pytest.mark.asyncio
 async def test_cached_metadata_never_contains_secret() -> None:
-    manager = TossTokenManager(
-        SequenceIssuer([response("metadata-secret")])
-    )
+    manager = TossTokenManager(SequenceIssuer([response("metadata-secret")]))
 
     assert manager.cached_metadata() is None
     await manager.get_token()
@@ -249,9 +244,7 @@ async def test_cached_metadata_never_contains_secret() -> None:
 async def test_manager_rejects_malformed_token_response(
     invalid_response: TokenIssueResponse,
 ) -> None:
-    manager = TossTokenManager(
-        SequenceIssuer([invalid_response])
-    )
+    manager = TossTokenManager(SequenceIssuer([invalid_response]))
 
     with pytest.raises(TossInvalidResponseError):
         await manager.get_token()
@@ -276,9 +269,7 @@ async def test_known_adapter_error_is_preserved() -> None:
 
 @pytest.mark.asyncio
 async def test_unexpected_issuer_error_is_wrapped() -> None:
-    manager = TossTokenManager(
-        SequenceIssuer([RuntimeError("socket failure")])
-    )
+    manager = TossTokenManager(SequenceIssuer([RuntimeError("socket failure")]))
 
     with pytest.raises(
         TossTransportError,
@@ -312,9 +303,7 @@ async def test_failed_refresh_never_returns_possibly_invalid_old_token() -> None
 
     replacement = await manager.get_token()
     assert replacement is not old_token
-    assert replacement.authorization_header() == (
-        "Bearer replacement-token"
-    )
+    assert replacement.authorization_header() == ("Bearer replacement-token")
     assert issuer.call_count == 3
 
 
@@ -362,9 +351,7 @@ def test_manager_rejects_negative_refresh_skew() -> None:
         TossConfigurationError,
         match="cannot be negative",
     ):
-        TossTokenManager(
-            refresh_skew=timedelta(seconds=-1)
-        )
+        TossTokenManager(refresh_skew=timedelta(seconds=-1))
 
 
 @pytest.mark.asyncio
@@ -409,10 +396,7 @@ async def test_concurrent_callers_share_one_failed_issuance() -> None:
     issuer = BlockingFailIssuer()
     manager = TossTokenManager(issuer)
 
-    tasks = [
-        asyncio.create_task(manager.get_token())
-        for _ in range(100)
-    ]
+    tasks = [asyncio.create_task(manager.get_token()) for _ in range(100)]
     await issuer.started.wait()
     issuer.release.set()
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -442,3 +426,25 @@ async def test_cancelled_waiter_does_not_cancel_shared_issuance() -> None:
     assert token.authorization_header() == "Bearer shared-token"
     assert issuer.call_count == 1
     assert await manager.get_token() is token
+
+
+@pytest.mark.asyncio
+async def test_invalidate_if_current_removes_matching_token() -> None:
+    issuer = CountingIssuer()
+    manager = TossTokenManager(issuer)
+    token = await manager.get_token()
+
+    assert await manager.invalidate_if_current(token) is True
+    assert manager.cached_metadata() is None
+
+
+@pytest.mark.asyncio
+async def test_late_invalidation_cannot_remove_replacement_token() -> None:
+    issuer = CountingIssuer()
+    manager = TossTokenManager(issuer)
+    old_token = await manager.get_token()
+    replacement = await manager.force_refresh()
+
+    assert await manager.invalidate_if_current(old_token) is False
+    assert manager.cached_metadata() == replacement.metadata
+    assert issuer.call_count == 2

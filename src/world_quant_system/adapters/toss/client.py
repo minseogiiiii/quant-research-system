@@ -17,6 +17,8 @@ from world_quant_system.adapters.toss.schemas import (
     TossRequest,
     TossResponse,
 )
+from world_quant_system.adapters.toss.token import AccessToken
+from world_quant_system.adapters.toss.token_manager import TossTokenManager
 
 
 class TossTransport(Protocol):
@@ -37,29 +39,38 @@ class NoNetworkTransport:
     ) -> TossResponse:
         del request
 
-        raise TossTransportError(
-            "Network transport is not configured."
-        )
+        raise TossTransportError("Network transport is not configured.")
 
 
 class TossHttpClient:
+    """Prepare Toss HTTP requests with optional managed authentication.
+
+    Supplying a token manager enables automatic Bearer authentication. A 401
+    response invalidates only the token used by that request, obtains a shared
+    replacement through ``TossTokenManager``, and retries exactly once.
+    """
+
     def __init__(
         self,
         base_url: str,
         *,
         transport: TossTransport | None = None,
         default_headers: Mapping[str, str] | None = None,
+        token_manager: TossTokenManager | None = None,
     ) -> None:
         normalized_base_url = base_url.rstrip("/")
 
         if not normalized_base_url.startswith("https://"):
-            raise TossConfigurationError(
-                "Toss base URL must use HTTPS."
-            )
+            raise TossConfigurationError("Toss base URL must use HTTPS.")
+
+        copied_default_headers = dict(default_headers or {})
+        if token_manager is not None:
+            self._reject_managed_authorization(copied_default_headers)
 
         self._base_url = normalized_base_url
         self._transport = transport or NoNetworkTransport()
-        self._default_headers = dict(default_headers or {})
+        self._default_headers = copied_default_headers
+        self._token_manager = token_manager
 
     async def get(
         self,
@@ -99,18 +110,87 @@ class TossHttpClient:
         json_body: Mapping[str, object] | None = None,
     ) -> TossResponse:
         normalized_path = self._normalize_path(path)
+        copied_headers = dict(headers or {})
+        token_manager = self._token_manager
 
-        merged_headers = {
-            **self._default_headers,
-            **dict(headers or {}),
+        if token_manager is None:
+            return await self._send_once(
+                method,
+                normalized_path,
+                headers=copied_headers,
+                params=params,
+                json_body=json_body,
+            )
+
+        self._reject_managed_authorization(copied_headers)
+        token = await token_manager.get_token()
+
+        try:
+            return await self._send_authenticated_once(
+                method,
+                normalized_path,
+                token=token,
+                headers=copied_headers,
+                params=params,
+                json_body=json_body,
+            )
+        except TossAuthenticationError:
+            await token_manager.invalidate_if_current(token)
+
+        replacement = await token_manager.get_token()
+        try:
+            return await self._send_authenticated_once(
+                method,
+                normalized_path,
+                token=replacement,
+                headers=copied_headers,
+                params=params,
+                json_body=json_body,
+            )
+        except TossAuthenticationError:
+            await token_manager.invalidate_if_current(replacement)
+            raise
+
+    async def _send_authenticated_once(
+        self,
+        method: HttpMethod,
+        normalized_path: str,
+        *,
+        token: AccessToken,
+        headers: Mapping[str, str],
+        params: Mapping[str, str] | None,
+        json_body: Mapping[str, object] | None,
+    ) -> TossResponse:
+        authenticated_headers = {
+            **headers,
+            "Authorization": token.authorization_header(),
         }
+        return await self._send_once(
+            method,
+            normalized_path,
+            headers=authenticated_headers,
+            params=params,
+            json_body=json_body,
+        )
 
+    async def _send_once(
+        self,
+        method: HttpMethod,
+        normalized_path: str,
+        *,
+        headers: Mapping[str, str],
+        params: Mapping[str, str] | None,
+        json_body: Mapping[str, object] | None,
+    ) -> TossResponse:
         request = TossRequest(
             method=method,
             url=f"{self._base_url}{normalized_path}",
-            headers=merged_headers,
+            headers=self._merge_headers(
+                self._default_headers,
+                headers,
+            ),
             params=dict(params or {}),
-            json_body=json_body,
+            json_body=(None if json_body is None else dict(json_body)),
         )
 
         try:
@@ -118,27 +198,49 @@ class TossHttpClient:
         except TossAdapterError:
             raise
         except Exception as error:
-            raise TossTransportError(
-                "Transport failed unexpectedly."
-            ) from error
+            raise TossTransportError("Transport failed unexpectedly.") from error
 
         self._raise_for_status(response)
-
         return response
+
+    @staticmethod
+    def _merge_headers(
+        defaults: Mapping[str, str],
+        overrides: Mapping[str, str],
+    ) -> dict[str, str]:
+        merged: dict[str, str] = {}
+        original_names: dict[str, str] = {}
+
+        for source in (defaults, overrides):
+            for name, value in source.items():
+                normalized_name = name.casefold()
+                previous_name = original_names.get(normalized_name)
+                if previous_name is not None:
+                    del merged[previous_name]
+
+                merged[name] = value
+                original_names[normalized_name] = name
+
+        return merged
+
+    @staticmethod
+    def _reject_managed_authorization(
+        headers: Mapping[str, str],
+    ) -> None:
+        if any(name.casefold() == "authorization" for name in headers):
+            raise TossConfigurationError(
+                "Authorization header is managed by the token manager."
+            )
 
     @staticmethod
     def _normalize_path(path: str) -> str:
         stripped_path = path.strip()
 
         if not stripped_path:
-            raise TossConfigurationError(
-                "Request path cannot be empty."
-            )
+            raise TossConfigurationError("Request path cannot be empty.")
 
         if "://" in stripped_path:
-            raise TossConfigurationError(
-                "Request path must not contain a full URL."
-            )
+            raise TossConfigurationError("Request path must not contain a full URL.")
 
         return f"/{stripped_path.lstrip('/')}"
 

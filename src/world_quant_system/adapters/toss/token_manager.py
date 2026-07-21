@@ -49,9 +49,7 @@ class NoNetworkTokenIssuer:
     """Fail closed until a real OAuth issuer is explicitly configured."""
 
     async def issue_token(self) -> TokenIssueResponse:
-        raise TossTransportError(
-            "Token issuer is not configured."
-        )
+        raise TossTransportError("Token issuer is not configured.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,9 +77,7 @@ class TossTokenManager:
         refresh_skew: timedelta = timedelta(minutes=5),
     ) -> None:
         if refresh_skew < timedelta(0):
-            raise TossConfigurationError(
-                "Token refresh skew cannot be negative."
-            )
+            raise TossConfigurationError("Token refresh skew cannot be negative.")
 
         self._issuer = issuer or NoNetworkTokenIssuer()
         self._clock = clock or SystemClock()
@@ -135,6 +131,25 @@ class TossTokenManager:
         async with self._state_lock:
             self._cached = None
 
+    async def invalidate_if_current(
+        self,
+        token: AccessToken,
+    ) -> bool:
+        """Invalidate only when ``token`` is still the cached instance.
+
+        This identity check prevents a late 401 response for an older token
+        from deleting a replacement token issued by another concurrent
+        request.
+        """
+
+        async with self._state_lock:
+            cached = self._cached
+            if cached is None or cached.token is not token:
+                return False
+
+            self._cached = None
+            return True
+
     def cached_metadata(self) -> TokenMetadata | None:
         """Return non-sensitive cached-token metadata, if available."""
 
@@ -150,9 +165,7 @@ class TossTokenManager:
         except TossAdapterError:
             raise
         except Exception as error:
-            raise TossTransportError(
-                "Token issuance failed unexpectedly."
-            ) from error
+            raise TossTransportError("Token issuance failed unexpectedly.") from error
 
         issued_at = self._validated_now_utc()
         issued_monotonic = self._clock.monotonic()
@@ -166,9 +179,7 @@ class TossTokenManager:
         expires_at_monotonic = issued_monotonic + lifetime_seconds
         cached = _CachedToken(
             token=token,
-            refresh_at_monotonic=(
-                expires_at_monotonic - effective_skew_seconds
-            ),
+            refresh_at_monotonic=(expires_at_monotonic - effective_skew_seconds),
             expires_at_monotonic=expires_at_monotonic,
         )
 
@@ -208,10 +219,7 @@ class TossTokenManager:
 
     def _is_fresh(self, cached: _CachedToken) -> bool:
         now = self._clock.monotonic()
-        return (
-            now < cached.refresh_at_monotonic
-            and now < cached.expires_at_monotonic
-        )
+        return now < cached.refresh_at_monotonic and now < cached.expires_at_monotonic
 
     def _validated_now_utc(self) -> datetime:
         now = self._clock.now_utc()
