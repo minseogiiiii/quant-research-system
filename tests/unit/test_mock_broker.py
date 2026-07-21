@@ -9,10 +9,7 @@ from world_quant_system.broker.portfolio import PortfolioReader
 from world_quant_system.domain.models import Position, Quote
 
 
-def make_quote(
-    symbol: str,
-    price: str,
-) -> Quote:
+def make_quote(symbol: str, price: str) -> Quote:
     return Quote(
         symbol=symbol,
         price=Decimal(price),
@@ -62,10 +59,11 @@ async def test_mock_broker_returns_positions() -> None:
         quantity=3,
         average_price=Decimal("90000"),
     )
-
     broker = MockBroker(positions=[position])
 
-    assert await broker.get_positions() == [position]
+    positions = await broker.get_positions()
+
+    assert positions == [position]
 
 
 @pytest.mark.asyncio

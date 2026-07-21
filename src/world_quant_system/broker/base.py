@@ -8,6 +8,5 @@ class Broker(
 ):
     """Temporary compatibility interface.
 
-    New adapters should implement MarketDataProvider
-    and PortfolioReader according to their capabilities.
+    New adapters should implement the smaller read interfaces directly.
     """
