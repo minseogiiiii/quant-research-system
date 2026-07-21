@@ -63,6 +63,10 @@ from world_quant_system.adapters.toss import (
     TossResponse,
     TossTokenManager,
 )
+from world_quant_system.data import (
+    FileRawMarketDataStore,
+    RawMarketDataCapture,
+)
 from world_quant_system.domain import Candle, CandleInterval, CandlePage
 
 print(f"Package: {world_quant_system.__file__}")
@@ -70,6 +74,7 @@ print(f"Client: {TossHttpClient.__name__}")
 print(f"Token manager: {TossTokenManager.__name__}")
 print(f"Market data: {TossMarketDataProvider.__name__}, {TossMarketDataParser.__name__}")
 print(f"Domain: {Candle.__name__}, {CandleInterval.__name__}, {CandlePage.__name__}")
+print(f"Raw storage: {FileRawMarketDataStore.__name__}, {RawMarketDataCapture.__name__}")
 print(f"Token response: {TokenIssueResponse.__name__}")
 print(f"Error: {TossAdapterError.__name__}")
 print(f"Schemas: {HttpMethod.__name__}, {TossRequest.__name__}, {TossResponse.__name__}")
@@ -91,11 +96,18 @@ echo "5/8 Running mypy..."
 echo "6/8 Verifying fail-closed network behavior..."
 "$PYTHON" -c '
 import asyncio
+import tempfile
+from datetime import UTC, datetime
+
 from world_quant_system.adapters.toss import (
     TossHttpClient,
     TossMarketDataProvider,
     TossTokenManager,
     TossTransportError,
+)
+from world_quant_system.data import (
+    FileRawMarketDataStore,
+    RawMarketDataCapture,
 )
 
 async def verify() -> None:
@@ -122,6 +134,25 @@ async def verify() -> None:
         assert str(error) == "Token issuer is not configured."
     else:
         raise AssertionError("Default token issuer unexpectedly issued a token.")
+
+    with tempfile.TemporaryDirectory() as directory:
+        store = FileRawMarketDataStore(directory)
+        metadata = await store.record(
+            RawMarketDataCapture(
+                provider="toss",
+                endpoint="/api/v1/prices",
+                request_params={"symbols": "005930"},
+                captured_at=datetime.now(UTC),
+                status_code=200,
+                response_headers={"X-Request-Id": "check-script"},
+                json_body={"result": []},
+                request_id="check-script",
+                idempotency_key="check-script",
+            )
+        )
+        record = await store.read(metadata.record_id)
+        assert record.metadata == metadata
+        assert record.json_body == {"result": []}
 
 asyncio.run(verify())
 '

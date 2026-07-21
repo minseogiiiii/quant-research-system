@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import cast
 
 import pytest
@@ -17,6 +18,12 @@ from world_quant_system.adapters.toss import (
     TossTokenManager,
 )
 from world_quant_system.adapters.toss.token import TokenIssueResponse
+from world_quant_system.data import (
+    FileRawMarketDataStore,
+    RawMarketDataCapture,
+    RawMarketDataError,
+    RawMarketDataMetadata,
+)
 from world_quant_system.domain.models import CandleInterval
 
 NOW = datetime(2026, 7, 21, 12, 0, tzinfo=UTC)
@@ -619,3 +626,109 @@ async def test_price_response_rejects_whitespace_padded_fields(
 
     with pytest.raises(TossInvalidResponseError):
         await provider.get_quote("005930")
+
+
+@pytest.mark.asyncio
+async def test_provider_archives_raw_response_before_parsing(
+    tmp_path: Path,
+) -> None:
+    malformed = price_item(price="0")
+    transport = CapturingTransport(
+        [
+            TossResponse(
+                status_code=200,
+                headers={"X-Request-Id": "raw-price-1"},
+                json_body={"result": [malformed]},
+            )
+        ]
+    )
+    store = FileRawMarketDataStore(tmp_path / "raw")
+    provider = TossMarketDataProvider(
+        TossHttpClient("https://example.test", transport=transport),
+        clock=FixedClock(),
+        raw_recorder=store,
+    )
+
+    with pytest.raises(TossInvalidResponseError):
+        await provider.get_quote("005930")
+
+    rows = await store.query(endpoint="/api/v1/prices")
+    assert len(rows) == 1
+    record = await store.read(rows[0].record_id)
+    assert record.request_params == {"symbols": "005930"}
+    assert record.json_body == {"result": [malformed]}
+    assert record.metadata.request_id == "raw-price-1"
+    assert record.metadata.idempotency_key == "toss:raw-price-1"
+
+
+@pytest.mark.asyncio
+async def test_provider_uses_request_id_for_idempotent_archival(
+    tmp_path: Path,
+) -> None:
+    response = TossResponse(
+        status_code=200,
+        headers={"x-request-id": "same-request"},
+        json_body={"result": [price_item()]},
+    )
+    transport = CapturingTransport([response, response])
+    store = FileRawMarketDataStore(tmp_path / "raw")
+    provider = TossMarketDataProvider(
+        TossHttpClient("https://example.test", transport=transport),
+        clock=FixedClock(),
+        raw_recorder=store,
+    )
+
+    await provider.get_quote("005930")
+    await provider.get_quote("005930")
+
+    assert len(await store.query()) == 1
+
+
+class FailingRawRecorder:
+    async def record(
+        self,
+        capture: RawMarketDataCapture,
+    ) -> RawMarketDataMetadata:
+        del capture
+        raise RawMarketDataError("storage unavailable")
+
+
+@pytest.mark.asyncio
+async def test_provider_fails_closed_when_raw_archive_fails() -> None:
+    transport = CapturingTransport([response_with_result([price_item()])])
+    provider = TossMarketDataProvider(
+        TossHttpClient("https://example.test", transport=transport),
+        clock=FixedClock(),
+        raw_recorder=FailingRawRecorder(),
+    )
+
+    with pytest.raises(RawMarketDataError, match="storage unavailable"):
+        await provider.get_quote("005930")
+
+
+@pytest.mark.asyncio
+async def test_provider_ignores_blank_request_id_for_archival(
+    tmp_path: Path,
+) -> None:
+    transport = CapturingTransport(
+        [
+            TossResponse(
+                status_code=200,
+                headers={"X-Request-Id": "   "},
+                json_body={"result": [price_item()]},
+            )
+        ]
+    )
+    store = FileRawMarketDataStore(tmp_path / "raw")
+    provider = TossMarketDataProvider(
+        TossHttpClient("https://example.test", transport=transport),
+        clock=FixedClock(),
+        raw_recorder=store,
+    )
+
+    await provider.get_quote("005930")
+
+    rows = await store.query()
+    assert len(rows) == 1
+    assert rows[0].request_id is None
+    assert rows[0].idempotency_key is None

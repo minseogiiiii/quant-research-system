@@ -1,5 +1,5 @@
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
@@ -8,9 +8,14 @@ from world_quant_system.adapters.toss.errors import TossConfigurationError
 from world_quant_system.adapters.toss.market_data_parser import (
     TossMarketDataParser,
 )
+from world_quant_system.adapters.toss.schemas import TossResponse
 from world_quant_system.broker.market_data import (
     CandleDataProvider,
     MarketDataProvider,
+)
+from world_quant_system.data.raw_market_data import (
+    RawMarketDataCapture,
+    RawMarketDataRecorder,
 )
 from world_quant_system.domain.models import (
     CandleInterval,
@@ -46,6 +51,7 @@ class TossMarketDataProvider(
         *,
         clock: MarketDataClock | None = None,
         future_tolerance: timedelta = timedelta(minutes=5),
+        raw_recorder: RawMarketDataRecorder | None = None,
     ) -> None:
         if not isinstance(future_tolerance, timedelta) or future_tolerance < timedelta(
             0
@@ -60,6 +66,7 @@ class TossMarketDataProvider(
             future_tolerance=future_tolerance,
         )
         self._future_tolerance = future_tolerance
+        self._raw_recorder = raw_recorder
 
     async def get_quote(self, symbol: str) -> Quote:
         quotes = await self.get_quotes([symbol])
@@ -85,9 +92,16 @@ class TossMarketDataProvider(
 
         unique_symbols = tuple(dict.fromkeys(requested))
         now_utc = self._validated_now_utc()
+        endpoint = "/api/v1/prices"
+        params = {"symbols": ",".join(unique_symbols)}
         response = await self._client.get(
-            "/api/v1/prices",
-            params={"symbols": ",".join(unique_symbols)},
+            endpoint,
+            params=params,
+        )
+        await self._record_raw_response(
+            endpoint=endpoint,
+            params=params,
+            response=response,
         )
         parsed = self._parser.parse_quotes(
             response.json_body,
@@ -135,9 +149,15 @@ class TossMarketDataProvider(
         if before is not None:
             params["before"] = before.isoformat()
 
+        endpoint = "/api/v1/candles"
         response = await self._client.get(
-            "/api/v1/candles",
+            endpoint,
             params=params,
+        )
+        await self._record_raw_response(
+            endpoint=endpoint,
+            params=params,
+            response=response,
         )
         return self._parser.parse_candle_page(
             response.json_body,
@@ -146,6 +166,58 @@ class TossMarketDataProvider(
             requested_count=count,
             now_utc=now_utc,
         )
+
+    async def _record_raw_response(
+        self,
+        *,
+        endpoint: str,
+        params: dict[str, str],
+        response: object,
+    ) -> None:
+        recorder = self._raw_recorder
+        if recorder is None:
+            return
+
+        if not isinstance(response, TossResponse):
+            raise TossConfigurationError(
+                "Market-data client returned an unsupported response type."
+            )
+
+        request_id = self._get_header(response.headers, "X-Request-Id")
+        if request_id is not None:
+            request_id = request_id.strip()
+            if not request_id or len(request_id) > 512:
+                request_id = None
+
+        idempotency_key = None
+        if request_id is not None and len(request_id) <= 507:
+            idempotency_key = f"toss:{request_id}"
+
+        await recorder.record(
+            RawMarketDataCapture(
+                provider="toss",
+                endpoint=endpoint,
+                request_params=params,
+                captured_at=self._validated_now_utc(),
+                status_code=response.status_code,
+                response_headers=response.headers,
+                json_body=response.json_body,
+                text=response.text,
+                request_id=request_id,
+                idempotency_key=idempotency_key,
+            )
+        )
+
+    @staticmethod
+    def _get_header(
+        headers: Mapping[str, str],
+        expected_name: str,
+    ) -> str | None:
+        normalized_expected_name = expected_name.casefold()
+        for name, value in headers.items():
+            if name.casefold() == normalized_expected_name:
+                return value
+        return None
 
     @staticmethod
     def _normalize_symbol(symbol: str) -> str:

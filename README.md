@@ -131,3 +131,43 @@ against the official prices and candles contracts:
 The provider only consumes an injected `TossHttpClient`. The default HTTP
 transport and default token issuer still fail closed, so this repository makes
 no real broker request and contains no credential-bearing code.
+
+## Immutable raw market-data archive
+
+The project now includes an opt-in `FileRawMarketDataStore`. When it is injected
+into `TossMarketDataProvider`, each successful prices or candles response is
+archived **before** parsed models are returned. If configured storage fails, the
+provider fails closed rather than returning market data that was not archived.
+
+The archive is intentionally local and broker-neutral:
+
+- append-only gzip-compressed canonical JSON documents
+- UTC date partitioning under `data/raw/blobs/<provider>/YYYY/MM/DD/`
+- SQLite catalog with WAL and full synchronous durability
+- atomic same-filesystem writes and interrupted-write recovery
+- SHA-256 integrity verification on every read
+- request-ID idempotency when Toss provides `X-Request-Id`
+- cross-thread and cross-process writer serialization on macOS/Linux
+- async APIs that move blocking disk work off the event loop
+- strict size limits and JSON type validation
+- redaction of sensitive request parameters and headers
+- rejection of token-, credential-, and account-like response fields
+- no order, account, credential, or live-network functionality
+
+Example wiring for a future read-only collector:
+
+```python
+from world_quant_system.adapters.toss import TossMarketDataProvider
+from world_quant_system.data import FileRawMarketDataStore
+
+raw_store = FileRawMarketDataStore("data/raw")
+provider = TossMarketDataProvider(
+    client,
+    raw_recorder=raw_store,
+)
+```
+
+The current archive preserves the complete parsed JSON response, response text,
+sanitized headers, request parameters, timestamps, and checksums. It does not
+claim byte-for-byte preservation of the original HTTP wire encoding because a
+real transport has not been added yet. `data/` remains excluded from Git.
