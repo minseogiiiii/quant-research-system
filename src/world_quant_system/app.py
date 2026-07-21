@@ -7,8 +7,10 @@ from world_quant_system.config.settings import Settings
 from world_quant_system.domain.models import Position, Quote
 
 
-async def build_demo_report() -> str:
-    settings = Settings()
+async def build_demo_report(
+    settings: Settings | None = None,
+) -> str:
+    app_settings = settings or Settings()
 
     quote = Quote(
         symbol="005930",
@@ -42,7 +44,14 @@ async def build_demo_report() -> str:
 
     return "\n".join(
         [
-            f"Environment: {settings.kis_env.value.upper()}",
+            (
+                "Execution mode: "
+                f"{app_settings.execution_mode.value.upper()}"
+            ),
+            (
+                "Broker provider: "
+                f"{app_settings.broker_provider.value.upper()}"
+            ),
             "Live trading: DISABLED",
             "",
             "Samsung Electronics",
