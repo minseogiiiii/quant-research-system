@@ -111,3 +111,23 @@ Safety properties:
 The test suite includes a deterministic seven-day token lifecycle simulation.
 This is a software state-machine simulation, not an investment-strategy
 backtest and not evidence of trading profitability.
+
+## Networkless Toss market-data provider
+
+The Toss adapter includes a read-only `TossMarketDataProvider` implemented
+against the official prices and candles contracts:
+
+- `GET /api/v1/prices` for one or multiple current prices
+- `GET /api/v1/candles` for `1m` and `1d` OHLCV pages
+- at most 200 symbols or candles per request
+- deterministic symbol normalization and request ordering
+- timezone-aware timestamps with configurable future-skew rejection
+- strict positive finite prices and nonnegative integer volume
+- OHLC range validation, duplicate detection, monotonic ordering checks,
+  currency consistency, pagination validation, and missing-result detection
+- oldest-to-newest candle output for research and replay consumers
+- transparent propagation of authentication, rate-limit, and server errors
+
+The provider only consumes an injected `TossHttpClient`. The default HTTP
+transport and default token issuer still fail closed, so this repository makes
+no real broker request and contains no credential-bearing code.

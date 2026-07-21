@@ -16,6 +16,7 @@ async def build_demo_report(
         symbol="005930",
         price=Decimal("95000"),
         timestamp=datetime.now(UTC),
+        currency="KRW",
         source="mock",
     )
 
@@ -50,7 +51,7 @@ async def build_demo_report(
             "",
             "Samsung Electronics",
             f"Symbol: {latest_quote.symbol}",
-            f"Price: {latest_quote.price:,.0f} KRW",
+            f"Price: {latest_quote.price:,.0f} {latest_quote.currency}",
             f"Source: {latest_quote.source}",
             "",
             "Account positions:",

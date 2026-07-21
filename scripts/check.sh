@@ -56,15 +56,20 @@ from world_quant_system.adapters.toss import (
     HttpMethod,
     TossAdapterError,
     TossHttpClient,
+    TossMarketDataParser,
+    TossMarketDataProvider,
     TokenIssueResponse,
     TossRequest,
     TossResponse,
     TossTokenManager,
 )
+from world_quant_system.domain import Candle, CandleInterval, CandlePage
 
 print(f"Package: {world_quant_system.__file__}")
 print(f"Client: {TossHttpClient.__name__}")
 print(f"Token manager: {TossTokenManager.__name__}")
+print(f"Market data: {TossMarketDataProvider.__name__}, {TossMarketDataParser.__name__}")
+print(f"Domain: {Candle.__name__}, {CandleInterval.__name__}, {CandlePage.__name__}")
 print(f"Token response: {TokenIssueResponse.__name__}")
 print(f"Error: {TossAdapterError.__name__}")
 print(f"Schemas: {HttpMethod.__name__}, {TossRequest.__name__}, {TossResponse.__name__}")
@@ -88,6 +93,7 @@ echo "6/8 Verifying fail-closed network behavior..."
 import asyncio
 from world_quant_system.adapters.toss import (
     TossHttpClient,
+    TossMarketDataProvider,
     TossTokenManager,
     TossTransportError,
 )
@@ -100,6 +106,14 @@ async def verify() -> None:
         assert str(error) == "Network transport is not configured."
     else:
         raise AssertionError("Default transport unexpectedly allowed a request.")
+
+    provider = TossMarketDataProvider(client)
+    try:
+        await provider.get_quote("005930")
+    except TossTransportError as error:
+        assert str(error) == "Network transport is not configured."
+    else:
+        raise AssertionError("Market-data provider unexpectedly allowed a request.")
 
     manager = TossTokenManager()
     try:
