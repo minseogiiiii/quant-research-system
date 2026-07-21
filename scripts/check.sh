@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+unset PYTHONHOME PYTHONPATH
+
 UV_BIN="$(command -v uv || true)"
 if [[ -z "$UV_BIN" ]]; then
     echo "ERROR: uv was not found in PATH."
@@ -27,6 +29,7 @@ unset UV_INDEX UV_INDEX_URL UV_EXTRA_INDEX_URL UV_DEFAULT_INDEX
 
 "$UV_BIN" sync \
     --locked \
+    --no-editable \
     --reinstall-package world-quant-system \
     --default-index https://pypi.org/simple
 
@@ -53,12 +56,16 @@ from world_quant_system.adapters.toss import (
     HttpMethod,
     TossAdapterError,
     TossHttpClient,
+    TokenIssueResponse,
     TossRequest,
     TossResponse,
+    TossTokenManager,
 )
 
 print(f"Package: {world_quant_system.__file__}")
 print(f"Client: {TossHttpClient.__name__}")
+print(f"Token manager: {TossTokenManager.__name__}")
+print(f"Token response: {TokenIssueResponse.__name__}")
 print(f"Error: {TossAdapterError.__name__}")
 print(f"Schemas: {HttpMethod.__name__}, {TossRequest.__name__}, {TossResponse.__name__}")
 '
@@ -81,6 +88,7 @@ echo "6/8 Verifying fail-closed network behavior..."
 import asyncio
 from world_quant_system.adapters.toss import (
     TossHttpClient,
+    TossTokenManager,
     TossTransportError,
 )
 
@@ -92,6 +100,14 @@ async def verify() -> None:
         assert str(error) == "Network transport is not configured."
     else:
         raise AssertionError("Default transport unexpectedly allowed a request.")
+
+    manager = TossTokenManager()
+    try:
+        await manager.get_token()
+    except TossTransportError as error:
+        assert str(error) == "Token issuer is not configured."
+    else:
+        raise AssertionError("Default token issuer unexpectedly issued a token.")
 
 asyncio.run(verify())
 '

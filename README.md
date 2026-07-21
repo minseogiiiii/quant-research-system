@@ -84,3 +84,24 @@ When `.venv` or editable installation metadata is corrupted, use:
 
 Do not delete individual files inside `.venv` and do not run `uv pip install`
 inside this managed project environment.
+
+## Networkless OAuth token manager
+
+The Toss adapter now includes a networkless `TossTokenManager` foundation.
+It deliberately does not know the client ID, client secret, or OAuth endpoint.
+A future issuer adapter must be injected explicitly.
+
+Safety properties:
+
+- Default construction fails closed and cannot contact the network.
+- Concurrent callers share a single token issuance attempt.
+- Tokens refresh before expiry using a monotonic clock.
+- A failed refresh never falls back to a token that may have been invalidated.
+- Access-token representations are masked.
+- No refresh-token workflow is implemented because the official Toss API does
+  not provide refresh tokens; expired tokens are reissued through the token
+  endpoint.
+
+The test suite includes a deterministic seven-day token lifecycle simulation.
+This is a software state-machine simulation, not an investment-strategy
+backtest and not evidence of trading profitability.
