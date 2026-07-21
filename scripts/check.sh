@@ -24,7 +24,6 @@ fi
 echo "1/7 Installing project in non-editable mode..."
 "$UV_BIN" sync \
     --locked \
-    --no-editable \
     --default-index https://pypi.org/simple
 
 PYTHON="$ROOT_DIR/.venv/bin/python"

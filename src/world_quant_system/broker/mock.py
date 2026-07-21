@@ -1,10 +1,14 @@
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 
-from world_quant_system.broker.base import MarketDataProvider, PortfolioReader
+from world_quant_system.broker.market_data import MarketDataProvider
+from world_quant_system.broker.portfolio import PortfolioReader
 from world_quant_system.domain.models import Position, Quote
 
 
-class MockBroker(MarketDataProvider, PortfolioReader):
+class MockBroker(
+    MarketDataProvider,
+    PortfolioReader,
+):
     def __init__(
         self,
         quotes: Mapping[str, Quote] | None = None,
@@ -17,7 +21,18 @@ class MockBroker(MarketDataProvider, PortfolioReader):
         try:
             return self._quotes[symbol]
         except KeyError as error:
-            raise LookupError(f"No quote is available for symbol: {symbol}") from error
+            raise LookupError(
+                f"No quote is available for symbol: {symbol}"
+            ) from error
+
+    async def get_quotes(
+        self,
+        symbols: Sequence[str],
+    ) -> list[Quote]:
+        return [
+            await self.get_quote(symbol)
+            for symbol in symbols
+        ]
 
     async def get_positions(self) -> list[Position]:
         return list(self._positions)
