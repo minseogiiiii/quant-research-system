@@ -13,11 +13,15 @@ dependencies = [
 world-quant-system = "world_quant_system.app:main"
 
 [build-system]
-requires = ["hatchling>=1.27,<2"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=80,<83"]
+build-backend = "setuptools.build_meta"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/world_quant_system"]
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["world_quant_system*"]
 
 [dependency-groups]
 dev = [
@@ -29,7 +33,12 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["-ra", "--strict-config", "--strict-markers"]
+addopts = [
+    "-ra",
+    "--strict-config",
+    "--strict-markers",
+    "--import-mode=importlib",
+]
 
 [tool.ruff]
 target-version = "py312"
@@ -42,7 +51,3 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 python_version = "3.12"
 strict = true
 warn_unreachable = true
-
-[tool.uv]
-package = true
-reinstall-package = ["world-quant-system"]

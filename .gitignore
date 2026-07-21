@@ -1,31 +1,28 @@
 # Python
 __pycache__/
 *.py[cod]
-*.egg-info/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 
-# Virtual environments and build output
+# Virtual environments
 .venv/
-dist/
-build/
 
-# Secrets and local configuration
-.env
-.env.*
-!.env.example
-secrets/
-*.key
-*.pem
+# Build artifacts
+build/
+dist/
+*.egg-info/
 
 # Local data and logs
 data/
 logs/
-*.db
-*.sqlite
-*.sqlite3
+
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
 
 # macOS and editors
 .DS_Store
 .vscode/
+.idea/

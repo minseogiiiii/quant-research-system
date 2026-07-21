@@ -1,16 +1,19 @@
 # World Quant System
 
-Broker-neutral foundation for a quantitative trading system designed around three priorities:
+Broker-neutral foundation for a quantitative trading system built around:
 
 1. Research efficiency
-2. Risk-controlled execution
+2. Deterministic risk controls
 3. Broker independence
+4. Fail-closed integrations
 
-The current project is intentionally limited to a safe mock environment. It contains no live-order API and no real brokerage credentials.
+The current project is intentionally limited to mock and networkless behavior.
+It contains no live-order API, access token, brokerage credential, or real HTTP
+transport.
 
-## Current modes
+## Current execution modes
 
-- `mock`: deterministic in-memory test data
+- `mock`: deterministic in-memory data
 - `replay`: reserved for historical-data playback
 - `shadow`: reserved for read-only broker data
 - `live`: intentionally blocked
@@ -19,19 +22,25 @@ The current project is intentionally limited to a safe mock environment. It cont
 
 ```bash
 uv python install 3.12
-uv sync
+uv sync --locked
 ```
 
-Do not mix `uv pip install -e .` with the project workflow. Use `uv sync` and `uv run` so the lockfile and environment remain consistent.
+Do not modify `.venv` with `pip` or `uv pip`. Let the uv project workflow manage
+it.
 
 ## Run
 
 ```bash
-uv run python -m world_quant_system
-uv run world-quant-system
+./scripts/run.sh
 ```
 
-Both commands must print `Execution mode: MOCK` and `Live trading: DISABLED`.
+Expected safety indicators:
+
+```text
+Execution mode: MOCK
+Broker provider: NONE
+Live trading: DISABLED
+```
 
 ## Validate everything
 
@@ -39,11 +48,39 @@ Both commands must print `Execution mode: MOCK` and `Live trading: DISABLED`.
 ./scripts/check.sh
 ```
 
-The check script performs a locked environment sync, unit tests, package-entrypoint smoke tests, Ruff, mypy, and both application entrypoints.
+The check script performs a locked sync, forces the local project package to be
+reinstalled, verifies imports from outside the repository, compiles source and
+tests, runs pytest, Ruff, mypy, validates the network kill switch, and checks
+both application entry points.
+
+## Current Toss adapter scope
+
+The Toss adapter currently provides only:
+
+- immutable request and response models
+- typed, sanitized exception classes
+- an injected transport protocol
+- a default `NoNetworkTransport` that always refuses requests
+- deterministic HTTP status-to-error mapping
+
+There is no real HTTP implementation, OAuth flow, account access, or order
+execution.
 
 ## Security rules
 
-- Never commit `.env.local` or any brokerage secret.
+- Never commit `.env.local`, tokens, account identifiers, or brokerage secrets.
 - Never give an LLM access to live brokerage credentials.
-- Do not add an order endpoint before a deterministic risk gate and reconciliation system exist.
-- Keep broker-specific code behind broker-neutral interfaces.
+- Keep default integrations fail-closed.
+- Do not add order submission before deterministic risk gates and account
+  reconciliation exist.
+
+## Recover a damaged environment
+
+When `.venv` or editable installation metadata is corrupted, use:
+
+```bash
+./scripts/reset_env.sh
+```
+
+Do not delete individual files inside `.venv` and do not run `uv pip install`
+inside this managed project environment.
