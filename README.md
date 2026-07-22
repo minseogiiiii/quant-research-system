@@ -171,3 +171,78 @@ The current archive preserves the complete parsed JSON response, response text,
 sanitized headers, request parameters, timestamps, and checksums. It does not
 claim byte-for-byte preservation of the original HTTP wire encoding because a
 real transport has not been added yet. `data/` remains excluded from Git.
+
+
+## Data quality gate and quarantine index
+
+The read-only market-data path now supports an opt-in `MarketDataQualityGate`.
+It verifies the immutable raw record before assessing parsed quotes or candles,
+persists a deterministic report, and blocks only `QUARANTINE` results. `WARNING`
+results remain available to research consumers so legitimate volatility and
+other possible alpha are not silently discarded.
+
+Statuses are deliberately conservative:
+
+- `PASS`: no quality issue was detected.
+- `WARNING`: usable for research, but the report records conditions such as a
+  stale quote, unusual candle gap, extreme return, wide range, zero-volume run,
+  or flatline run.
+- `QUARANTINE`: unusable. Examples include raw-file integrity failure, metadata
+  mismatch, endpoint mismatch, strict parse failure, future timestamp, or
+  source mismatch.
+
+Quality reports are stored separately from raw market data:
+
+```text
+data/
+├── raw/                  # immutable gzip JSON and raw catalog
+└── quality/
+    └── quality.sqlite3   # durable PASS/WARNING/QUARANTINE reports
+```
+
+The quality catalog uses SQLite WAL mode, full synchronous durability,
+connection closing after every operation, canonical JSON, SHA-256 verification,
+and a semantic fingerprint. Temporal checks are anchored to the raw capture
+time, so reprocessing the same immutable record later remains deterministic.
+The assessment key includes the raw record ID, raw content digest, dataset kind,
+validator version, and a fingerprint of the active quality policy. Repeated
+assessment is idempotent, while a policy change creates a distinct assessment
+instead of silently reusing old results.
+
+Example wiring:
+
+```python
+from world_quant_system.adapters.toss import TossMarketDataProvider
+from world_quant_system.data import (
+    FileRawMarketDataStore,
+    MarketDataQualityGate,
+    SQLiteDataQualityStore,
+)
+
+raw_store = FileRawMarketDataStore("data/raw")
+quality_store = SQLiteDataQualityStore("data/quality")
+quality_gate = MarketDataQualityGate(raw_store, quality_store)
+
+provider = TossMarketDataProvider(
+    client,
+    raw_recorder=raw_store,
+    quality_gate=quality_gate,
+)
+```
+
+The quality thresholds are policy inputs, not trading signals. They can be
+changed only through an explicit `DataQualityPolicy`; the defaults preserve
+large legitimate price moves as warnings rather than quarantining them.
+
+Run the deterministic data-quality simulation with:
+
+```bash
+.venv/bin/python scripts/quality_gate_backtest.py
+```
+
+The simulation covers clean quotes and candles, empty responses, stale and
+future timestamps, source mismatches, extreme moves, wide ranges, candle gaps,
+zero-volume runs, and flatline runs. It checks exact classifications, unsafe-
+case recall, false quarantines, and preservation of potentially valuable
+high-volatility observations. This is a data-quality state-machine backtest,
+not an investment-strategy profitability backtest.

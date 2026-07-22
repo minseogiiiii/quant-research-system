@@ -1,3 +1,34 @@
+from world_quant_system.data.quality_backtest import (
+    QualityBacktestResult,
+    run_quality_gate_backtest,
+)
+from world_quant_system.data.quality_gate import (
+    MarketDataQualityGate,
+    QualityClock,
+    RawMarketDataVerifier,
+    SystemQualityClock,
+)
+from world_quant_system.data.quality_models import (
+    DataQualityConfigurationError,
+    DataQualityError,
+    DataQualityPolicy,
+    DataQualityRejectedError,
+    DataQualityReport,
+    DataQualityReportNotFoundError,
+    DataQualityReportReader,
+    DataQualityReportWriter,
+    DataQualityStoreConflictError,
+    DataQualityStoreError,
+    DataQualityStoreIntegrityError,
+    QualityAssessment,
+    QualityDatasetKind,
+    QualityIssue,
+    QualityIssueCode,
+    QualitySeverity,
+    QualityStatus,
+)
+from world_quant_system.data.quality_store import SQLiteDataQualityStore
+from world_quant_system.data.quality_validator import DataQualityValidator
 from world_quant_system.data.raw_market_data import (
     FileRawMarketDataStore,
     RawMarketDataCapture,
@@ -13,7 +44,28 @@ from world_quant_system.data.raw_market_data import (
 )
 
 __all__ = [
+    "DataQualityConfigurationError",
+    "DataQualityError",
+    "DataQualityPolicy",
+    "DataQualityRejectedError",
+    "DataQualityReport",
+    "DataQualityReportNotFoundError",
+    "DataQualityReportReader",
+    "DataQualityReportWriter",
+    "DataQualityStoreConflictError",
+    "DataQualityStoreError",
+    "DataQualityStoreIntegrityError",
+    "DataQualityValidator",
     "FileRawMarketDataStore",
+    "MarketDataQualityGate",
+    "QualityAssessment",
+    "QualityBacktestResult",
+    "QualityClock",
+    "QualityDatasetKind",
+    "QualityIssue",
+    "QualityIssueCode",
+    "QualitySeverity",
+    "QualityStatus",
     "RawMarketDataCapture",
     "RawMarketDataConfigurationError",
     "RawMarketDataConflictError",
@@ -24,4 +76,8 @@ __all__ = [
     "RawMarketDataRecord",
     "RawMarketDataRecorder",
     "RawMarketDataSerializationError",
+    "RawMarketDataVerifier",
+    "SQLiteDataQualityStore",
+    "SystemQualityClock",
+    "run_quality_gate_backtest",
 ]

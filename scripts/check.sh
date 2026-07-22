@@ -45,7 +45,7 @@ for executable in "$PYTHON" "$RUFF" "$MYPY" "$CONSOLE"; do
     fi
 done
 
-echo "1/8 Verifying the installed package outside the repository..."
+echo "1/9 Verifying the installed package outside the repository..."
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 (
@@ -64,36 +64,60 @@ from world_quant_system.adapters.toss import (
     TossTokenManager,
 )
 from world_quant_system.data import (
+    DataQualityValidator,
     FileRawMarketDataStore,
+    MarketDataQualityGate,
+    QualityStatus,
     RawMarketDataCapture,
+    SQLiteDataQualityStore,
 )
 from world_quant_system.domain import Candle, CandleInterval, CandlePage
 
 print(f"Package: {world_quant_system.__file__}")
 print(f"Client: {TossHttpClient.__name__}")
 print(f"Token manager: {TossTokenManager.__name__}")
-print(f"Market data: {TossMarketDataProvider.__name__}, {TossMarketDataParser.__name__}")
+print(
+    "Market data: "
+    f"{TossMarketDataProvider.__name__}, "
+    f"{TossMarketDataParser.__name__}"
+)
 print(f"Domain: {Candle.__name__}, {CandleInterval.__name__}, {CandlePage.__name__}")
-print(f"Raw storage: {FileRawMarketDataStore.__name__}, {RawMarketDataCapture.__name__}")
+print(
+    "Raw storage: "
+    f"{FileRawMarketDataStore.__name__}, "
+    f"{RawMarketDataCapture.__name__}"
+)
+print(
+    "Quality gate: "
+    f"{MarketDataQualityGate.__name__}, "
+    f"{DataQualityValidator.__name__}, "
+    f"{SQLiteDataQualityStore.__name__}, "
+    f"{QualityStatus.__name__}"
+)
 print(f"Token response: {TokenIssueResponse.__name__}")
 print(f"Error: {TossAdapterError.__name__}")
-print(f"Schemas: {HttpMethod.__name__}, {TossRequest.__name__}, {TossResponse.__name__}")
+print(
+    "Schemas: "
+    f"{HttpMethod.__name__}, "
+    f"{TossRequest.__name__}, "
+    f"{TossResponse.__name__}"
+)
 '
 )
 
-echo "2/8 Compiling source and tests..."
+echo "2/9 Compiling source and tests..."
 "$PYTHON" -m compileall -q src tests
 
-echo "3/8 Running tests..."
+echo "3/9 Running tests..."
 "$PYTHON" -m pytest -q
 
-echo "4/8 Running Ruff..."
+echo "4/9 Running Ruff..."
 "$RUFF" check .
 
-echo "5/8 Running mypy..."
+echo "5/9 Running mypy..."
 "$MYPY" src tests
 
-echo "6/8 Verifying fail-closed network behavior..."
+echo "6/9 Verifying fail-closed network behavior..."
 "$PYTHON" -c '
 import asyncio
 import tempfile
@@ -107,7 +131,10 @@ from world_quant_system.adapters.toss import (
 )
 from world_quant_system.data import (
     FileRawMarketDataStore,
+    MarketDataQualityGate,
+    QualityStatus,
     RawMarketDataCapture,
+    SQLiteDataQualityStore,
 )
 
 async def verify() -> None:
@@ -154,17 +181,30 @@ async def verify() -> None:
         assert record.metadata == metadata
         assert record.json_body == {"result": []}
 
+        quality_store = SQLiteDataQualityStore(f"{directory}/quality")
+        quality_gate = MarketDataQualityGate(store, quality_store)
+        report = await quality_gate.assess_parse_failure(
+            metadata,
+            expected_endpoint="/api/v1/prices",
+        )
+        assert report.status is QualityStatus.QUARANTINE
+        stored_report = await quality_store.get(report.report_id)
+        assert stored_report == report
+
 asyncio.run(verify())
 '
 
-echo "7/8 Testing module entry point..."
+echo "7/9 Running deterministic data-quality simulation..."
+"$PYTHON" scripts/quality_gate_backtest.py
+
+echo "8/9 Testing module entry point..."
 MODULE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 \
         "$PYTHON" -m world_quant_system
 )"
 
-echo "8/8 Testing console entry point..."
+echo "9/9 Testing console entry point..."
 CONSOLE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$CONSOLE"

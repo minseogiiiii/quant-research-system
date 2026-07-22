@@ -11,12 +11,16 @@ build/
 dist/
 *.egg-info/
 
-# Local secrets and runtime state
+# Secrets and local configuration
 .env
 .env.*
 !.env.example
-/data/
-logs/
 
-# macOS
+# Local market data and runtime output
+/data/
+/logs/
+
+# Local transfer artifacts
+*.zip
+*.patch
 .DS_Store

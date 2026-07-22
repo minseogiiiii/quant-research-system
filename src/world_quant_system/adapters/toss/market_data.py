@@ -4,7 +4,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 from world_quant_system.adapters.toss.client import TossHttpClient
-from world_quant_system.adapters.toss.errors import TossConfigurationError
+from world_quant_system.adapters.toss.errors import (
+    TossConfigurationError,
+    TossInvalidResponseError,
+)
 from world_quant_system.adapters.toss.market_data_parser import (
     TossMarketDataParser,
 )
@@ -13,8 +16,14 @@ from world_quant_system.broker.market_data import (
     CandleDataProvider,
     MarketDataProvider,
 )
+from world_quant_system.data.quality_gate import MarketDataQualityGate
+from world_quant_system.data.quality_models import (
+    DataQualityRejectedError,
+    QualityStatus,
+)
 from world_quant_system.data.raw_market_data import (
     RawMarketDataCapture,
+    RawMarketDataMetadata,
     RawMarketDataRecorder,
 )
 from world_quant_system.domain.models import (
@@ -52,6 +61,7 @@ class TossMarketDataProvider(
         clock: MarketDataClock | None = None,
         future_tolerance: timedelta = timedelta(minutes=5),
         raw_recorder: RawMarketDataRecorder | None = None,
+        quality_gate: MarketDataQualityGate | None = None,
     ) -> None:
         if not isinstance(future_tolerance, timedelta) or future_tolerance < timedelta(
             0
@@ -66,7 +76,13 @@ class TossMarketDataProvider(
             future_tolerance=future_tolerance,
         )
         self._future_tolerance = future_tolerance
+        if quality_gate is not None and raw_recorder is None:
+            raise TossConfigurationError(
+                "Quality gate requires a raw market-data recorder."
+            )
+
         self._raw_recorder = raw_recorder
+        self._quality_gate = quality_gate
 
     async def get_quote(self, symbol: str) -> Quote:
         quotes = await self.get_quotes([symbol])
@@ -98,16 +114,33 @@ class TossMarketDataProvider(
             endpoint,
             params=params,
         )
-        await self._record_raw_response(
+        metadata = await self._record_raw_response(
             endpoint=endpoint,
             params=params,
             response=response,
         )
-        parsed = self._parser.parse_quotes(
-            response.json_body,
-            expected_symbols=unique_symbols,
-            now_utc=now_utc,
-        )
+        try:
+            parsed = self._parser.parse_quotes(
+                response.json_body,
+                expected_symbols=unique_symbols,
+                now_utc=now_utc,
+            )
+        except TossInvalidResponseError:
+            if self._quality_gate is not None and metadata is not None:
+                await self._quality_gate.assess_parse_failure(
+                    metadata,
+                    expected_endpoint=endpoint,
+                )
+            raise
+
+        if self._quality_gate is not None and metadata is not None:
+            report = await self._quality_gate.assess_quotes(
+                metadata,
+                tuple(parsed.values()),
+            )
+            if report.status is QualityStatus.QUARANTINE:
+                raise DataQualityRejectedError(report.report_id)
+
         return [parsed[symbol] for symbol in requested]
 
     async def get_candles(
@@ -154,18 +187,33 @@ class TossMarketDataProvider(
             endpoint,
             params=params,
         )
-        await self._record_raw_response(
+        metadata = await self._record_raw_response(
             endpoint=endpoint,
             params=params,
             response=response,
         )
-        return self._parser.parse_candle_page(
-            response.json_body,
-            symbol=normalized_symbol,
-            interval=interval,
-            requested_count=count,
-            now_utc=now_utc,
-        )
+        try:
+            page = self._parser.parse_candle_page(
+                response.json_body,
+                symbol=normalized_symbol,
+                interval=interval,
+                requested_count=count,
+                now_utc=now_utc,
+            )
+        except TossInvalidResponseError:
+            if self._quality_gate is not None and metadata is not None:
+                await self._quality_gate.assess_parse_failure(
+                    metadata,
+                    expected_endpoint=endpoint,
+                )
+            raise
+
+        if self._quality_gate is not None and metadata is not None:
+            report = await self._quality_gate.assess_candle_page(metadata, page)
+            if report.status is QualityStatus.QUARANTINE:
+                raise DataQualityRejectedError(report.report_id)
+
+        return page
 
     async def _record_raw_response(
         self,
@@ -173,10 +221,10 @@ class TossMarketDataProvider(
         endpoint: str,
         params: dict[str, str],
         response: object,
-    ) -> None:
+    ) -> RawMarketDataMetadata | None:
         recorder = self._raw_recorder
         if recorder is None:
-            return
+            return None
 
         if not isinstance(response, TossResponse):
             raise TossConfigurationError(
@@ -193,7 +241,7 @@ class TossMarketDataProvider(
         if request_id is not None and len(request_id) <= 507:
             idempotency_key = f"toss:{request_id}"
 
-        await recorder.record(
+        return await recorder.record(
             RawMarketDataCapture(
                 provider="toss",
                 endpoint=endpoint,
