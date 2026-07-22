@@ -45,7 +45,7 @@ for executable in "$PYTHON" "$RUFF" "$MYPY" "$CONSOLE"; do
     fi
 done
 
-echo "1/9 Verifying the installed package outside the repository..."
+echo "1/10 Verifying the installed package outside the repository..."
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 (
@@ -66,12 +66,16 @@ from world_quant_system.adapters.toss import (
 from world_quant_system.data import (
     DataQualityValidator,
     FileRawMarketDataStore,
+    MarketDataNormalizer,
     MarketDataQualityGate,
+    NormalizedCandleRecord,
     QualityStatus,
     RawMarketDataCapture,
     SQLiteDataQualityStore,
+    SQLiteNormalizedMarketDataStore,
 )
 from world_quant_system.domain import Candle, CandleInterval, CandlePage
+from world_quant_system.replay import DeterministicReplayEngine, ReplayConfig
 
 print(f"Package: {world_quant_system.__file__}")
 print(f"Client: {TossHttpClient.__name__}")
@@ -94,6 +98,17 @@ print(
     f"{SQLiteDataQualityStore.__name__}, "
     f"{QualityStatus.__name__}"
 )
+print(
+    "Normalized data: "
+    f"{MarketDataNormalizer.__name__}, "
+    f"{SQLiteNormalizedMarketDataStore.__name__}, "
+    f"{NormalizedCandleRecord.__name__}"
+)
+print(
+    "Replay: "
+    f"{DeterministicReplayEngine.__name__}, "
+    f"{ReplayConfig.__name__}"
+)
 print(f"Token response: {TokenIssueResponse.__name__}")
 print(f"Error: {TossAdapterError.__name__}")
 print(
@@ -105,19 +120,20 @@ print(
 '
 )
 
-echo "2/9 Compiling source and tests..."
+echo "2/10 Compiling source and tests..."
 "$PYTHON" -m compileall -q src tests
 
-echo "3/9 Running tests..."
+echo "3/10 Running tests..."
 "$PYTHON" -m pytest -q
 
-echo "4/9 Running Ruff..."
+echo "4/10 Running Ruff..."
+rm -rf build dist
 "$RUFF" check .
 
-echo "5/9 Running mypy..."
+echo "5/10 Running mypy..."
 "$MYPY" src tests
 
-echo "6/9 Verifying fail-closed network behavior..."
+echo "6/10 Verifying fail-closed network behavior..."
 "$PYTHON" -c '
 import asyncio
 import tempfile
@@ -131,11 +147,16 @@ from world_quant_system.adapters.toss import (
 )
 from world_quant_system.data import (
     FileRawMarketDataStore,
+    MarketDataNormalizer,
     MarketDataQualityGate,
     QualityStatus,
     RawMarketDataCapture,
     SQLiteDataQualityStore,
+    SQLiteNormalizedMarketDataStore,
 )
+from world_quant_system.domain import Candle, CandleInterval, CandlePage
+from world_quant_system.replay import DeterministicReplayEngine, ReplayConfig
+from decimal import Decimal
 
 async def verify() -> None:
     client = TossHttpClient("https://example.test")
@@ -191,20 +212,71 @@ async def verify() -> None:
         stored_report = await quality_store.get(report.report_id)
         assert stored_report == report
 
+        normalized_store = SQLiteNormalizedMarketDataStore(
+            f"{directory}/normalized"
+        )
+        normalizer = MarketDataNormalizer(normalized_store)
+        candle = Candle(
+            symbol="005930",
+            interval=CandleInterval.DAY_1,
+            timestamp=datetime(2026, 7, 20, tzinfo=UTC),
+            open_price=Decimal("95000"),
+            high_price=Decimal("96000"),
+            low_price=Decimal("94000"),
+            close_price=Decimal("95500"),
+            volume=1000,
+            currency="KRW",
+            source="toss",
+        )
+        candle_metadata = await store.record(
+            RawMarketDataCapture(
+                provider="toss",
+                endpoint="/api/v1/candles",
+                request_params={"symbol": "005930", "interval": "1d"},
+                captured_at=datetime(2026, 7, 21, tzinfo=UTC),
+                status_code=200,
+                response_headers={"X-Request-Id": "check-candle"},
+                json_body={"result": []},
+                request_id="check-candle",
+                idempotency_key="check-candle",
+            )
+        )
+        candle_report = await quality_gate.assess_candle_page(
+            candle_metadata,
+            CandlePage((candle,), None),
+        )
+        assert candle_report.status is not QualityStatus.QUARANTINE
+        records = await normalizer.normalize_candle_page(
+            candle_report,
+            CandlePage((candle,), None),
+        )
+        assert len(records) == 1
+        replay = await DeterministicReplayEngine(
+            normalized_store,
+            ReplayConfig(
+                symbols=("005930",),
+                interval=CandleInterval.DAY_1,
+            ),
+        ).run()
+        assert replay.event_count == 1
+
 asyncio.run(verify())
 '
 
-echo "7/9 Running deterministic data-quality simulation..."
+echo "7/10 Running deterministic data-quality simulation..."
 "$PYTHON" scripts/quality_gate_backtest.py
 
-echo "8/9 Testing module entry point..."
+echo "8/10 Running normalized-storage replay simulation..."
+"$PYTHON" scripts/normalized_replay_backtest.py
+
+echo "9/10 Testing module entry point..."
 MODULE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 \
         "$PYTHON" -m world_quant_system
 )"
 
-echo "9/9 Testing console entry point..."
+echo "10/10 Testing console entry point..."
 CONSOLE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$CONSOLE"

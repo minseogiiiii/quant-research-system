@@ -17,10 +17,12 @@ from world_quant_system.data import (
     DataQualityRejectedError,
     DataQualityValidator,
     FileRawMarketDataStore,
+    MarketDataNormalizer,
     MarketDataQualityGate,
     QualityDatasetKind,
     QualityStatus,
     SQLiteDataQualityStore,
+    SQLiteNormalizedMarketDataStore,
 )
 
 NOW = datetime(2026, 7, 21, 12, 0, tzinfo=UTC)
@@ -151,3 +153,47 @@ async def test_parse_failure_is_persisted_as_quarantine(tmp_path: Path) -> None:
     reports = await store.quarantined()
     assert len(reports) == 1
     assert reports[0].dataset_kind is QualityDatasetKind.PARSE_FAILURE
+
+
+def test_normalizer_requires_quality_gate(tmp_path: Path) -> None:
+    client = TossHttpClient("https://example.test")
+    normalizer = MarketDataNormalizer(
+        SQLiteNormalizedMarketDataStore(tmp_path / "normalized"),
+        clock=FixedClock(),
+    )
+
+    with pytest.raises(TossConfigurationError, match="quality gate"):
+        TossMarketDataProvider(client, normalizer=normalizer)
+
+
+@pytest.mark.asyncio
+async def test_quality_approved_quote_is_normalized_before_return(
+    tmp_path: Path,
+) -> None:
+    raw_store = FileRawMarketDataStore(tmp_path / "raw")
+    quality_store = SQLiteDataQualityStore(tmp_path / "quality")
+    normalized_store = SQLiteNormalizedMarketDataStore(tmp_path / "normalized")
+    gate = MarketDataQualityGate(
+        raw_store,
+        quality_store,
+        clock=FixedClock(),
+    )
+    normalizer = MarketDataNormalizer(normalized_store, clock=FixedClock())
+    provider = TossMarketDataProvider(
+        TossHttpClient(
+            "https://example.test",
+            transport=CapturingTransport(
+                [response(timestamp="2026-07-21T12:00:00+00:00")]
+            ),
+        ),
+        clock=FixedClock(),
+        raw_recorder=raw_store,
+        quality_gate=gate,
+        normalizer=normalizer,
+    )
+
+    quote = await provider.get_quote("005930")
+    stored = await normalized_store.latest_quote("005930")
+
+    assert stored.quote == quote
+    assert stored.quality_status is QualityStatus.PASS

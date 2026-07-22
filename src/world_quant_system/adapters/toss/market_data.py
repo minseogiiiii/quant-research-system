@@ -16,6 +16,7 @@ from world_quant_system.broker.market_data import (
     CandleDataProvider,
     MarketDataProvider,
 )
+from world_quant_system.data.normalizer import MarketDataNormalizer
 from world_quant_system.data.quality_gate import MarketDataQualityGate
 from world_quant_system.data.quality_models import (
     DataQualityRejectedError,
@@ -62,6 +63,7 @@ class TossMarketDataProvider(
         future_tolerance: timedelta = timedelta(minutes=5),
         raw_recorder: RawMarketDataRecorder | None = None,
         quality_gate: MarketDataQualityGate | None = None,
+        normalizer: MarketDataNormalizer | None = None,
     ) -> None:
         if not isinstance(future_tolerance, timedelta) or future_tolerance < timedelta(
             0
@@ -80,9 +82,14 @@ class TossMarketDataProvider(
             raise TossConfigurationError(
                 "Quality gate requires a raw market-data recorder."
             )
+        if normalizer is not None and quality_gate is None:
+            raise TossConfigurationError(
+                "Normalizer requires a configured data-quality gate."
+            )
 
         self._raw_recorder = raw_recorder
         self._quality_gate = quality_gate
+        self._normalizer = normalizer
 
     async def get_quote(self, symbol: str) -> Quote:
         quotes = await self.get_quotes([symbol])
@@ -134,12 +141,15 @@ class TossMarketDataProvider(
             raise
 
         if self._quality_gate is not None and metadata is not None:
+            unique_quotes = tuple(parsed.values())
             report = await self._quality_gate.assess_quotes(
                 metadata,
-                tuple(parsed.values()),
+                unique_quotes,
             )
             if report.status is QualityStatus.QUARANTINE:
                 raise DataQualityRejectedError(report.report_id)
+            if self._normalizer is not None:
+                await self._normalizer.normalize_quotes(report, unique_quotes)
 
         return [parsed[symbol] for symbol in requested]
 
@@ -212,6 +222,8 @@ class TossMarketDataProvider(
             report = await self._quality_gate.assess_candle_page(metadata, page)
             if report.status is QualityStatus.QUARANTINE:
                 raise DataQualityRejectedError(report.report_id)
+            if self._normalizer is not None:
+                await self._normalizer.normalize_candle_page(report, page)
 
         return page
 

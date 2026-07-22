@@ -14,7 +14,7 @@ transport.
 ## Current execution modes
 
 - `mock`: deterministic in-memory data
-- `replay`: reserved for historical-data playback
+- `replay`: deterministic normalized-candle playback foundation
 - `shadow`: reserved for read-only broker data
 - `live`: intentionally blocked
 
@@ -246,3 +246,60 @@ zero-volume runs, and flatline runs. It checks exact classifications, unsafe-
 case recall, false quarantines, and preservation of potentially valuable
 high-volatility observations. This is a data-quality state-machine backtest,
 not an investment-strategy profitability backtest.
+
+## Versioned normalized storage and deterministic replay
+
+Quality-approved data can now be written to an opt-in
+`SQLiteNormalizedMarketDataStore`. The normalized catalog is separate from the
+immutable raw archive and quality reports:
+
+```text
+data/
+├── raw/
+├── quality/
+└── normalized/
+    └── normalized.sqlite3
+```
+
+The storage path is designed for reproducible research rather than order
+execution:
+
+- only `PASS` and `WARNING` datasets can enter normalized storage
+- `QUARANTINE` data is rejected before any write
+- Decimal prices and timezone-aware UTC event times are preserved exactly
+- deterministic item IDs make repeated writes idempotent
+- a conflicting rewrite of the same source/symbol/interval/timestamp is blocked
+- every item retains raw-record, raw SHA-256, quality-report, quality-status,
+  normalizer-version, and normalization-time lineage
+- multiple equivalent source observations add lineage instead of duplicating
+  the canonical candle
+- any warning lineage makes the canonical item conservatively `WARNING`
+- canonical JSON and SHA-256 protect catalog contents from silent corruption
+- SQLite WAL, `synchronous=FULL`, bounded queries, batch transactions, and
+  connection closing support durable concurrent use
+- candle scans are cursor-paged in deterministic order by timestamp, symbol,
+  and item ID
+
+`MarketDataNormalizer` can be connected to `TossMarketDataProvider` only when a
+quality gate is also configured. When enabled, raw capture, quality assessment,
+and normalization all complete before data is returned to the caller.
+
+The `DeterministicReplayEngine` reads only normalized candles. It has no broker
+transport and no order API. It advances a monotonic replay clock, never emits
+the same item twice, does not move backward in time, and produces a SHA-256
+event digest. `WARNING` data is included by default to avoid deleting possible
+alpha events, but a PASS-only replay can be requested explicitly.
+
+Run the normalized-storage and replay integrity simulation with:
+
+```bash
+.venv/bin/python scripts/normalized_replay_backtest.py
+```
+
+The simulation checks 2,000 synthetic normalized candles, deterministic replay
+across different page boundaries, warning-event preservation, PASS-only
+filtering, idempotent duplicate writes, conflicting rewrite rejection, and
+quarantine rejection. This is a storage and replay integrity backtest. It does
+not estimate strategy returns, Sharpe ratio, or future profitability. Those
+metrics require historical market data, transaction-cost assumptions, and a
+strategy implemented in the next research phase.
