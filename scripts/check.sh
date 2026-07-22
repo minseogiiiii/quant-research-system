@@ -37,21 +37,30 @@ PYTHON="$ROOT_DIR/.venv/bin/python"
 RUFF="$ROOT_DIR/.venv/bin/ruff"
 MYPY="$ROOT_DIR/.venv/bin/mypy"
 CONSOLE="$ROOT_DIR/.venv/bin/world-quant-system"
+WQS="$ROOT_DIR/.venv/bin/wqs"
 
-for executable in "$PYTHON" "$RUFF" "$MYPY" "$CONSOLE"; do
+for executable in "$PYTHON" "$RUFF" "$MYPY" "$CONSOLE" "$WQS"; do
     if [[ ! -x "$executable" ]]; then
         echo "ERROR: Required executable is missing: $executable"
         exit 1
     fi
 done
 
-echo "1/10 Verifying the installed package outside the repository..."
+echo "1/12 Verifying the installed package outside the repository..."
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 (
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$PYTHON" -c '
 import world_quant_system
+from world_quant_system.backtest import (
+    AtomicJsonBacktestSummaryWriter,
+    BacktestConfig,
+    BuyAndHoldStrategy,
+    NextOpenExecutionModel,
+    SmaCrossoverStrategy,
+    StrategyBacktestEngine,
+)
 from world_quant_system.adapters.toss import (
     HttpMethod,
     TossAdapterError,
@@ -109,6 +118,15 @@ print(
     f"{DeterministicReplayEngine.__name__}, "
     f"{ReplayConfig.__name__}"
 )
+print(
+    "Backtest: "
+    f"{StrategyBacktestEngine.__name__}, "
+    f"{BacktestConfig.__name__}, "
+    f"{NextOpenExecutionModel.__name__}, "
+    f"{BuyAndHoldStrategy.__name__}, "
+    f"{SmaCrossoverStrategy.__name__}, "
+    f"{AtomicJsonBacktestSummaryWriter.__name__}"
+)
 print(f"Token response: {TokenIssueResponse.__name__}")
 print(f"Error: {TossAdapterError.__name__}")
 print(
@@ -120,25 +138,33 @@ print(
 '
 )
 
-echo "2/10 Compiling source and tests..."
+echo "2/12 Compiling source and tests..."
 "$PYTHON" -m compileall -q src tests
 
-echo "3/10 Running tests..."
+echo "3/12 Running tests..."
 "$PYTHON" -m pytest -q
 
-echo "4/10 Running Ruff..."
+echo "4/12 Running Ruff..."
 rm -rf build dist
 "$RUFF" check .
 
-echo "5/10 Running mypy..."
+echo "5/12 Running mypy..."
 "$MYPY" src tests
 
-echo "6/10 Verifying fail-closed network behavior..."
+echo "6/12 Verifying fail-closed network behavior..."
 "$PYTHON" -c '
 import asyncio
 import tempfile
 from datetime import UTC, datetime
 
+from world_quant_system.backtest import (
+    AtomicJsonBacktestSummaryWriter,
+    BacktestConfig,
+    BuyAndHoldStrategy,
+    NextOpenExecutionModel,
+    SmaCrossoverStrategy,
+    StrategyBacktestEngine,
+)
 from world_quant_system.adapters.toss import (
     TossHttpClient,
     TossMarketDataProvider,
@@ -263,20 +289,23 @@ async def verify() -> None:
 asyncio.run(verify())
 '
 
-echo "7/10 Running deterministic data-quality simulation..."
+echo "7/12 Running deterministic data-quality simulation..."
 "$PYTHON" scripts/quality_gate_backtest.py
 
-echo "8/10 Running normalized-storage replay simulation..."
+echo "8/12 Running normalized-storage replay simulation..."
 "$PYTHON" scripts/normalized_replay_backtest.py
 
-echo "9/10 Testing module entry point..."
+echo "9/12 Running deterministic strategy backtest simulation..."
+"$PYTHON" scripts/strategy_backtest.py
+
+echo "10/12 Testing module entry point..."
 MODULE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 \
         "$PYTHON" -m world_quant_system
 )"
 
-echo "10/10 Testing console entry point..."
+echo "11/12 Testing console entry point..."
 CONSOLE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$CONSOLE"
@@ -287,6 +316,16 @@ if [[ "$MODULE_OUTPUT" != "$CONSOLE_OUTPUT" ]]; then
     diff \
         <(printf '%s\n' "$MODULE_OUTPUT") \
         <(printf '%s\n' "$CONSOLE_OUTPUT") || true
+    exit 1
+fi
+
+echo "12/12 Testing research CLI entry point..."
+CLI_HELP="$(
+    cd "$TMP_DIR"
+    env -u PYTHONPATH PYTHONNOUSERSITE=1 "$WQS" --help
+)"
+if [[ "$CLI_HELP" != *"backtest"* ]]; then
+    echo "ERROR: Research CLI does not expose the backtest command."
     exit 1
 fi
 

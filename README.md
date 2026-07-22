@@ -302,4 +302,88 @@ filtering, idempotent duplicate writes, conflicting rewrite rejection, and
 quarantine rejection. This is a storage and replay integrity backtest. It does
 not estimate strategy returns, Sharpe ratio, or future profitability. Those
 metrics require historical market data, transaction-cost assumptions, and a
-strategy implemented in the next research phase.
+the separate strategy backtesting engine documented below.
+
+## Strategy Backtesting Engine v1
+
+The research layer now includes a deterministic, single-symbol, long-only
+strategy backtester. It consumes only `NormalizedCandleRecord` objects through
+the existing replay interface and has no broker transport, credential access,
+or order-submission path.
+
+Safety and accounting rules:
+
+- a signal is generated only after the current candle close is observed
+- the earliest possible fill is the next candle open
+- same-candle and backward-time fills are rejected
+- prices, cash, cost basis, commissions, and slippage use `Decimal`
+- cash and long position quantities cannot become negative
+- duplicate fills and multiple fills for the same v1 order are blocked
+- fees and adverse fixed-basis-point slippage are included in PnL
+- volume participation limits are deterministic and can produce partial fills
+- strategy, replay, configuration, and final run digests support reproduction
+- each engine is single-use and each strategy is reset before a run, preventing state leakage
+
+Included reference strategies:
+
+- `buy-and-hold`: observes the first close, then requests entry for the next open
+- `sma-crossover`: O(1) rolling short/long simple moving averages, with a
+  long-or-flat target and no access to future candles
+
+Included performance measures:
+
+- total return and CAGR
+- maximum drawdown
+- annualized volatility, Sharpe, Sortino, and Calmar ratios
+  (risk ratios require at least 20 period returns; CAGR requires 30 days)
+- closed-trade win rate, profit factor, average win, and average loss
+- turnover and average exposure
+- commission and slippage costs
+- a passive benchmark beginning at the first execution-eligible open
+
+Run the deterministic synthetic accounting and look-ahead simulation with:
+
+```bash
+.venv/bin/python scripts/strategy_backtest.py
+```
+
+This simulation validates software behavior with synthetic candles. Its returns
+are not historical investment results and do not predict future profitability.
+
+Backtest v1 uses a zero risk-free rate, whole-share long-only orders, generic
+basis-point fees, and deterministic fixed slippage. Exchange taxes, tick-size
+rounding, dividends, splits, delistings, and other corporate actions must be
+handled by later market-specific models or by correctly adjusted input data.
+Open positions contribute to total return and drawdown; closed-trade statistics
+include completed round trips only. A position still open at the final candle is
+marked at that close and is not charged a hypothetical same-candle exit cost.
+
+### Research CLI
+
+The separate `wqs` command keeps research functions away from the default mock
+application entry point. It reads an existing normalized database and remains
+networkless:
+
+```bash
+wqs backtest \
+  --normalized-root data/normalized \
+  --strategy sma-cross \
+  --symbol 005930 \
+  --interval 1d \
+  --start 2020-01-01 \
+  --end 2025-12-31 \
+  --initial-cash 10000000 \
+  --short-window 20 \
+  --long-window 100 \
+  --commission-bps 15 \
+  --slippage-bps 10 \
+  --max-volume-participation 0.10
+```
+
+Daily CLI runs default to 252 annualization periods. Intraday runs must provide
+`--annualization-periods` explicitly because session lengths differ by market.
+
+Use `--pass-only` to exclude `WARNING` observations. By default, warnings remain
+available so high-volatility events are not silently removed from research.
+`--json-output PATH` atomically writes a compact summary. The CLI cannot enable
+LIVE mode or submit an order.
