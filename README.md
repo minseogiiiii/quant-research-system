@@ -301,7 +301,7 @@ across different page boundaries, warning-event preservation, PASS-only
 filtering, idempotent duplicate writes, conflicting rewrite rejection, and
 quarantine rejection. This is a storage and replay integrity backtest. It does
 not estimate strategy returns, Sharpe ratio, or future profitability. Those
-metrics require historical market data, transaction-cost assumptions, and a
+metrics require historical market data, transaction-cost assumptions, and
 the separate strategy backtesting engine documented below.
 
 ## Strategy Backtesting Engine v1
@@ -387,3 +387,110 @@ Use `--pass-only` to exclude `WARNING` observations. By default, warnings remain
 available so high-volatility events are not silently removed from research.
 `--json-output PATH` atomically writes a compact summary. The CLI cannot enable
 LIVE mode or submit an order.
+
+## Research Validity Layer v1
+
+The research-validity layer records what was tested before results are used for
+strategy selection. It is deliberately separate from broker adapters and from
+the backtest execution engine. Its purpose is to reduce hidden data snooping,
+accidental holdout reuse, and irreproducible parameter searches.
+
+The first release provides:
+
+- non-overlapping half-open train, validation, and untouched-holdout windows
+- deterministic experiment IDs derived from strategy, parameters, data digest,
+  Git commit, costs, execution assumptions, split, and search audit
+- a durable SQLite experiment registry with canonical JSON and SHA-256 checks
+- idempotent concurrent registration of the same experiment specification
+- immutable success or failure outcomes, including preservation of failed runs
+- parent-experiment and change-reason lineage for strategy revisions
+- parameter-search metadata: search ID, search space, trial number, total trials,
+  and selection metric
+- fail-closed, one-time holdout consumption, including concurrent-use protection
+- a networkless CLI with no broker transport or order-submission path
+
+The registry is stored separately from normalized market data:
+
+```text
+data/
+├── normalized/
+│   └── normalized.sqlite3
+└── research/
+    └── research.sqlite3
+```
+
+Research windows use `[start, end)` semantics. Adjacent periods are valid, but
+any overlap is rejected. A holdout can be recorded as consumed only once for an
+experiment. Retrying that operation fails closed, even if the same digest is
+submitted again.
+
+Register an experiment before running or selecting it:
+
+```bash
+wqs research register \
+  --root data/research \
+  --strategy sma-cross \
+  --strategy-version 1.0.0 \
+  --dataset-digest <lowercase-sha256> \
+  --code-commit <git-commit> \
+  --parameters-json '{"short_window":20,"long_window":100}' \
+  --cost-model-json '{"commission_bps":"15","slippage_bps":"10"}' \
+  --execution-model-json '{"fill":"next_open"}' \
+  --train-start 2020-01-01 \
+  --train-end 2023-01-01 \
+  --validation-start 2023-01-01 \
+  --validation-end 2024-01-01 \
+  --holdout-start 2024-01-01 \
+  --holdout-end 2025-01-01 \
+  --search-id sma-grid-v1 \
+  --search-space-json '{"short_window":[10,20],"long_window":[80,100]}' \
+  --trial-number 1 \
+  --total-trials 4 \
+  --selection-metric validation_sharpe
+```
+
+Record either a successful result digest or a failed experiment reason:
+
+```bash
+wqs research record-outcome \
+  --root data/research \
+  --experiment-id <uuid> \
+  --status succeeded \
+  --result-digest <lowercase-sha256>
+```
+
+```bash
+wqs research record-outcome \
+  --root data/research \
+  --experiment-id <uuid> \
+  --status failed \
+  --failure-reason 'validation robustness gate failed'
+```
+
+Inspect the immutable record and its holdout state:
+
+```bash
+wqs research inspect \
+  --root data/research \
+  --experiment-id <uuid>
+```
+
+Record the single permitted untouched-holdout evaluation:
+
+```bash
+wqs research consume-holdout \
+  --root data/research \
+  --experiment-id <uuid> \
+  --result-digest <lowercase-sha256>
+```
+
+Run the deterministic registry simulation with:
+
+```bash
+.venv/bin/python scripts/research_validity_simulation.py
+```
+
+This release does not yet implement point-in-time universes, delisting and
+corporate-action records, Deflated Sharpe, PBO, robustness matrices, or
+walk-forward evaluation. Those belong in later validity releases after this
+registry and holdout-control foundation is fully validated.

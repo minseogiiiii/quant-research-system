@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import sys
 from datetime import UTC, date, datetime, time
 from decimal import Decimal, InvalidOperation
@@ -26,6 +27,20 @@ from world_quant_system.data import (
 )
 from world_quant_system.domain import CandleInterval
 from world_quant_system.replay import ReplayConfig, ReplayError
+from world_quant_system.research import (
+    ExperimentOutcome,
+    ExperimentRecord,
+    ExperimentSnapshot,
+    ExperimentSpec,
+    ExperimentStatus,
+    HoldoutConsumption,
+    ParameterSearchAudit,
+    ResearchError,
+    ResearchSplit,
+    ResearchWindow,
+    SQLiteExperimentRegistry,
+    canonical_json_object,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -77,6 +92,69 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Atomically write a compact result summary as JSON.",
     )
+
+    research = subparsers.add_parser(
+        "research",
+        help="Manage deterministic research-validity records.",
+    )
+    research_subparsers = research.add_subparsers(
+        dest="research_command",
+        required=True,
+    )
+    register = research_subparsers.add_parser(
+        "register",
+        help="Register an immutable experiment specification before execution.",
+    )
+    register.add_argument("--root", type=Path, required=True)
+    register.add_argument("--strategy", required=True)
+    register.add_argument("--strategy-version", default="1.0.0")
+    register.add_argument("--dataset-digest", required=True)
+    register.add_argument("--code-commit", required=True)
+    register.add_argument("--parameters-json", default="{}")
+    register.add_argument("--cost-model-json", default="{}")
+    register.add_argument("--execution-model-json", default="{}")
+    register.add_argument("--train-start", required=True)
+    register.add_argument("--train-end", required=True)
+    register.add_argument("--validation-start", required=True)
+    register.add_argument("--validation-end", required=True)
+    register.add_argument("--holdout-start", required=True)
+    register.add_argument("--holdout-end", required=True)
+    register.add_argument("--search-id", default="standalone")
+    register.add_argument("--search-space-json", default="{}")
+    register.add_argument("--trial-number", type=int, default=1)
+    register.add_argument("--total-trials", type=int, default=1)
+    register.add_argument("--selection-metric", default="not_applicable")
+    register.add_argument("--parent-experiment-id")
+    register.add_argument("--change-reason")
+
+    inspect = research_subparsers.add_parser(
+        "inspect",
+        help="Inspect an experiment, its outcome, and holdout state.",
+    )
+    inspect.add_argument("--root", type=Path, required=True)
+    inspect.add_argument("--experiment-id", required=True)
+
+    record_outcome = research_subparsers.add_parser(
+        "record-outcome",
+        help="Persist an immutable success or failure result.",
+    )
+    record_outcome.add_argument("--root", type=Path, required=True)
+    record_outcome.add_argument("--experiment-id", required=True)
+    record_outcome.add_argument(
+        "--status",
+        choices=tuple(status.value for status in ExperimentStatus),
+        required=True,
+    )
+    record_outcome.add_argument("--result-digest")
+    record_outcome.add_argument("--failure-reason")
+
+    consume_holdout = research_subparsers.add_parser(
+        "consume-holdout",
+        help="Record the one permitted untouched-holdout evaluation.",
+    )
+    consume_holdout.add_argument("--root", type=Path, required=True)
+    consume_holdout.add_argument("--experiment-id", required=True)
+    consume_holdout.add_argument("--result-digest", required=True)
     return parser
 
 
@@ -90,10 +168,14 @@ def main(argv: list[str] | None = None) -> None:
             if arguments.json_output is not None:
                 AtomicJsonBacktestSummaryWriter(arguments.json_output).write(result)
             return
+        if arguments.command == "research":
+            print(asyncio.run(_run_research(arguments)))
+            return
     except (
         BacktestError,
         NormalizedMarketDataError,
         ReplayError,
+        ResearchError,
         ValueError,
         OSError,
     ) as error:
@@ -135,6 +217,204 @@ async def _run_backtest(arguments: argparse.Namespace) -> BacktestRunResult:
     store = SQLiteNormalizedMarketDataStore(root)
     return await StrategyBacktestEngine(store, config, strategy).run()
 
+
+
+async def _run_research(arguments: argparse.Namespace) -> str:
+    root = arguments.root.expanduser().resolve()
+    registry = SQLiteExperimentRegistry(root)
+    if arguments.research_command == "register":
+        split = ResearchSplit(
+            train=ResearchWindow(
+                _parse_research_boundary(arguments.train_start),
+                _parse_research_boundary(arguments.train_end),
+            ),
+            validation=ResearchWindow(
+                _parse_research_boundary(arguments.validation_start),
+                _parse_research_boundary(arguments.validation_end),
+            ),
+            holdout=ResearchWindow(
+                _parse_research_boundary(arguments.holdout_start),
+                _parse_research_boundary(arguments.holdout_end),
+            ),
+        )
+        spec = ExperimentSpec(
+            strategy_name=arguments.strategy,
+            strategy_version=arguments.strategy_version,
+            parameters_json=_canonical_json_argument(
+                arguments.parameters_json,
+                "parameters",
+            ),
+            dataset_digest=arguments.dataset_digest,
+            code_commit=arguments.code_commit,
+            cost_model_json=_canonical_json_argument(
+                arguments.cost_model_json,
+                "cost model",
+            ),
+            execution_model_json=_canonical_json_argument(
+                arguments.execution_model_json,
+                "execution model",
+            ),
+            split=split,
+            search_audit=ParameterSearchAudit(
+                search_id=arguments.search_id,
+                search_space_json=_canonical_json_argument(
+                    arguments.search_space_json,
+                    "search space",
+                ),
+                trial_number=arguments.trial_number,
+                total_trials=arguments.total_trials,
+                selection_metric=arguments.selection_metric,
+            ),
+            parent_experiment_id=arguments.parent_experiment_id,
+            change_reason=arguments.change_reason,
+        )
+        record = await registry.register(spec)
+        return _format_research_registration(record)
+    if arguments.research_command == "inspect":
+        snapshot = await registry.get(arguments.experiment_id)
+        return _format_research_snapshot(snapshot)
+    if arguments.research_command == "record-outcome":
+        outcome = ExperimentOutcome(
+            experiment_id=arguments.experiment_id,
+            status=ExperimentStatus(arguments.status),
+            completed_at=datetime.now(UTC),
+            result_digest=arguments.result_digest,
+            failure_reason=arguments.failure_reason,
+        )
+        stored = await registry.record_outcome(outcome)
+        return _format_research_outcome(stored)
+    if arguments.research_command == "consume-holdout":
+        consumption = HoldoutConsumption(
+            experiment_id=arguments.experiment_id,
+            result_digest=arguments.result_digest,
+            consumed_at=datetime.now(UTC),
+        )
+        stored_consumption = await registry.consume_holdout(consumption)
+        return _format_holdout_consumption(stored_consumption)
+    _unreachable()
+
+
+def _parse_research_boundary(value: str) -> datetime:
+    try:
+        if len(value) == 10:
+            return datetime.combine(
+                date.fromisoformat(value),
+                time.min,
+                tzinfo=UTC,
+            )
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError(f"Invalid research timestamp: {value}") from error
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(
+            "Research timestamps must include a timezone or use YYYY-MM-DD."
+        )
+    return parsed.astimezone(UTC)
+
+
+def _canonical_json_argument(value: str, field_name: str) -> str:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Invalid JSON for {field_name}.") from error
+    if not isinstance(parsed, dict):
+        raise ValueError(f"{field_name.capitalize()} JSON must be an object.")
+    return canonical_json_object(parsed)
+
+
+def _format_research_registration(record: ExperimentRecord) -> str:
+    return "\n".join(
+        (
+            "Execution mode: RESEARCH_REGISTRY",
+            "Network access: DISABLED",
+            "Live trading: DISABLED",
+            "Order submission: DISABLED",
+            "",
+            f"Experiment ID:       {record.experiment_id}",
+            f"Research digest:     {record.research_digest}",
+            f"Strategy:            {record.spec.strategy_name}",
+            f"Trial:               {record.spec.search_audit.trial_number}/"
+            f"{record.spec.search_audit.total_trials}",
+            f"Registered at:       {record.registered_at.isoformat()}",
+            "Holdout state:       UNTOUCHED",
+        )
+    )
+
+
+def _format_research_snapshot(snapshot: ExperimentSnapshot) -> str:
+    outcome = (
+        "not_recorded"
+        if snapshot.outcome is None
+        else snapshot.outcome.status.value
+    )
+    holdout = (
+        "UNTOUCHED"
+        if snapshot.holdout_consumption is None
+        else "CONSUMED"
+    )
+    lines = [
+        "Execution mode: RESEARCH_REGISTRY",
+        "Network access: DISABLED",
+        "Live trading: DISABLED",
+        "Order submission: DISABLED",
+        "",
+        f"Experiment ID:       {snapshot.record.experiment_id}",
+        f"Research digest:     {snapshot.record.research_digest}",
+        f"Strategy:            {snapshot.record.spec.strategy_name}",
+        f"Status:              {outcome}",
+        f"Holdout state:       {holdout}",
+    ]
+    if snapshot.outcome is not None:
+        lines.append(
+            "Result digest:       "
+            f"{snapshot.outcome.result_digest or 'N/A'}"
+        )
+        lines.append(
+            "Failure reason:      "
+            f"{snapshot.outcome.failure_reason or 'N/A'}"
+        )
+    if snapshot.holdout_consumption is not None:
+        lines.append(
+            "Holdout digest:      "
+            f"{snapshot.holdout_consumption.result_digest}"
+        )
+        lines.append(
+            "Holdout consumed:    "
+            f"{snapshot.holdout_consumption.consumed_at.isoformat()}"
+        )
+    return "\n".join(lines)
+
+
+def _format_research_outcome(outcome: ExperimentOutcome) -> str:
+    return "\n".join(
+        (
+            "Execution mode: RESEARCH_REGISTRY",
+            "Network access: DISABLED",
+            "Live trading: DISABLED",
+            "Order submission: DISABLED",
+            "",
+            f"Experiment ID:       {outcome.experiment_id}",
+            f"Status:              {outcome.status.value}",
+            f"Result digest:       {outcome.result_digest or 'N/A'}",
+            f"Failure reason:      {outcome.failure_reason or 'N/A'}",
+        )
+    )
+
+
+def _format_holdout_consumption(consumption: HoldoutConsumption) -> str:
+    return "\n".join(
+        (
+            "Execution mode: RESEARCH_REGISTRY",
+            "Network access: DISABLED",
+            "Live trading: DISABLED",
+            "Order submission: DISABLED",
+            "",
+            f"Experiment ID:       {consumption.experiment_id}",
+            "Holdout state:       CONSUMED",
+            f"Holdout digest:      {consumption.result_digest}",
+            f"Consumed at:         {consumption.consumed_at.isoformat()}",
+        )
+    )
 
 def _strategy_from_arguments(arguments: argparse.Namespace) -> Strategy:
     if arguments.strategy == "buy-and-hold":

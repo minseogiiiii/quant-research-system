@@ -46,7 +46,7 @@ for executable in "$PYTHON" "$RUFF" "$MYPY" "$CONSOLE" "$WQS"; do
     fi
 done
 
-echo "1/12 Verifying the installed package outside the repository..."
+echo "1/13 Verifying the installed package outside the repository..."
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 (
@@ -85,6 +85,16 @@ from world_quant_system.data import (
 )
 from world_quant_system.domain import Candle, CandleInterval, CandlePage
 from world_quant_system.replay import DeterministicReplayEngine, ReplayConfig
+from world_quant_system.research import (
+    ExperimentOutcome,
+    ExperimentSpec,
+    ExperimentStatus,
+    HoldoutConsumption,
+    ParameterSearchAudit,
+    ResearchSplit,
+    ResearchWindow,
+    SQLiteExperimentRegistry,
+)
 
 print(f"Package: {world_quant_system.__file__}")
 print(f"Client: {TossHttpClient.__name__}")
@@ -127,6 +137,16 @@ print(
     f"{SmaCrossoverStrategy.__name__}, "
     f"{AtomicJsonBacktestSummaryWriter.__name__}"
 )
+print(
+    "Research validity: "
+    f"{ResearchSplit.__name__}, "
+    f"{ExperimentSpec.__name__}, "
+    f"{ParameterSearchAudit.__name__}, "
+    f"{ExperimentOutcome.__name__}, "
+    f"{ExperimentStatus.__name__}, "
+    f"{HoldoutConsumption.__name__}, "
+    f"{SQLiteExperimentRegistry.__name__}"
+)
 print(f"Token response: {TokenIssueResponse.__name__}")
 print(f"Error: {TossAdapterError.__name__}")
 print(
@@ -138,20 +158,20 @@ print(
 '
 )
 
-echo "2/12 Compiling source and tests..."
+echo "2/13 Compiling source and tests..."
 "$PYTHON" -m compileall -q src tests
 
-echo "3/12 Running tests..."
+echo "3/13 Running tests..."
 "$PYTHON" -m pytest -q
 
-echo "4/12 Running Ruff..."
+echo "4/13 Running Ruff..."
 rm -rf build dist
 "$RUFF" check .
 
-echo "5/12 Running mypy..."
+echo "5/13 Running mypy..."
 "$MYPY" src tests
 
-echo "6/12 Verifying fail-closed network behavior..."
+echo "6/13 Verifying fail-closed network behavior..."
 "$PYTHON" -c '
 import asyncio
 import tempfile
@@ -289,23 +309,26 @@ async def verify() -> None:
 asyncio.run(verify())
 '
 
-echo "7/12 Running deterministic data-quality simulation..."
+echo "7/13 Running deterministic data-quality simulation..."
 "$PYTHON" scripts/quality_gate_backtest.py
 
-echo "8/12 Running normalized-storage replay simulation..."
+echo "8/13 Running normalized-storage replay simulation..."
 "$PYTHON" scripts/normalized_replay_backtest.py
 
-echo "9/12 Running deterministic strategy backtest simulation..."
+echo "9/13 Running deterministic strategy backtest simulation..."
 "$PYTHON" scripts/strategy_backtest.py
 
-echo "10/12 Testing module entry point..."
+echo "10/13 Running deterministic research-validity simulation..."
+"$PYTHON" scripts/research_validity_simulation.py
+
+echo "11/13 Testing module entry point..."
 MODULE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 \
         "$PYTHON" -m world_quant_system
 )"
 
-echo "11/12 Testing console entry point..."
+echo "12/13 Testing console entry point..."
 CONSOLE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$CONSOLE"
@@ -319,15 +342,25 @@ if [[ "$MODULE_OUTPUT" != "$CONSOLE_OUTPUT" ]]; then
     exit 1
 fi
 
-echo "12/12 Testing research CLI entry point..."
+echo "13/13 Testing research CLI entry point..."
 CLI_HELP="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$WQS" --help
 )"
-if [[ "$CLI_HELP" != *"backtest"* ]]; then
-    echo "ERROR: Research CLI does not expose the backtest command."
+if [[ "$CLI_HELP" != *"backtest"* || "$CLI_HELP" != *"research"* ]]; then
+    echo "ERROR: Research CLI does not expose required commands."
     exit 1
 fi
+RESEARCH_HELP="$(
+    cd "$TMP_DIR"
+    env -u PYTHONPATH PYTHONNOUSERSITE=1 "$WQS" research --help
+)"
+for command in register inspect record-outcome consume-holdout; do
+    if [[ "$RESEARCH_HELP" != *"$command"* ]]; then
+        echo "ERROR: Research CLI does not expose $command."
+        exit 1
+    fi
+done
 
 printf '%s\n' "$MODULE_OUTPUT"
 echo
