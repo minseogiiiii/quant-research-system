@@ -16,6 +16,13 @@ from world_quant_system.data import (
     SQLiteNormalizedMarketDataStore,
 )
 from world_quant_system.domain import Candle, CandleInterval, CandlePage
+from world_quant_system.research import (
+    DataAvailabilityRecord,
+    PointInTimeDataKind,
+    SecurityLifecycle,
+    SQLitePointInTimeStore,
+    UniverseMembership,
+)
 
 
 def test_backtest_cli_fails_closed_when_database_is_missing(tmp_path: Path) -> None:
@@ -138,3 +145,97 @@ def test_intraday_cli_requires_explicit_annualization_periods(
             ]
         )
     assert error.value.code == 2
+
+
+def test_backtest_cli_can_require_point_in_time_validation(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    normalized_root = tmp_path / "normalized"
+    point_in_time_root = tmp_path / "point-in-time"
+    asyncio.run(
+        _seed_point_in_time_backtest(
+            normalized_root,
+            point_in_time_root,
+        )
+    )
+
+    main(
+        [
+            "backtest",
+            "--normalized-root",
+            str(normalized_root),
+            "--strategy",
+            "buy-and-hold",
+            "--symbol",
+            "ABC",
+            "--start",
+            "2026-01-01",
+            "--end",
+            "2026-01-03",
+            "--point-in-time-root",
+            str(point_in_time_root),
+            "--universe-id",
+            "TEST-UNIVERSE",
+            "--exchange",
+            "XNAS",
+            "--initial-cash",
+            "1200",
+            "--commission-bps",
+            "0",
+            "--slippage-bps",
+            "0",
+            "--max-volume-participation",
+            "1",
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert "Data context:" in output
+    assert "NOT_VALIDATED" not in output
+    assert "Order submission: DISABLED" in output
+
+
+async def _seed_point_in_time_backtest(
+    normalized_root: Path,
+    point_in_time_root: Path,
+) -> None:
+    await _seed_normalized_store(normalized_root)
+    normalized = SQLiteNormalizedMarketDataStore(normalized_root)
+    records = await normalized.query_candles(limit=10)
+    catalog = SQLitePointInTimeStore(point_in_time_root)
+    await catalog.save_security(
+        SecurityLifecycle(
+            exchange="XNAS",
+            symbol="ABC",
+            listed_at=datetime(2000, 1, 1, tzinfo=UTC),
+            tradable_from=datetime(2000, 1, 1, tzinfo=UTC),
+            source="test",
+            source_digest="a" * 64,
+        )
+    )
+    await catalog.save_membership(
+        UniverseMembership(
+            universe_id="TEST-UNIVERSE",
+            exchange="XNAS",
+            symbol="ABC",
+            member_from=datetime(2026, 1, 1, tzinfo=UTC),
+            member_until=datetime(2026, 1, 4, tzinfo=UTC),
+            available_at=datetime(2026, 1, 1, tzinfo=UTC),
+            source="test",
+            source_digest="b" * 64,
+        )
+    )
+    for record in records:
+        await catalog.save_availability(
+            DataAvailabilityRecord(
+                data_id=record.item_id,
+                data_kind=PointInTimeDataKind.CANDLE,
+                exchange="XNAS",
+                symbol="ABC",
+                effective_at=record.candle.timestamp,
+                available_at=record.candle.timestamp,
+                source="test",
+                source_digest="c" * 64,
+            )
+        )

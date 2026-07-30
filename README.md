@@ -490,7 +490,169 @@ Run the deterministic registry simulation with:
 .venv/bin/python scripts/research_validity_simulation.py
 ```
 
-This release does not yet implement point-in-time universes, delisting and
-corporate-action records, Deflated Sharpe, PBO, robustness matrices, or
-walk-forward evaluation. Those belong in later validity releases after this
-registry and holdout-control foundation is fully validated.
+Point-in-time universes and explicit delisting metadata are implemented in the
+next section. Deflated Sharpe, PBO, robustness matrices, walk-forward
+evaluation, and full corporate-action accounting remain later validity phases.
+
+## Point-in-Time Data Integrity v1
+
+The point-in-time catalog prevents a historical research run from silently
+using securities, universe membership, or data that were unavailable at the
+simulated decision time. It remains networkless and has no broker, credential,
+or order-submission path.
+
+The first release stores immutable, SHA-256-protected records for:
+
+- security listing, tradability, and delisting boundaries
+- point-in-time universe membership intervals and their publication times
+- per-item `effective_at` and `available_at` timestamps
+- explicit delisting events, reasons, and last-tradable timestamps
+- deterministic universe snapshots and single-symbol backtest contexts
+
+The distinction between timestamps is mandatory:
+
+- `effective_at` is the time represented by the data or membership
+- `available_at` is the first time a historical decision could have used it
+
+A record can be effective while still unavailable. Such a record is rejected
+until the decision timestamp reaches `available_at`. Membership intervals use
+half-open `[member_from, member_until)` semantics and cannot overlap for the
+same universe and security.
+
+The catalog is stored separately from normalized observations and experiment
+records:
+
+```text
+data/
+├── normalized/
+│   └── normalized.sqlite3
+├── research/
+│   └── research.sqlite3
+└── point_in_time/
+    └── point_in_time.sqlite3
+```
+
+Register a security lifecycle before any membership or data item:
+
+```bash
+wqs point-in-time register-security \
+  --root data/point_in_time \
+  --exchange XKRX \
+  --symbol 005930 \
+  --listed-at 1975-06-11 \
+  --tradable-from 1975-06-11 \
+  --source exchange-master-v1 \
+  --source-digest <lowercase-sha256>
+```
+
+Register a historically effective universe interval and when that record was
+known:
+
+```bash
+wqs point-in-time register-membership \
+  --root data/point_in_time \
+  --universe-id KOSPI \
+  --exchange XKRX \
+  --symbol 005930 \
+  --member-from 2020-01-01 \
+  --member-until 2025-01-01 \
+  --available-at 2019-12-31T09:00:00+09:00 \
+  --source universe-history-v1 \
+  --source-digest <lowercase-sha256>
+```
+
+Every normalized candle used by point-in-time replay requires its own
+availability record. `--data-id` is the normalized candle `item_id`:
+
+```bash
+wqs point-in-time register-availability \
+  --root data/point_in_time \
+  --data-id <normalized-item-uuid> \
+  --data-kind candle \
+  --exchange XKRX \
+  --symbol 005930 \
+  --effective-at 2020-01-02T15:30:00+09:00 \
+  --available-at 2020-01-02T15:30:00+09:00 \
+  --source historical-candles-v1 \
+  --source-digest <lowercase-sha256>
+```
+
+Delisted securities remain in historical universes. A lifecycle with a
+`delisted_at` boundary is unusable until an explicit matching delisting record
+is stored:
+
+```bash
+wqs point-in-time register-delisting \
+  --root data/point_in_time \
+  --exchange XKRX \
+  --symbol 000001 \
+  --last-tradable-at 2021-06-30 \
+  --delisted-at 2021-07-01 \
+  --available-at 2021-06-01 \
+  --reason regulatory \
+  --source delisting-history-v1 \
+  --source-digest <lowercase-sha256>
+```
+
+Build a deterministic universe snapshot or a bounded backtest context:
+
+```bash
+wqs point-in-time snapshot \
+  --root data/point_in_time \
+  --universe-id KOSPI \
+  --as-of 2020-06-01
+```
+
+```bash
+wqs point-in-time backtest-context \
+  --root data/point_in_time \
+  --universe-id KOSPI \
+  --exchange XKRX \
+  --symbol 005930 \
+  --start 2020-01-01 \
+  --end 2025-01-01
+```
+
+Historical backtests can enable fail-closed validation by providing all three
+point-in-time arguments together. Explicit start and end boundaries are then
+required:
+
+```bash
+wqs backtest \
+  --normalized-root data/normalized \
+  --point-in-time-root data/point_in_time \
+  --universe-id KOSPI \
+  --exchange XKRX \
+  --strategy sma-cross \
+  --symbol 005930 \
+  --start 2020-01-01 \
+  --end 2024-12-31
+```
+
+The validated context digest is included in the backtest configuration
+fingerprint. Each replay candle is checked for:
+
+- a tradable security lifecycle at the event timestamp
+- exactly one effective universe membership
+- membership availability no later than the decision timestamp
+- a matching candle availability record
+- `available_at <= decision_at`
+- explicit delisting metadata whenever the lifecycle is delisted
+
+The experiment registry can also include a point-in-time context digest and
+canonical policy JSON, so strategy selection records identify the exact data
+eligibility context used by the backtest.
+
+Run the deterministic integration simulation with:
+
+```bash
+.venv/bin/python scripts/point_in_time_simulation.py
+```
+
+The simulation verifies insertion-order-independent snapshot and context
+digests, future-data rejection, membership-overlap rejection, and preservation
+of a historically valid security that was later delisted.
+
+This release does not calculate delisting returns, dividend reinvestment,
+split-adjusted series, mergers, spin-offs, or multi-asset portfolio effects.
+Those require separate market-specific corporate-action and portfolio models.

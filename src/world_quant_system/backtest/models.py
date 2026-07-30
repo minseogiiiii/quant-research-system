@@ -489,6 +489,7 @@ class BacktestConfig:
     slippage_bps: Decimal = Decimal("10")
     max_volume_participation: Decimal = Decimal("0.10")
     annualization_periods: int = 252
+    data_context_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.replay, ReplayConfig):
@@ -520,6 +521,8 @@ class BacktestConfig:
                 "Maximum volume participation cannot exceed 1."
             )
         _require_positive_int(self.annualization_periods, "Annualization periods")
+        if self.data_context_digest is not None:
+            _validate_sha256(self.data_context_digest, "Data context digest")
 
     @property
     def symbol(self) -> str:
@@ -527,7 +530,7 @@ class BacktestConfig:
 
     @property
     def fingerprint(self) -> str:
-        document = {
+        document: dict[str, object] = {
             "replay_fingerprint": self.replay.fingerprint,
             "initial_cash": format(self.initial_cash, "f"),
             "commission_bps": format(self.commission_bps, "f"),
@@ -537,6 +540,8 @@ class BacktestConfig:
             ),
             "annualization_periods": self.annualization_periods,
         }
+        if self.data_context_digest is not None:
+            document["data_context_digest"] = self.data_context_digest
         return hashlib.sha256(canonical_json_bytes(document)).hexdigest()
 
 
@@ -623,7 +628,7 @@ class BacktestRunResult:
 
 def backtest_config_document(config: BacktestConfig) -> dict[str, object]:
     replay = config.replay
-    return {
+    document: dict[str, object] = {
         "symbol": config.symbol,
         "interval": replay.interval.value,
         "start": format_utc(replay.start) if replay.start is not None else None,
@@ -639,6 +644,9 @@ def backtest_config_document(config: BacktestConfig) -> dict[str, object]:
         "annualization_periods": config.annualization_periods,
         "fingerprint": config.fingerprint,
     }
+    if config.data_context_digest is not None:
+        document["data_context_digest"] = config.data_context_digest
+    return document
 
 
 def signal_document(signal: TargetPositionSignal) -> dict[str, object]:

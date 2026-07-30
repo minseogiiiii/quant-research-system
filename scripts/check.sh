@@ -46,7 +46,7 @@ for executable in "$PYTHON" "$RUFF" "$MYPY" "$CONSOLE" "$WQS"; do
     fi
 done
 
-echo "1/13 Verifying the installed package outside the repository..."
+echo "1/14 Verifying the installed package outside the repository..."
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 (
@@ -86,14 +86,20 @@ from world_quant_system.data import (
 from world_quant_system.domain import Candle, CandleInterval, CandlePage
 from world_quant_system.replay import DeterministicReplayEngine, ReplayConfig
 from world_quant_system.research import (
+    DataAvailabilityRecord,
     ExperimentOutcome,
     ExperimentSpec,
     ExperimentStatus,
     HoldoutConsumption,
     ParameterSearchAudit,
+    PointInTimePolicy,
+    PointInTimeSnapshot,
     ResearchSplit,
     ResearchWindow,
     SQLiteExperimentRegistry,
+    SQLitePointInTimeStore,
+    SecurityLifecycle,
+    UniverseMembership,
 )
 
 print(f"Package: {world_quant_system.__file__}")
@@ -147,6 +153,15 @@ print(
     f"{HoldoutConsumption.__name__}, "
     f"{SQLiteExperimentRegistry.__name__}"
 )
+print(
+    "Point-in-time data: "
+    f"{SecurityLifecycle.__name__}, "
+    f"{UniverseMembership.__name__}, "
+    f"{DataAvailabilityRecord.__name__}, "
+    f"{PointInTimePolicy.__name__}, "
+    f"{PointInTimeSnapshot.__name__}, "
+    f"{SQLitePointInTimeStore.__name__}"
+)
 print(f"Token response: {TokenIssueResponse.__name__}")
 print(f"Error: {TossAdapterError.__name__}")
 print(
@@ -158,20 +173,20 @@ print(
 '
 )
 
-echo "2/13 Compiling source and tests..."
+echo "2/14 Compiling source and tests..."
 "$PYTHON" -m compileall -q src tests
 
-echo "3/13 Running tests..."
+echo "3/14 Running tests..."
 "$PYTHON" -m pytest -q
 
-echo "4/13 Running Ruff..."
+echo "4/14 Running Ruff..."
 rm -rf build dist
 "$RUFF" check .
 
-echo "5/13 Running mypy..."
+echo "5/14 Running mypy..."
 "$MYPY" src tests
 
-echo "6/13 Verifying fail-closed network behavior..."
+echo "6/14 Verifying fail-closed network behavior..."
 "$PYTHON" -c '
 import asyncio
 import tempfile
@@ -309,26 +324,29 @@ async def verify() -> None:
 asyncio.run(verify())
 '
 
-echo "7/13 Running deterministic data-quality simulation..."
+echo "7/14 Running deterministic data-quality simulation..."
 "$PYTHON" scripts/quality_gate_backtest.py
 
-echo "8/13 Running normalized-storage replay simulation..."
+echo "8/14 Running normalized-storage replay simulation..."
 "$PYTHON" scripts/normalized_replay_backtest.py
 
-echo "9/13 Running deterministic strategy backtest simulation..."
+echo "9/14 Running deterministic strategy backtest simulation..."
 "$PYTHON" scripts/strategy_backtest.py
 
-echo "10/13 Running deterministic research-validity simulation..."
+echo "10/14 Running deterministic research-validity simulation..."
 "$PYTHON" scripts/research_validity_simulation.py
 
-echo "11/13 Testing module entry point..."
+echo "11/14 Running point-in-time data-integrity simulation..."
+"$PYTHON" scripts/point_in_time_simulation.py
+
+echo "12/14 Testing module entry point..."
 MODULE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 \
         "$PYTHON" -m world_quant_system
 )"
 
-echo "12/13 Testing console entry point..."
+echo "13/14 Testing console entry point..."
 CONSOLE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$CONSOLE"
@@ -342,12 +360,13 @@ if [[ "$MODULE_OUTPUT" != "$CONSOLE_OUTPUT" ]]; then
     exit 1
 fi
 
-echo "13/13 Testing research CLI entry point..."
+echo "14/14 Testing research CLI entry point..."
 CLI_HELP="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$WQS" --help
 )"
-if [[ "$CLI_HELP" != *"backtest"* || "$CLI_HELP" != *"research"* ]]; then
+if [[ "$CLI_HELP" != *"backtest"* || "$CLI_HELP" != *"research"* \
+    || "$CLI_HELP" != *"point-in-time"* ]]; then
     echo "ERROR: Research CLI does not expose required commands."
     exit 1
 fi
@@ -358,6 +377,17 @@ RESEARCH_HELP="$(
 for command in register inspect record-outcome consume-holdout; do
     if [[ "$RESEARCH_HELP" != *"$command"* ]]; then
         echo "ERROR: Research CLI does not expose $command."
+        exit 1
+    fi
+done
+POINT_IN_TIME_HELP="$(
+    cd "$TMP_DIR"
+    env -u PYTHONPATH PYTHONNOUSERSITE=1 "$WQS" point-in-time --help
+)"
+for command in register-security register-membership register-availability \
+    register-delisting snapshot backtest-context inspect-security validate-access; do
+    if [[ "$POINT_IN_TIME_HELP" != *"$command"* ]]; then
+        echo "ERROR: Point-in-time CLI does not expose $command."
         exit 1
     fi
 done

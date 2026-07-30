@@ -148,6 +148,8 @@ class ExperimentSpec:
     search_audit: ParameterSearchAudit
     parent_experiment_id: str | None = None
     change_reason: str | None = None
+    point_in_time_context_digest: str | None = None
+    point_in_time_policy_json: str | None = None
 
     def __post_init__(self) -> None:
         _require_nonblank(self.strategy_name, "Strategy name")
@@ -188,6 +190,26 @@ class ExperimentSpec:
         if self.parent_experiment_id is not None:
             _validate_uuid(self.parent_experiment_id, "Parent experiment ID")
             _require_nonblank(self.change_reason, "Change reason")
+        point_in_time_values = (
+            self.point_in_time_context_digest,
+            self.point_in_time_policy_json,
+        )
+        if any(value is not None for value in point_in_time_values) and not all(
+            value is not None for value in point_in_time_values
+        ):
+            raise ResearchConfigurationError(
+                "Point-in-time context digest and policy JSON must be "
+                "provided together."
+            )
+        if self.point_in_time_context_digest is not None:
+            _validate_sha256(
+                self.point_in_time_context_digest,
+                "Point-in-time context digest",
+            )
+            _validate_canonical_json_object(
+                self.point_in_time_policy_json,
+                "Point-in-time policy JSON",
+            )
 
     @property
     def research_digest(self) -> str:
@@ -198,7 +220,7 @@ class ExperimentSpec:
         return str(uuid5(_EXPERIMENT_NAMESPACE, self.research_digest))
 
     def to_document(self) -> dict[str, object]:
-        return {
+        document: dict[str, object] = {
             "schema_version": _SCHEMA_VERSION,
             "strategy": {
                 "name": self.strategy_name,
@@ -214,6 +236,12 @@ class ExperimentSpec:
             "parent_experiment_id": self.parent_experiment_id,
             "change_reason": self.change_reason,
         }
+        if self.point_in_time_context_digest is not None:
+            document["point_in_time"] = {
+                "context_digest": self.point_in_time_context_digest,
+                "policy": _json_object(cast(str, self.point_in_time_policy_json)),
+            }
+        return document
 
 
 @dataclass(frozen=True, slots=True)
@@ -362,10 +390,26 @@ def experiment_spec_from_document(document: Mapping[str, object]) -> ExperimentS
     audit_document = _required_mapping(document, "search_audit")
     parent = document.get("parent_experiment_id")
     change_reason = document.get("change_reason")
+    point_in_time = document.get("point_in_time")
     if parent is not None and not isinstance(parent, str):
         raise ResearchIntegrityError("Stored parent experiment ID is invalid.")
     if change_reason is not None and not isinstance(change_reason, str):
         raise ResearchIntegrityError("Stored change reason is invalid.")
+    point_in_time_context_digest: str | None = None
+    point_in_time_policy_json: str | None = None
+    if point_in_time is not None:
+        if not isinstance(point_in_time, dict):
+            raise ResearchIntegrityError(
+                "Stored point-in-time experiment context is invalid."
+            )
+        point_in_time_mapping = cast(dict[str, object], point_in_time)
+        point_in_time_context_digest = _required_string(
+            point_in_time_mapping,
+            "context_digest",
+        )
+        point_in_time_policy_json = canonical_json_object(
+            _required_mapping(point_in_time_mapping, "policy")
+        )
     return ExperimentSpec(
         strategy_name=_required_string(strategy, "name"),
         strategy_version=_required_string(strategy, "version"),
@@ -400,6 +444,8 @@ def experiment_spec_from_document(document: Mapping[str, object]) -> ExperimentS
         ),
         parent_experiment_id=parent,
         change_reason=change_reason,
+        point_in_time_context_digest=point_in_time_context_digest,
+        point_in_time_policy_json=point_in_time_policy_json,
     )
 
 
