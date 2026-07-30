@@ -150,6 +150,9 @@ class ExperimentSpec:
     change_reason: str | None = None
     point_in_time_context_digest: str | None = None
     point_in_time_policy_json: str | None = None
+    corporate_action_context_digest: str | None = None
+    corporate_action_policy_json: str | None = None
+    dividend_tax_model_digest: str | None = None
 
     def __post_init__(self) -> None:
         _require_nonblank(self.strategy_name, "Strategy name")
@@ -210,6 +213,31 @@ class ExperimentSpec:
                 self.point_in_time_policy_json,
                 "Point-in-time policy JSON",
             )
+        corporate_action_values = (
+            self.corporate_action_context_digest,
+            self.corporate_action_policy_json,
+            self.dividend_tax_model_digest,
+        )
+        if any(value is not None for value in corporate_action_values) and not all(
+            value is not None for value in corporate_action_values
+        ):
+            raise ResearchConfigurationError(
+                "Corporate-action context, policy, and dividend-tax digests "
+                "must be provided together."
+            )
+        if self.corporate_action_context_digest is not None:
+            _validate_sha256(
+                self.corporate_action_context_digest,
+                "Corporate-action context digest",
+            )
+            _validate_canonical_json_object(
+                self.corporate_action_policy_json,
+                "Corporate-action policy JSON",
+            )
+            _validate_sha256(
+                self.dividend_tax_model_digest,
+                "Dividend-tax model digest",
+            )
 
     @property
     def research_digest(self) -> str:
@@ -240,6 +268,14 @@ class ExperimentSpec:
             document["point_in_time"] = {
                 "context_digest": self.point_in_time_context_digest,
                 "policy": _json_object(cast(str, self.point_in_time_policy_json)),
+            }
+        if self.corporate_action_context_digest is not None:
+            document["corporate_actions"] = {
+                "context_digest": self.corporate_action_context_digest,
+                "policy": _json_object(
+                    cast(str, self.corporate_action_policy_json)
+                ),
+                "dividend_tax_model_digest": self.dividend_tax_model_digest,
             }
         return document
 
@@ -391,12 +427,16 @@ def experiment_spec_from_document(document: Mapping[str, object]) -> ExperimentS
     parent = document.get("parent_experiment_id")
     change_reason = document.get("change_reason")
     point_in_time = document.get("point_in_time")
+    corporate_actions = document.get("corporate_actions")
     if parent is not None and not isinstance(parent, str):
         raise ResearchIntegrityError("Stored parent experiment ID is invalid.")
     if change_reason is not None and not isinstance(change_reason, str):
         raise ResearchIntegrityError("Stored change reason is invalid.")
     point_in_time_context_digest: str | None = None
     point_in_time_policy_json: str | None = None
+    corporate_action_context_digest: str | None = None
+    corporate_action_policy_json: str | None = None
+    dividend_tax_model_digest: str | None = None
     if point_in_time is not None:
         if not isinstance(point_in_time, dict):
             raise ResearchIntegrityError(
@@ -409,6 +449,23 @@ def experiment_spec_from_document(document: Mapping[str, object]) -> ExperimentS
         )
         point_in_time_policy_json = canonical_json_object(
             _required_mapping(point_in_time_mapping, "policy")
+        )
+    if corporate_actions is not None:
+        if not isinstance(corporate_actions, dict):
+            raise ResearchIntegrityError(
+                "Stored corporate-action experiment context is invalid."
+            )
+        corporate_action_mapping = cast(dict[str, object], corporate_actions)
+        corporate_action_context_digest = _required_string(
+            corporate_action_mapping,
+            "context_digest",
+        )
+        corporate_action_policy_json = canonical_json_object(
+            _required_mapping(corporate_action_mapping, "policy")
+        )
+        dividend_tax_model_digest = _required_string(
+            corporate_action_mapping,
+            "dividend_tax_model_digest",
         )
     return ExperimentSpec(
         strategy_name=_required_string(strategy, "name"),
@@ -446,6 +503,9 @@ def experiment_spec_from_document(document: Mapping[str, object]) -> ExperimentS
         change_reason=change_reason,
         point_in_time_context_digest=point_in_time_context_digest,
         point_in_time_policy_json=point_in_time_policy_json,
+        corporate_action_context_digest=corporate_action_context_digest,
+        corporate_action_policy_json=corporate_action_policy_json,
+        dividend_tax_model_digest=dividend_tax_model_digest,
     )
 
 

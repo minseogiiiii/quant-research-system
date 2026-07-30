@@ -46,7 +46,7 @@ for executable in "$PYTHON" "$RUFF" "$MYPY" "$CONSOLE" "$WQS"; do
     fi
 done
 
-echo "1/14 Verifying the installed package outside the repository..."
+echo "1/15 Verifying the installed package outside the repository..."
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 (
@@ -57,6 +57,8 @@ from world_quant_system.backtest import (
     AtomicJsonBacktestSummaryWriter,
     BacktestConfig,
     BuyAndHoldStrategy,
+    CorporateActionTimeline,
+    FlatRateDividendTaxModel,
     NextOpenExecutionModel,
     SmaCrossoverStrategy,
     StrategyBacktestEngine,
@@ -86,6 +88,9 @@ from world_quant_system.data import (
 from world_quant_system.domain import Candle, CandleInterval, CandlePage
 from world_quant_system.replay import DeterministicReplayEngine, ReplayConfig
 from world_quant_system.research import (
+    CorporateActionPolicy,
+    CorporateActionRecord,
+    CorporateActionType,
     DataAvailabilityRecord,
     ExperimentOutcome,
     ExperimentSpec,
@@ -96,6 +101,7 @@ from world_quant_system.research import (
     PointInTimeSnapshot,
     ResearchSplit,
     ResearchWindow,
+    SQLiteCorporateActionStore,
     SQLiteExperimentRegistry,
     SQLitePointInTimeStore,
     SecurityLifecycle,
@@ -154,6 +160,15 @@ print(
     f"{SQLiteExperimentRegistry.__name__}"
 )
 print(
+    "Corporate actions: "
+    f"{CorporateActionRecord.__name__}, "
+    f"{CorporateActionType.__name__}, "
+    f"{CorporateActionPolicy.__name__}, "
+    f"{SQLiteCorporateActionStore.__name__}, "
+    f"{CorporateActionTimeline.__name__}, "
+    f"{FlatRateDividendTaxModel.__name__}"
+)
+print(
     "Point-in-time data: "
     f"{SecurityLifecycle.__name__}, "
     f"{UniverseMembership.__name__}, "
@@ -173,20 +188,20 @@ print(
 '
 )
 
-echo "2/14 Compiling source and tests..."
+echo "2/15 Compiling source and tests..."
 "$PYTHON" -m compileall -q src tests
 
-echo "3/14 Running tests..."
+echo "3/15 Running tests..."
 "$PYTHON" -m pytest -q
 
-echo "4/14 Running Ruff..."
+echo "4/15 Running Ruff..."
 rm -rf build dist
 "$RUFF" check .
 
-echo "5/14 Running mypy..."
+echo "5/15 Running mypy..."
 "$MYPY" src tests
 
-echo "6/14 Verifying fail-closed network behavior..."
+echo "6/15 Verifying fail-closed network behavior..."
 "$PYTHON" -c '
 import asyncio
 import tempfile
@@ -324,29 +339,32 @@ async def verify() -> None:
 asyncio.run(verify())
 '
 
-echo "7/14 Running deterministic data-quality simulation..."
+echo "7/15 Running deterministic data-quality simulation..."
 "$PYTHON" scripts/quality_gate_backtest.py
 
-echo "8/14 Running normalized-storage replay simulation..."
+echo "8/15 Running normalized-storage replay simulation..."
 "$PYTHON" scripts/normalized_replay_backtest.py
 
-echo "9/14 Running deterministic strategy backtest simulation..."
+echo "9/15 Running deterministic strategy backtest simulation..."
 "$PYTHON" scripts/strategy_backtest.py
 
-echo "10/14 Running deterministic research-validity simulation..."
+echo "10/15 Running deterministic research-validity simulation..."
 "$PYTHON" scripts/research_validity_simulation.py
 
-echo "11/14 Running point-in-time data-integrity simulation..."
+echo "11/15 Running point-in-time data-integrity simulation..."
 "$PYTHON" scripts/point_in_time_simulation.py
 
-echo "12/14 Testing module entry point..."
+echo "12/15 Running corporate-action and delisting-economics simulation..."
+"$PYTHON" scripts/corporate_action_simulation.py
+
+echo "13/15 Testing module entry point..."
 MODULE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 \
         "$PYTHON" -m world_quant_system
 )"
 
-echo "13/14 Testing console entry point..."
+echo "14/15 Testing console entry point..."
 CONSOLE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$CONSOLE"
@@ -360,13 +378,14 @@ if [[ "$MODULE_OUTPUT" != "$CONSOLE_OUTPUT" ]]; then
     exit 1
 fi
 
-echo "14/14 Testing research CLI entry point..."
+echo "15/15 Testing research CLI entry point..."
 CLI_HELP="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$WQS" --help
 )"
 if [[ "$CLI_HELP" != *"backtest"* || "$CLI_HELP" != *"research"* \
-    || "$CLI_HELP" != *"point-in-time"* ]]; then
+    || "$CLI_HELP" != *"point-in-time"* \
+    || "$CLI_HELP" != *"corporate-actions"* ]]; then
     echo "ERROR: Research CLI does not expose required commands."
     exit 1
 fi
@@ -377,6 +396,16 @@ RESEARCH_HELP="$(
 for command in register inspect record-outcome consume-holdout; do
     if [[ "$RESEARCH_HELP" != *"$command"* ]]; then
         echo "ERROR: Research CLI does not expose $command."
+        exit 1
+    fi
+done
+CORPORATE_ACTION_HELP="$(
+    cd "$TMP_DIR"
+    env -u PYTHONPATH PYTHONNOUSERSITE=1 "$WQS" corporate-actions --help
+)"
+for command in register inspect list backtest-context; do
+    if [[ "$CORPORATE_ACTION_HELP" != *"$command"* ]]; then
+        echo "ERROR: Corporate-action CLI does not expose $command."
         exit 1
     fi
 done

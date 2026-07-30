@@ -1,3 +1,7 @@
+from world_quant_system.backtest.corporate_actions import (
+    CorporateActionTimeline,
+    FlatRateDividendTaxModel,
+)
 from world_quant_system.backtest.engine import StrategyBacktestEngine
 from world_quant_system.backtest.execution import (
     BasisPointsCommissionModel,
@@ -8,6 +12,7 @@ from world_quant_system.backtest.execution import (
 from world_quant_system.backtest.interfaces import (
     BacktestResultWriter,
     CommissionModel,
+    DividendTaxModel,
     ExecutionModel,
     PortfolioLedger,
     PositionSizer,
@@ -56,9 +61,12 @@ __all__ = [
     "BuyAndHoldStrategy",
     "ClosedTrade",
     "CommissionModel",
+    "CorporateActionTimeline",
+    "DividendTaxModel",
     "ExecutionDecision",
     "ExecutionModel",
     "Fill",
+    "FlatRateDividendTaxModel",
     "FixedBasisPointsSlippageModel",
     "LongOnlyPortfolioLedger",
     "LongOnlyTargetPositionSizer",

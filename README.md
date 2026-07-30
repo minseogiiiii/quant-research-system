@@ -653,6 +653,189 @@ The simulation verifies insertion-order-independent snapshot and context
 digests, future-data rejection, membership-overlap rejection, and preservation
 of a historically valid security that was later delisted.
 
-This release does not calculate delisting returns, dividend reinvestment,
-split-adjusted series, mergers, spin-offs, or multi-asset portfolio effects.
-Those require separate market-specific corporate-action and portfolio models.
+The next section adds separate market-event accounting for splits, cash
+dividends, symbol changes, and explicit delisting economics. Raw prices remain
+immutable; mergers, spin-offs, and multi-asset consideration remain later
+phases.
+
+## Corporate Actions & Delisting Economics v1
+
+The research backtester now applies historically knowable corporate actions to
+portfolio accounting without rewriting raw or normalized OHLCV observations.
+Corporate-action metadata lives in a separate immutable SQLite catalog:
+
+```text
+data/
+├── normalized/
+│   └── normalized.sqlite3
+├── point_in_time/
+│   └── point_in_time.sqlite3
+└── corporate_actions/
+    └── corporate_actions.sqlite3
+```
+
+The first release supports:
+
+- forward splits and reverse splits
+- deterministic fractional-share rejection or explicit cash in lieu
+- cash-dividend entitlement at the ex timestamp and cash credit at payment
+- a separate, digest-pinned flat-rate dividend withholding model
+- symbol changes that preserve the open position and cost basis
+- delisting settlement by explicit cash price or recovery rate
+- zero-value delisting as an explicit full-loss outcome
+
+Raw and normalized prices are never overwritten. The event timeline is stored
+and applied separately, and the backtest result includes every application,
+its before/after quantity and cost basis, cash movement, tax, and reference
+price.
+
+Register a two-for-one split:
+
+```bash
+wqs corporate-actions register \
+  --root data/corporate_actions \
+  --exchange XKRX \
+  --symbol 005930 \
+  --type split \
+  --effective-at 2020-05-04T00:00:00+09:00 \
+  --available-at 2020-04-01T09:00:00+09:00 \
+  --source exchange-actions-v1 \
+  --source-digest <lowercase-sha256> \
+  --ratio-numerator 2 \
+  --ratio-denominator 1
+```
+
+A reverse split that can create fractional shares must either use the default
+fail-closed `reject` policy or provide an explicit cash-in-lieu price and run
+with the `cash_in_lieu` policy.
+
+Register a cash dividend. The effective timestamp must equal the ex timestamp,
+and declaration, ex, record, and payment times must be ordered:
+
+```bash
+wqs corporate-actions register \
+  --root data/corporate_actions \
+  --exchange XKRX \
+  --symbol 005930 \
+  --type cash_dividend \
+  --effective-at 2024-03-28T00:00:00+09:00 \
+  --available-at 2024-01-31T09:00:00+09:00 \
+  --declared-at 2024-01-31T09:00:00+09:00 \
+  --ex-at 2024-03-28T00:00:00+09:00 \
+  --record-at 2024-03-29T00:00:00+09:00 \
+  --payment-at 2024-04-19T00:00:00+09:00 \
+  --cash-amount-per-share 361 \
+  --source exchange-actions-v1 \
+  --source-digest <lowercase-sha256>
+```
+
+Dividend rights are fixed using the held quantity at the ex event. Selling
+before payment does not erase the entitlement. Net dividend proceeds are also
+attributed to the entitled trade so trade-level win rate and profit-factor
+metrics do not silently omit dividends paid after sale.
+
+Register a symbol change:
+
+```bash
+wqs corporate-actions register \
+  --root data/corporate_actions \
+  --exchange XNAS \
+  --symbol OLD \
+  --type symbol_change \
+  --effective-at 2023-06-01T00:00:00-04:00 \
+  --available-at 2023-05-01T09:00:00-04:00 \
+  --new-symbol NEW \
+  --source exchange-actions-v1 \
+  --source-digest <lowercase-sha256>
+```
+
+Register explicit delisting economics. Exactly one settlement method is
+required; missing settlement information is rejected rather than pretending
+the position was sold at the last normal close:
+
+```bash
+wqs corporate-actions register \
+  --root data/corporate_actions \
+  --exchange XNAS \
+  --symbol NEW \
+  --type delisting \
+  --effective-at 2024-01-15T00:00:00-05:00 \
+  --available-at 2024-01-05T09:00:00-05:00 \
+  --delisting-cash-price 0 \
+  --source delisting-economics-v1 \
+  --source-digest <lowercase-sha256>
+```
+
+Inspect or list immutable records and build a digest-pinned context:
+
+```bash
+wqs corporate-actions inspect \
+  --root data/corporate_actions \
+  --action-id <uuid>
+```
+
+```bash
+wqs corporate-actions list \
+  --root data/corporate_actions \
+  --exchange XKRX \
+  --symbol 005930 \
+  --start 2020-01-01 \
+  --end 2025-01-01
+```
+
+```bash
+wqs corporate-actions backtest-context \
+  --root data/corporate_actions \
+  --exchange XKRX \
+  --symbol 005930 \
+  --start 2020-01-01 \
+  --end 2025-01-01
+```
+
+Run a corporate-action-aware backtest:
+
+```bash
+wqs backtest \
+  --normalized-root data/normalized \
+  --corporate-action-root data/corporate_actions \
+  --exchange XKRX \
+  --strategy buy-and-hold \
+  --symbol 005930 \
+  --start 2020-01-01 \
+  --end 2024-12-31 \
+  --dividend-tax-rate 0.154 \
+  --fractional-share-policy reject
+```
+
+For a symbol-change path, replay can contain the predecessor and successor
+symbols only when they are pinned by the same corporate-action context. When
+point-in-time validation is also enabled, each symbol segment receives its own
+bounded lifecycle, universe-membership, and availability context. A pending
+order is cancelled at symbol-change and delisting boundaries rather than being
+silently filled against a different security identity.
+
+Corporate-action runs include these values in deterministic configuration and
+research fingerprints:
+
+- corporate-action context digest
+- corporate-action dataset and policy digests
+- dividend-tax model digest
+- point-in-time context digest when enabled
+- every corporate-action application in the final run digest
+
+Cash dividends that cross a requested backtest boundary are rejected in v1.
+This avoids omitting a pre-start entitlement or ending with an unvalued
+receivable. Mergers, spin-offs, stock dividends, rights offerings, dividend
+reinvestment, and multi-asset consideration remain later phases.
+
+Run the deterministic economics simulation with:
+
+```bash
+.venv/bin/python scripts/corporate_action_simulation.py
+```
+
+It verifies insertion-order-independent context digests, deterministic
+backtest digests, idempotent writes, conflict rejection, future-known action
+rejection, split basis preservation, after-sale dividend attribution,
+symbol continuity, and explicit zero-value delisting loss. The simulation and
+CLI remain networkless; live trading and broker order submission stay disabled.

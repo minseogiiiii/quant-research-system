@@ -1095,7 +1095,98 @@ def _intervals_cover(
     return cursor >= target
 
 
+class PointInTimeValidatedMultiSymbolCandleReader:
+    """Fail-closed point-in-time validation for one symbol-change path."""
+
+    def __init__(
+        self,
+        reader: NormalizedMarketDataReader,
+        store: SQLitePointInTimeStore,
+        contexts: tuple[PointInTimeBacktestContext, ...],
+    ) -> None:
+        if not contexts:
+            raise PointInTimeIntegrityError(
+                "Multi-symbol validation requires at least one context."
+            )
+        by_symbol: dict[str, PointInTimeBacktestContext] = {}
+        first = contexts[0]
+        for context in contexts:
+            if context.symbol in by_symbol:
+                raise PointInTimeIntegrityError(
+                    "Multi-symbol point-in-time contexts cannot repeat symbols."
+                )
+            if (
+                context.universe_id != first.universe_id
+                or context.exchange != first.exchange
+                or context.policy != first.policy
+            ):
+                raise PointInTimeIntegrityError(
+                    "Multi-symbol contexts must share universe, venue, and policy."
+                )
+            by_symbol[context.symbol] = context
+        self._reader = reader
+        self._store = store
+        self._contexts = tuple(sorted(contexts, key=lambda item: item.symbol))
+        self._by_symbol = by_symbol
+
+    @property
+    def context_digest(self) -> str:
+        documents = [context.to_document() for context in self._contexts]
+        return hashlib.sha256(canonical_json_bytes(documents)).hexdigest()
+
+    async def query_candles(
+        self,
+        *,
+        symbols: Sequence[str] | None = None,
+        interval: CandleInterval | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        statuses: Sequence[QualityStatus] | None = None,
+        after: NormalizedCandleCursor | None = None,
+        limit: int = 1_000,
+    ) -> tuple[NormalizedCandleRecord, ...]:
+        records = await self._reader.query_candles(
+            symbols=symbols,
+            interval=interval,
+            start=start,
+            end=end,
+            statuses=statuses,
+            after=after,
+            limit=limit,
+        )
+        for record in records:
+            candle = record.candle
+            context = self._by_symbol.get(candle.symbol.upper())
+            if context is None:
+                raise PointInTimeEligibilityError(
+                    "Replay candle symbol is not pinned by the validated contexts."
+                )
+            if not context.start <= candle.timestamp < context.end:
+                raise PointInTimeEligibilityError(
+                    "Replay candle falls outside its point-in-time context."
+                )
+            grant = await self._store.validate_access(
+                universe_id=context.universe_id,
+                exchange=context.exchange,
+                symbol=context.symbol,
+                data_id=record.item_id,
+                event_at=candle.timestamp,
+                decision_at=candle.timestamp,
+                policy=context.policy,
+            )
+            if (
+                grant.lifecycle_id != context.lifecycle_id
+                or grant.membership_id not in context.membership_ids
+                or grant.availability_id not in context.availability_ids
+            ):
+                raise PointInTimeIntegrityError(
+                    "Replay metadata is not pinned by the validated context digest."
+                )
+        return records
+
+
 __all__ = [
     "PointInTimeValidatedCandleReader",
+    "PointInTimeValidatedMultiSymbolCandleReader",
     "SQLitePointInTimeStore",
 ]

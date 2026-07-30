@@ -42,6 +42,17 @@ class CommissionModel(Protocol):
         ...
 
 
+class DividendTaxModel(Protocol):
+    @property
+    def fingerprint(self) -> str:
+        """Return deterministic identity for the dividend tax assumptions."""
+        ...
+
+    def calculate(self, gross_dividend: Decimal) -> Decimal:
+        """Return deterministic tax withheld from a nonnegative gross dividend."""
+        ...
+
+
 class SlippageModel(Protocol):
     def execution_price(
         self,

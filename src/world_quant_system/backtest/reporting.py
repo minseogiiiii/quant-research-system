@@ -13,6 +13,7 @@ from world_quant_system.backtest.models import (
     metrics_document,
 )
 from world_quant_system.data.normalized_models import canonical_json_bytes
+from world_quant_system.research import CorporateActionType
 
 
 class AtomicJsonBacktestSummaryWriter:
@@ -98,5 +99,17 @@ def backtest_summary_document(result: BacktestRunResult) -> dict[str, object]:
         },
         "fill_count": len(result.fills),
         "closed_trade_count": len(result.trades),
+        "corporate_action_count": len(result.corporate_actions),
+        "corporate_action_type_counts": {
+            action_type.value: sum(
+                application.action_type is action_type
+                for application in result.corporate_actions
+            )
+            for action_type in CorporateActionType
+        },
+        "corporate_actions": [
+            application.to_document()
+            for application in result.corporate_actions
+        ],
         "metrics": metrics_document(result.metrics),
     }

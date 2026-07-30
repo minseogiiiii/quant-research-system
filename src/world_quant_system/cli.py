@@ -16,6 +16,8 @@ from world_quant_system.backtest import (
     BacktestError,
     BacktestRunResult,
     BuyAndHoldStrategy,
+    CorporateActionTimeline,
+    FlatRateDividendTaxModel,
     OrderStatus,
     SmaCrossoverStrategy,
     Strategy,
@@ -29,6 +31,10 @@ from world_quant_system.data import (
 from world_quant_system.domain import CandleInterval
 from world_quant_system.replay import ReplayConfig, ReplayError
 from world_quant_system.research import (
+    CorporateActionBacktestContext,
+    CorporateActionPolicy,
+    CorporateActionRecord,
+    CorporateActionType,
     DataAvailabilityRecord,
     DelistingReason,
     DelistingRecord,
@@ -37,6 +43,7 @@ from world_quant_system.research import (
     ExperimentSnapshot,
     ExperimentSpec,
     ExperimentStatus,
+    FractionalSharePolicy,
     HoldoutConsumption,
     ParameterSearchAudit,
     PointInTimeAccessGrant,
@@ -44,14 +51,17 @@ from world_quant_system.research import (
     PointInTimeDataKind,
     PointInTimeSnapshot,
     PointInTimeValidatedCandleReader,
+    PointInTimeValidatedMultiSymbolCandleReader,
     ResearchError,
     ResearchSplit,
     ResearchWindow,
     SecurityLifecycle,
+    SQLiteCorporateActionStore,
     SQLiteExperimentRegistry,
     SQLitePointInTimeStore,
     UniverseMembership,
     canonical_json_object,
+    corporate_action_policy_json,
     point_in_time_policy_json,
 )
 
@@ -112,6 +122,90 @@ def build_parser() -> argparse.ArgumentParser:
     )
     backtest.add_argument("--universe-id")
     backtest.add_argument("--exchange")
+    backtest.add_argument(
+        "--corporate-action-root",
+        type=Path,
+        help="Apply a validated corporate-action catalog during replay.",
+    )
+    backtest.add_argument(
+        "--dividend-tax-rate",
+        default="0",
+        help="Flat dividend withholding rate from 0 to 1.",
+    )
+    backtest.add_argument(
+        "--fractional-share-policy",
+        choices=tuple(policy.value for policy in FractionalSharePolicy),
+        default=FractionalSharePolicy.REJECT.value,
+    )
+
+    corporate_actions = subparsers.add_parser(
+        "corporate-actions",
+        help="Manage immutable corporate-action and delisting economics.",
+    )
+    action_subparsers = corporate_actions.add_subparsers(
+        dest="corporate_action_command",
+        required=True,
+    )
+    register_action = action_subparsers.add_parser(
+        "register",
+        help="Register one immutable corporate action.",
+    )
+    register_action.add_argument("--root", type=Path, required=True)
+    register_action.add_argument("--exchange", required=True)
+    register_action.add_argument("--symbol", required=True)
+    register_action.add_argument(
+        "--type",
+        choices=tuple(action_type.value for action_type in CorporateActionType),
+        required=True,
+    )
+    register_action.add_argument("--effective-at", required=True)
+    register_action.add_argument("--available-at", required=True)
+    register_action.add_argument("--source", required=True)
+    register_action.add_argument("--source-digest", required=True)
+    register_action.add_argument("--ratio-numerator", type=int)
+    register_action.add_argument("--ratio-denominator", type=int)
+    register_action.add_argument("--cash-amount-per-share")
+    register_action.add_argument("--declared-at")
+    register_action.add_argument("--ex-at")
+    register_action.add_argument("--record-at")
+    register_action.add_argument("--payment-at")
+    register_action.add_argument("--new-symbol")
+    register_action.add_argument("--cash-in-lieu-price")
+    register_action.add_argument("--delisting-cash-price")
+    register_action.add_argument("--delisting-recovery-rate")
+
+    inspect_action = action_subparsers.add_parser(
+        "inspect",
+        help="Inspect one immutable corporate action.",
+    )
+    inspect_action.add_argument("--root", type=Path, required=True)
+    inspect_action.add_argument("--action-id", required=True)
+
+    list_actions = action_subparsers.add_parser(
+        "list",
+        help="List actions for one security and period.",
+    )
+    list_actions.add_argument("--root", type=Path, required=True)
+    list_actions.add_argument("--exchange", required=True)
+    list_actions.add_argument("--symbol", required=True)
+    list_actions.add_argument("--start")
+    list_actions.add_argument("--end")
+
+    action_context = action_subparsers.add_parser(
+        "backtest-context",
+        help="Build one deterministic corporate-action backtest context.",
+    )
+    action_context.add_argument("--root", type=Path, required=True)
+    action_context.add_argument("--exchange", required=True)
+    action_context.add_argument("--symbol", required=True)
+    action_context.add_argument("--start", required=True)
+    action_context.add_argument("--end", required=True)
+    action_context.add_argument("--expected-delisted-at")
+    action_context.add_argument(
+        "--fractional-share-policy",
+        choices=tuple(policy.value for policy in FractionalSharePolicy),
+        default=FractionalSharePolicy.REJECT.value,
+    )
 
     research = subparsers.add_parser(
         "research",
@@ -148,6 +242,9 @@ def build_parser() -> argparse.ArgumentParser:
     register.add_argument("--change-reason")
     register.add_argument("--point-in-time-context-digest")
     register.add_argument("--point-in-time-policy-json")
+    register.add_argument("--corporate-action-context-digest")
+    register.add_argument("--corporate-action-policy-json")
+    register.add_argument("--dividend-tax-model-digest")
 
     inspect = research_subparsers.add_parser(
         "inspect",
@@ -301,6 +398,9 @@ def main(argv: list[str] | None = None) -> None:
             if arguments.json_output is not None:
                 AtomicJsonBacktestSummaryWriter(arguments.json_output).write(result)
             return
+        if arguments.command == "corporate-actions":
+            print(asyncio.run(_run_corporate_actions(arguments)))
+            return
         if arguments.command == "research":
             print(asyncio.run(_run_research(arguments)))
             return
@@ -330,26 +430,78 @@ async def _run_backtest(arguments: argparse.Namespace) -> BacktestRunResult:
     interval = CandleInterval(arguments.interval)
     start = _parse_time(arguments.start, is_end=False)
     end = _parse_time(arguments.end, is_end=True)
+    normalized_store = SQLiteNormalizedMarketDataStore(root)
+    replay_symbols: tuple[str, ...] = (str(arguments.symbol).strip().upper(),)
+    corporate_action_context: CorporateActionBacktestContext | None = None
+    corporate_action_timeline: CorporateActionTimeline | None = None
+    corporate_actions: tuple[CorporateActionRecord, ...] = ()
+    dividend_tax_model: FlatRateDividendTaxModel | None = None
+
+    if arguments.corporate_action_root is not None:
+        if start is None or end is None or arguments.exchange is None:
+            raise BacktestConfigurationError(
+                "Corporate-action backtests require --start, --end, and --exchange."
+            )
+        action_store = SQLiteCorporateActionStore(
+            arguments.corporate_action_root.expanduser().resolve()
+        )
+        expected_delisted_at: datetime | None = None
+        if arguments.point_in_time_root is not None:
+            point_store = SQLitePointInTimeStore(
+                arguments.point_in_time_root.expanduser().resolve()
+            )
+            lifecycle = await point_store.get_security(
+                arguments.exchange,
+                arguments.symbol,
+            )
+            expected_delisted_at = lifecycle.delisted_at
+        action_policy = CorporateActionPolicy(
+            fractional_share_policy=FractionalSharePolicy(
+                arguments.fractional_share_policy
+            )
+        )
+        corporate_action_context = await action_store.build_backtest_context(
+            exchange=arguments.exchange,
+            initial_symbol=arguments.symbol,
+            start=start,
+            end=_exclusive_end(end),
+            policy=action_policy,
+            expected_delisted_at=expected_delisted_at,
+        )
+        corporate_actions = await action_store.load_context_actions(
+            corporate_action_context
+        )
+        corporate_action_timeline = CorporateActionTimeline(
+            corporate_action_context,
+            corporate_actions,
+        )
+        dividend_tax_model = FlatRateDividendTaxModel(
+            _decimal(arguments.dividend_tax_rate, "dividend tax rate")
+        )
+        replay_symbols = corporate_action_context.symbols
+
     replay = ReplayConfig(
-        symbols=(arguments.symbol,),
+        symbols=replay_symbols,
         interval=interval,
         start=start,
         end=end,
         include_warnings=not arguments.pass_only,
         page_size=arguments.page_size,
     )
-    normalized_store = SQLiteNormalizedMarketDataStore(root)
     reader: NormalizedMarketDataReader = normalized_store
     data_context_digest: str | None = None
     point_in_time_values = (
         arguments.point_in_time_root,
         arguments.universe_id,
-        arguments.exchange,
     )
     if any(value is not None for value in point_in_time_values):
         if not all(value is not None for value in point_in_time_values):
             raise BacktestConfigurationError(
-                "Point-in-time root, universe ID, and exchange are required together."
+                "Point-in-time root and universe ID are required together."
+            )
+        if arguments.exchange is None:
+            raise BacktestConfigurationError(
+                "Point-in-time backtests also require --exchange."
             )
         if start is None or end is None:
             raise BacktestConfigurationError(
@@ -358,21 +510,47 @@ async def _run_backtest(arguments: argparse.Namespace) -> BacktestRunResult:
         point_in_time_store = SQLitePointInTimeStore(
             arguments.point_in_time_root.expanduser().resolve()
         )
-        context = await point_in_time_store.build_backtest_context(
-            universe_id=arguments.universe_id,
-            exchange=arguments.exchange,
-            symbol=arguments.symbol,
-            start=start,
-            end=_exclusive_end(end),
-        )
-        reader = PointInTimeValidatedCandleReader(
-            normalized_store,
-            point_in_time_store,
-            context,
-        )
-        data_context_digest = context.context_digest
+        exclusive_end = _exclusive_end(end)
+        if corporate_action_context is None:
+            context = await point_in_time_store.build_backtest_context(
+                universe_id=arguments.universe_id,
+                exchange=arguments.exchange,
+                symbol=arguments.symbol,
+                start=start,
+                end=exclusive_end,
+            )
+            if context.delisting_id is not None:
+                raise BacktestConfigurationError(
+                    "Delisted-security backtests require --corporate-action-root."
+                )
+            validated_reader = PointInTimeValidatedCandleReader(
+                normalized_store,
+                point_in_time_store,
+                context,
+            )
+            reader = validated_reader
+            data_context_digest = validated_reader.context_digest
+        else:
+            contexts = await _build_point_in_time_symbol_contexts(
+                store=point_in_time_store,
+                universe_id=arguments.universe_id,
+                exchange=arguments.exchange,
+                start=start,
+                end=exclusive_end,
+                corporate_action_context=corporate_action_context,
+                actions=corporate_actions,
+            )
+            multi_reader = PointInTimeValidatedMultiSymbolCandleReader(
+                normalized_store,
+                point_in_time_store,
+                contexts,
+            )
+            reader = multi_reader
+            data_context_digest = multi_reader.context_digest
+
     config = BacktestConfig(
         replay=replay,
+        initial_symbol=arguments.symbol,
         initial_cash=_decimal(arguments.initial_cash, "initial cash"),
         commission_bps=_decimal(arguments.commission_bps, "commission bps"),
         slippage_bps=_decimal(arguments.slippage_bps, "slippage bps"),
@@ -385,8 +563,142 @@ async def _run_backtest(arguments: argparse.Namespace) -> BacktestRunResult:
             arguments.annualization_periods,
         ),
         data_context_digest=data_context_digest,
+        corporate_action_context_digest=(
+            None
+            if corporate_action_context is None
+            else corporate_action_context.context_digest
+        ),
+        dividend_tax_model_digest=(
+            None if dividend_tax_model is None else dividend_tax_model.fingerprint
+        ),
     )
-    return await StrategyBacktestEngine(reader, config, strategy).run()
+    return await StrategyBacktestEngine(
+        reader,
+        config,
+        strategy,
+        corporate_action_timeline=corporate_action_timeline,
+        dividend_tax_model=dividend_tax_model,
+    ).run()
+
+
+async def _build_point_in_time_symbol_contexts(
+    *,
+    store: SQLitePointInTimeStore,
+    universe_id: str,
+    exchange: str,
+    start: datetime,
+    end: datetime,
+    corporate_action_context: CorporateActionBacktestContext,
+    actions: tuple[CorporateActionRecord, ...],
+) -> tuple[PointInTimeBacktestContext, ...]:
+    segments: list[tuple[str, datetime, datetime]] = []
+    current_symbol = corporate_action_context.initial_symbol
+    segment_start = start
+    for action in sorted(actions, key=lambda item: item.effective_at):
+        if action.action_type is CorporateActionType.SYMBOL_CHANGE:
+            if segment_start >= action.effective_at:
+                raise BacktestConfigurationError(
+                    "Symbol-change segments must have positive duration."
+                )
+            segments.append((current_symbol, segment_start, action.effective_at))
+            assert action.new_symbol is not None
+            current_symbol = action.new_symbol
+            segment_start = action.effective_at
+        elif action.action_type is CorporateActionType.DELISTING:
+            if segment_start < action.effective_at:
+                segments.append(
+                    (current_symbol, segment_start, action.effective_at)
+                )
+            segment_start = end
+            break
+    if segment_start < end:
+        segments.append((current_symbol, segment_start, end))
+    if tuple(symbol for symbol, _, _ in segments) != (
+        corporate_action_context.symbols
+    ):
+        raise BacktestConfigurationError(
+            "Point-in-time segments do not match the corporate-action symbol path."
+        )
+    contexts: list[PointInTimeBacktestContext] = []
+    for symbol, segment_start, segment_end in segments:
+        contexts.append(
+            await store.build_backtest_context(
+                universe_id=universe_id,
+                exchange=exchange,
+                symbol=symbol,
+                start=segment_start,
+                end=segment_end,
+            )
+        )
+    return tuple(contexts)
+
+
+async def _run_corporate_actions(arguments: argparse.Namespace) -> str:
+    store = SQLiteCorporateActionStore(arguments.root.expanduser().resolve())
+    command = arguments.corporate_action_command
+    if command == "register":
+        action = CorporateActionRecord(
+            exchange=arguments.exchange,
+            symbol=arguments.symbol,
+            action_type=CorporateActionType(arguments.type),
+            effective_at=_parse_research_boundary(arguments.effective_at),
+            available_at=_parse_research_boundary(arguments.available_at),
+            source=arguments.source,
+            source_digest=arguments.source_digest,
+            ratio_numerator=arguments.ratio_numerator,
+            ratio_denominator=arguments.ratio_denominator,
+            cash_amount_per_share=_optional_decimal_argument(
+                arguments.cash_amount_per_share,
+                "cash amount per share",
+            ),
+            declared_at=_optional_research_boundary(arguments.declared_at),
+            ex_at=_optional_research_boundary(arguments.ex_at),
+            record_at=_optional_research_boundary(arguments.record_at),
+            payment_at=_optional_research_boundary(arguments.payment_at),
+            new_symbol=arguments.new_symbol,
+            cash_in_lieu_price=_optional_decimal_argument(
+                arguments.cash_in_lieu_price,
+                "cash-in-lieu price",
+            ),
+            delisting_cash_price=_optional_decimal_argument(
+                arguments.delisting_cash_price,
+                "delisting cash price",
+            ),
+            delisting_recovery_rate=_optional_decimal_argument(
+                arguments.delisting_recovery_rate,
+                "delisting recovery rate",
+            ),
+        )
+        return _format_corporate_action(await store.save_action(action))
+    if command == "inspect":
+        return _format_corporate_action(
+            await store.get_action(arguments.action_id)
+        )
+    if command == "list":
+        actions = await store.list_actions(
+            exchange=arguments.exchange,
+            symbol=arguments.symbol,
+            start=_optional_research_boundary(arguments.start),
+            end=_optional_research_boundary(arguments.end),
+        )
+        return _format_corporate_action_list(actions)
+    if command == "backtest-context":
+        context = await store.build_backtest_context(
+            exchange=arguments.exchange,
+            initial_symbol=arguments.symbol,
+            start=_parse_research_boundary(arguments.start),
+            end=_parse_research_boundary(arguments.end),
+            policy=CorporateActionPolicy(
+                fractional_share_policy=FractionalSharePolicy(
+                    arguments.fractional_share_policy
+                )
+            ),
+            expected_delisted_at=_optional_research_boundary(
+                arguments.expected_delisted_at
+            ),
+        )
+        return _format_corporate_action_context(context)
+    _unreachable()
 
 
 async def _run_research(arguments: argparse.Namespace) -> str:
@@ -448,6 +760,18 @@ async def _run_research(arguments: argparse.Namespace) -> str:
                     "point-in-time policy",
                 )
             ),
+            corporate_action_context_digest=(
+                arguments.corporate_action_context_digest
+            ),
+            corporate_action_policy_json=(
+                None
+                if arguments.corporate_action_policy_json is None
+                else _canonical_json_argument(
+                    arguments.corporate_action_policy_json,
+                    "corporate-action policy",
+                )
+            ),
+            dividend_tax_model_digest=arguments.dividend_tax_model_digest,
         )
         record = await registry.register(spec)
         return _format_research_registration(record)
@@ -838,6 +1162,71 @@ def _format_access_grant(grant: PointInTimeAccessGrant) -> str:
     )
 
 
+def _format_corporate_action(action: CorporateActionRecord) -> str:
+    details = json.dumps(
+        action.to_document(),
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return "\n".join(
+        (
+            "Execution mode: CORPORATE_ACTION_CATALOG",
+            "Network access: DISABLED",
+            "Live trading: DISABLED",
+            "Order submission: DISABLED",
+            "",
+            f"Action ID:           {action.action_id}",
+            f"Security:            {action.exchange}:{action.symbol}",
+            f"Action type:         {action.action_type.value}",
+            f"Effective at:        {action.effective_at.isoformat()}",
+            f"Available at:        {action.available_at.isoformat()}",
+            f"Action JSON:         {details}",
+        )
+    )
+
+
+def _format_corporate_action_list(
+    actions: tuple[CorporateActionRecord, ...],
+) -> str:
+    action_lines = tuple(
+        f"{action.effective_at.isoformat()} | {action.action_type.value} | "
+        f"{action.symbol} | {action.action_id}"
+        for action in actions
+    )
+    return "\n".join(
+        (
+            "Execution mode: CORPORATE_ACTION_CATALOG",
+            "Network access: DISABLED",
+            "Live trading: DISABLED",
+            "Order submission: DISABLED",
+            "",
+            f"Actions:              {len(actions)}",
+            *(action_lines or ("No matching actions.",)),
+        )
+    )
+
+
+def _format_corporate_action_context(
+    context: CorporateActionBacktestContext,
+) -> str:
+    return "\n".join(
+        (
+            "Execution mode: CORPORATE_ACTION_CATALOG",
+            "Network access: DISABLED",
+            "Live trading: DISABLED",
+            "Order submission: DISABLED",
+            "",
+            f"Security path:       {' -> '.join(context.symbols)}",
+            f"Period:              {context.start.isoformat()} -> "
+            f"{context.end.isoformat()}",
+            f"Actions:             {len(context.action_ids)}",
+            f"Dataset digest:      {context.action_dataset_digest}",
+            f"Policy JSON:         {corporate_action_policy_json(context.policy)}",
+            f"Context digest:      {context.context_digest}",
+        )
+    )
+
+
 def _optional_iso_output(value: datetime | None) -> str:
     return "N/A" if value is None else value.isoformat()
 
@@ -885,6 +1274,13 @@ def _parse_time(value: str | None, *, is_end: bool) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
+def _optional_decimal_argument(
+    value: str | None,
+    field_name: str,
+) -> Decimal | None:
+    return None if value is None else _decimal(value, field_name)
+
+
 def _decimal(value: str, field_name: str) -> Decimal:
     try:
         parsed = Decimal(value)
@@ -919,7 +1315,8 @@ def _format_result(result: BacktestRunResult) -> str:
         if result.replay_result.last_event_at is None
         else result.replay_result.last_event_at.isoformat()
     )
-    final_quantity = 0 if not result.equity_curve else result.equity_curve[-1].quantity
+    final_snapshot = None if not result.equity_curve else result.equity_curve[-1]
+    final_quantity = 0 if final_snapshot is None else final_snapshot.quantity
     filled_orders = sum(
         record.status is OrderStatus.FILLED for record in result.orders
     )
@@ -931,6 +1328,26 @@ def _format_result(result: BacktestRunResult) -> str:
     )
     expired_orders = sum(
         record.status is OrderStatus.EXPIRED for record in result.orders
+    )
+    dividend_gross = (
+        Decimal("0")
+        if final_snapshot is None
+        else final_snapshot.total_dividend_gross
+    )
+    dividend_tax = (
+        Decimal("0")
+        if final_snapshot is None
+        else final_snapshot.total_dividend_tax
+    )
+    dividend_net = (
+        Decimal("0")
+        if final_snapshot is None
+        else final_snapshot.total_dividend_net
+    )
+    cash_in_lieu = (
+        Decimal("0")
+        if final_snapshot is None
+        else final_snapshot.total_cash_in_lieu
     )
     lines = [
         "Execution mode: REPLAY",
@@ -972,9 +1389,18 @@ def _format_result(result: BacktestRunResult) -> str:
         f"Final quantity:      {final_quantity}",
         f"Commission cost:     {metrics.commission_cost:,.2f}",
         f"Slippage cost:       {metrics.slippage_cost:,.2f}",
+        f"Corporate actions:   {len(result.corporate_actions)}",
+        f"Dividend gross:      {dividend_gross:,.2f}",
+        f"Dividend tax:        {dividend_tax:,.2f}",
+        f"Dividend net:        {dividend_net:,.2f}",
+        f"Cash in lieu:        {cash_in_lieu:,.2f}",
         f"Replay digest:       {result.replay_result.event_digest}",
         "Data context:        "
         f"{result.config.data_context_digest or 'NOT_VALIDATED'}",
+        "Corporate context:   "
+        f"{result.config.corporate_action_context_digest or 'NOT_APPLIED'}",
+        "Dividend tax model:  "
+        f"{result.config.dividend_tax_model_digest or 'NOT_APPLIED'}",
         f"Config fingerprint:  {result.config_fingerprint}",
         f"Run digest:          {result.run_digest}",
     ]

@@ -175,3 +175,32 @@ def test_outcome_enforces_success_and_failure_shapes() -> None:
             status=ExperimentStatus.SUCCEEDED,
             completed_at=now,
         )
+
+
+def test_corporate_action_context_is_pinned_in_research_digest() -> None:
+    policy_json = canonical_json_object(
+        {
+            "fractional_share_policy": "reject",
+            "require_explicit_delisting_value": True,
+            "require_known_before_event": True,
+        }
+    )
+    candidate = spec(
+        corporate_action_context_digest="d" * 64,
+        corporate_action_policy_json=policy_json,
+        dividend_tax_model_digest="e" * 64,
+    )
+
+    assert candidate.to_document()["corporate_actions"] == {
+        "context_digest": "d" * 64,
+        "policy": {
+            "fractional_share_policy": "reject",
+            "require_explicit_delisting_value": True,
+            "require_known_before_event": True,
+        },
+        "dividend_tax_model_digest": "e" * 64,
+    }
+    assert candidate.research_digest != spec().research_digest
+
+    with pytest.raises(ResearchConfigurationError):
+        spec(corporate_action_context_digest="d" * 64)

@@ -1,3 +1,24 @@
+from world_quant_system.research.corporate_action_models import (
+    CorporateActionApplication,
+    CorporateActionBacktestContext,
+    CorporateActionConfigurationError,
+    CorporateActionConflictError,
+    CorporateActionEligibilityError,
+    CorporateActionError,
+    CorporateActionEvent,
+    CorporateActionEventPhase,
+    CorporateActionIntegrityError,
+    CorporateActionInvariantError,
+    CorporateActionNotFoundError,
+    CorporateActionPolicy,
+    CorporateActionRecord,
+    CorporateActionType,
+    FractionalSharePolicy,
+    corporate_action_policy_json,
+)
+from world_quant_system.research.corporate_action_store import (
+    SQLiteCorporateActionStore,
+)
 from world_quant_system.research.models import (
     ExperimentOutcome,
     ExperimentRecord,
@@ -42,6 +63,7 @@ from world_quant_system.research.point_in_time_models import (
 )
 from world_quant_system.research.point_in_time_store import (
     PointInTimeValidatedCandleReader,
+    PointInTimeValidatedMultiSymbolCandleReader,
     SQLitePointInTimeStore,
 )
 from world_quant_system.research.registry import SQLiteExperimentRegistry
@@ -50,6 +72,20 @@ __all__ = [
     "AsOfPolicy",
     "AvailabilityPolicy",
     "DataAvailabilityRecord",
+    "CorporateActionApplication",
+    "CorporateActionBacktestContext",
+    "CorporateActionConfigurationError",
+    "CorporateActionConflictError",
+    "CorporateActionEligibilityError",
+    "CorporateActionError",
+    "CorporateActionEvent",
+    "CorporateActionEventPhase",
+    "CorporateActionIntegrityError",
+    "CorporateActionInvariantError",
+    "CorporateActionNotFoundError",
+    "CorporateActionPolicy",
+    "CorporateActionRecord",
+    "CorporateActionType",
     "DelistingPolicy",
     "DelistingReason",
     "DelistingRecord",
@@ -58,6 +94,7 @@ __all__ = [
     "ExperimentSnapshot",
     "ExperimentSpec",
     "ExperimentStatus",
+    "FractionalSharePolicy",
     "HoldoutConsumedError",
     "HoldoutConsumption",
     "ParameterSearchAudit",
@@ -75,6 +112,7 @@ __all__ = [
     "PointInTimePolicy",
     "PointInTimeSnapshot",
     "PointInTimeValidatedCandleReader",
+    "PointInTimeValidatedMultiSymbolCandleReader",
     "ResearchConfigurationError",
     "ResearchConflictError",
     "ResearchError",
@@ -82,10 +120,12 @@ __all__ = [
     "ResearchNotFoundError",
     "ResearchSplit",
     "ResearchWindow",
+    "SQLiteCorporateActionStore",
     "SQLiteExperimentRegistry",
     "SQLitePointInTimeStore",
     "SecurityLifecycle",
     "UniverseMembership",
     "canonical_json_object",
+    "corporate_action_policy_json",
     "point_in_time_policy_json",
 ]

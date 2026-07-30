@@ -16,6 +16,7 @@ from world_quant_system.research import (
     PointInTimeEligibilityError,
     PointInTimeIntegrityError,
     PointInTimeValidatedCandleReader,
+    PointInTimeValidatedMultiSymbolCandleReader,
     SecurityLifecycle,
     SQLitePointInTimeStore,
     UniverseMembership,
@@ -207,3 +208,114 @@ async def test_validated_reader_rejects_metadata_added_after_context_build(
 
     with pytest.raises(PointInTimeIntegrityError):
         await reader.query_candles(limit=10)
+
+
+@pytest.mark.asyncio
+async def test_multi_symbol_reader_validates_one_symbol_change_path(
+    tmp_path: Path,
+) -> None:
+    old_timestamp = START + timedelta(days=1)
+    new_timestamp = START + timedelta(days=3)
+
+    def item(symbol: str, timestamp: datetime, identity: str) -> NormalizedCandleRecord:
+        return NormalizedCandleRecord(
+            item_id=str(uuid5(_NAMESPACE, f"item-{identity}")),
+            candle=Candle(
+                symbol=symbol,
+                interval=CandleInterval.DAY_1,
+                timestamp=timestamp,
+                open_price=Decimal("10"),
+                high_price=Decimal("10"),
+                low_price=Decimal("10"),
+                close_price=Decimal("10"),
+                volume=1_000,
+                currency="USD",
+                source="test",
+            ),
+            quality_status=QualityStatus.PASS,
+            raw_record_id=str(uuid5(_NAMESPACE, f"raw-{identity}")),
+            raw_content_sha256="d" * 64,
+            quality_report_id=str(uuid5(_NAMESPACE, f"report-{identity}")),
+            normalized_at=timestamp + timedelta(hours=1),
+            normalizer_version="1.0.0",
+            content_sha256="e" * 64,
+            schema_version=1,
+            lineage_count=1,
+        )
+
+    candidate_records = (
+        item("OLD", old_timestamp, "old"),
+        item("NEW", new_timestamp, "new"),
+    )
+    store = SQLitePointInTimeStore(tmp_path / "pit")
+    for symbol in ("OLD", "NEW"):
+        await store.save_security(
+            SecurityLifecycle(
+                exchange="XNAS",
+                symbol=symbol,
+                listed_at=datetime(2000, 1, 1, tzinfo=UTC),
+                tradable_from=datetime(2000, 1, 1, tzinfo=UTC),
+                source="test",
+                source_digest="a" * 64,
+            )
+        )
+    for symbol, member_from, member_until in (
+        ("OLD", START, START + timedelta(days=2)),
+        (
+            "NEW",
+            START + timedelta(days=2),
+            START + timedelta(days=5),
+        ),
+    ):
+        await store.save_membership(
+            UniverseMembership(
+                universe_id="TEST",
+                exchange="XNAS",
+                symbol=symbol,
+                member_from=member_from,
+                member_until=member_until,
+                available_at=START,
+                source="test",
+                source_digest="b" * 64,
+            )
+        )
+    for record in candidate_records:
+        await store.save_availability(
+            DataAvailabilityRecord(
+                data_id=record.item_id,
+                data_kind=PointInTimeDataKind.CANDLE,
+                exchange="XNAS",
+                symbol=record.candle.symbol,
+                effective_at=record.candle.timestamp,
+                available_at=record.candle.timestamp,
+                source="test",
+                source_digest="c" * 64,
+            )
+        )
+    old_context = await store.build_backtest_context(
+        universe_id="TEST",
+        exchange="XNAS",
+        symbol="OLD",
+        start=START,
+        end=START + timedelta(days=2),
+    )
+    new_context = await store.build_backtest_context(
+        universe_id="TEST",
+        exchange="XNAS",
+        symbol="NEW",
+        start=START + timedelta(days=2),
+        end=START + timedelta(days=5),
+    )
+    reader = PointInTimeValidatedMultiSymbolCandleReader(
+        InMemoryNormalizedCandleReader(candidate_records),
+        store,
+        (old_context, new_context),
+    )
+    reversed_reader = PointInTimeValidatedMultiSymbolCandleReader(
+        InMemoryNormalizedCandleReader(candidate_records),
+        store,
+        (new_context, old_context),
+    )
+
+    assert await reader.query_candles(limit=10) == candidate_records
+    assert reader.context_digest == reversed_reader.context_digest

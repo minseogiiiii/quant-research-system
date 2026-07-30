@@ -10,6 +10,9 @@ from uuid import UUID
 
 from world_quant_system.data.normalized_models import canonical_json_bytes, format_utc
 from world_quant_system.replay import ReplayConfig, ReplayRunResult
+from world_quant_system.research.corporate_action_models import (
+    CorporateActionApplication,
+)
 
 _ZERO = Decimal("0")
 _ONE = Decimal("1")
@@ -46,6 +49,7 @@ class OrderRejectReason(StrEnum):
     NO_EXECUTABLE_VOLUME = "no_executable_volume"
     ZERO_QUANTITY = "zero_quantity"
     NO_NEXT_CANDLE = "no_next_candle"
+    CORPORATE_ACTION_BOUNDARY = "corporate_action_boundary"
 
 
 @dataclass(frozen=True, slots=True)
@@ -287,6 +291,11 @@ class PortfolioSnapshot:
     total_commission: Decimal
     total_slippage: Decimal
     exposure: Decimal
+    total_dividend_gross: Decimal = _ZERO
+    total_dividend_tax: Decimal = _ZERO
+    total_dividend_net: Decimal = _ZERO
+    total_cash_in_lieu: Decimal = _ZERO
+    corporate_action_count: int = 0
 
     def __post_init__(self) -> None:
         _require_aware(self.timestamp, "Portfolio snapshot timestamp")
@@ -301,6 +310,10 @@ class PortfolioSnapshot:
             ("Total commission", self.total_commission),
             ("Total slippage", self.total_slippage),
             ("Exposure", self.exposure),
+            ("Total dividend gross", self.total_dividend_gross),
+            ("Total dividend tax", self.total_dividend_tax),
+            ("Total dividend net", self.total_dividend_net),
+            ("Total cash in lieu", self.total_cash_in_lieu),
         ):
             _require_finite_nonnegative_decimal(field_value, field_name)
         _require_finite_positive_decimal(self.market_price, "Market price")
@@ -327,6 +340,16 @@ class PortfolioSnapshot:
         ):
             raise BacktestInvariantError(
                 "Average cost must equal position cost basis divided by quantity."
+            )
+        _require_nonnegative_int(
+            self.corporate_action_count,
+            "Corporate action count",
+        )
+        if self.total_dividend_net != (
+            self.total_dividend_gross - self.total_dividend_tax
+        ):
+            raise BacktestInvariantError(
+                "Net dividends must equal gross dividends less tax."
             )
         expected_unrealized = self.market_value - self.position_cost_basis
         if self.unrealized_pnl != expected_unrealized:
@@ -490,15 +513,36 @@ class BacktestConfig:
     max_volume_participation: Decimal = Decimal("0.10")
     annualization_periods: int = 252
     data_context_digest: str | None = None
+    initial_symbol: str | None = None
+    corporate_action_context_digest: str | None = None
+    dividend_tax_model_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.replay, ReplayConfig):
             raise BacktestConfigurationError(
                 "Backtest replay configuration must be a ReplayConfig."
             )
-        if len(self.replay.symbols) != 1:
-            raise BacktestConfigurationError(
-                "Backtest v1 supports exactly one symbol per run."
+        if self.initial_symbol is None:
+            if len(self.replay.symbols) != 1:
+                raise BacktestConfigurationError(
+                    "Multi-symbol replay requires an explicit initial symbol."
+                )
+            object.__setattr__(self, "initial_symbol", self.replay.symbols[0])
+        elif (
+            not isinstance(self.initial_symbol, str)
+            or not self.initial_symbol.strip()
+        ):
+            raise BacktestConfigurationError("Initial symbol cannot be blank.")
+        else:
+            normalized_initial_symbol = self.initial_symbol.strip().upper()
+            if normalized_initial_symbol not in self.replay.symbols:
+                raise BacktestConfigurationError(
+                    "Initial symbol must be included in replay symbols."
+                )
+            object.__setattr__(
+                self,
+                "initial_symbol",
+                normalized_initial_symbol,
             )
         _require_finite_positive_decimal(self.initial_cash, "Initial cash")
         _require_finite_nonnegative_decimal(
@@ -523,10 +567,35 @@ class BacktestConfig:
         _require_positive_int(self.annualization_periods, "Annualization periods")
         if self.data_context_digest is not None:
             _validate_sha256(self.data_context_digest, "Data context digest")
+        if self.corporate_action_context_digest is not None:
+            _validate_sha256(
+                self.corporate_action_context_digest,
+                "Corporate-action context digest",
+            )
+        if self.dividend_tax_model_digest is not None:
+            _validate_sha256(
+                self.dividend_tax_model_digest,
+                "Dividend tax model digest",
+            )
+        if (self.corporate_action_context_digest is None) != (
+            self.dividend_tax_model_digest is None
+        ):
+            raise BacktestConfigurationError(
+                "Corporate-action context and dividend-tax digests "
+                "are required together."
+            )
+        if (
+            len(self.replay.symbols) > 1
+            and self.corporate_action_context_digest is None
+        ):
+            raise BacktestConfigurationError(
+                "Multi-symbol replay requires a validated corporate-action context."
+            )
 
     @property
     def symbol(self) -> str:
-        return self.replay.symbols[0]
+        assert self.initial_symbol is not None
+        return self.initial_symbol
 
     @property
     def fingerprint(self) -> str:
@@ -539,9 +608,16 @@ class BacktestConfig:
                 self.max_volume_participation, "f"
             ),
             "annualization_periods": self.annualization_periods,
+            "initial_symbol": self.symbol,
         }
         if self.data_context_digest is not None:
             document["data_context_digest"] = self.data_context_digest
+        if self.corporate_action_context_digest is not None:
+            document["corporate_action_context_digest"] = (
+                self.corporate_action_context_digest
+            )
+        if self.dividend_tax_model_digest is not None:
+            document["dividend_tax_model_digest"] = self.dividend_tax_model_digest
         return hashlib.sha256(canonical_json_bytes(document)).hexdigest()
 
 
@@ -558,6 +634,7 @@ class BacktestRunResult:
     equity_curve: tuple[PortfolioSnapshot, ...]
     metrics: PerformanceMetrics
     run_digest: str
+    corporate_actions: tuple[CorporateActionApplication, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.config, BacktestConfig):
@@ -612,6 +689,13 @@ class BacktestRunResult:
                 "Backtest result must contain PerformanceMetrics."
             )
         _validate_sha256(self.run_digest, "Run digest")
+        if not isinstance(self.corporate_actions, tuple) or not all(
+            isinstance(item, CorporateActionApplication)
+            for item in self.corporate_actions
+        ):
+            raise BacktestConfigurationError(
+                "Corporate actions must be an immutable application tuple."
+            )
         if self.config.replay.fingerprint != self.replay_result.config_fingerprint:
             raise BacktestInvariantError(
                 "Backtest and replay configuration fingerprints must match."
@@ -642,10 +726,17 @@ def backtest_config_document(config: BacktestConfig) -> dict[str, object]:
             config.max_volume_participation, "f"
         ),
         "annualization_periods": config.annualization_periods,
+        "initial_symbol": config.symbol,
         "fingerprint": config.fingerprint,
     }
     if config.data_context_digest is not None:
         document["data_context_digest"] = config.data_context_digest
+    if config.corporate_action_context_digest is not None:
+        document["corporate_action_context_digest"] = (
+            config.corporate_action_context_digest
+        )
+    if config.dividend_tax_model_digest is not None:
+        document["dividend_tax_model_digest"] = config.dividend_tax_model_digest
     return document
 
 
@@ -712,6 +803,11 @@ def snapshot_document(snapshot: PortfolioSnapshot) -> dict[str, object]:
         "total_commission": format(snapshot.total_commission, "f"),
         "total_slippage": format(snapshot.total_slippage, "f"),
         "exposure": format(snapshot.exposure, "f"),
+        "total_dividend_gross": format(snapshot.total_dividend_gross, "f"),
+        "total_dividend_tax": format(snapshot.total_dividend_tax, "f"),
+        "total_dividend_net": format(snapshot.total_dividend_net, "f"),
+        "total_cash_in_lieu": format(snapshot.total_cash_in_lieu, "f"),
+        "corporate_action_count": snapshot.corporate_action_count,
     }
 
 
