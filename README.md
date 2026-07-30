@@ -988,3 +988,91 @@ wqs robustness \
 The resulting pass or failure is a research-policy decision, not evidence of
 future returns. A strategy that fails remains recorded rather than being
 silently discarded.
+
+## Statistical Validation & Overfitting Control v1
+
+This layer evaluates whether a completed strategy search is likely to contain
+selection bias or backtest overfitting. It does not optimize strategies and it
+must not be used as an objective function for selecting new parameters.
+
+Input is a strict, networkless wide CSV with one timestamp column and one
+periodic-return column per successful trial:
+
+```text
+timestamp,<trial-id-1>,<trial-id-2>,...
+2020-01-01T00:00:00Z,0.001,-0.002,...
+```
+
+All timestamps must be timezone-aware and strictly increasing. Every successful
+trial must have one finite return at every timestamp. Periodic returns must be
+greater than -1. Failed trials can be supplied explicitly or loaded from the
+immutable experiment registry. Declared trials with neither returns nor a
+recorded failure are counted as omitted, generate a warning, and force the
+report to fail.
+
+The report includes:
+
+- raw period and annualized Sharpe ratios
+- sample skewness and Pearson kurtosis
+- Probabilistic Sharpe Ratio against zero
+- Bonferroni family-wise error control
+- Benjamini-Hochberg false-discovery q-values
+- Deflated Sharpe Ratio using declared/effective trial count and cross-trial
+  Sharpe variance
+- combinatorially symmetric cross-validation (CSCV)
+- Probability of Backtest Overfitting (PBO)
+- probability that the in-sample-selected trial loses out of sample
+- in-sample versus out-of-sample rank correlation and rank-reversal detection
+- deterministic report ID and SHA-256 digest
+
+The CSCV implementation uses an even number of equal, contiguous time
+partitions. The observation count must be divisible by the configured partition
+count, each partition must contain at least four observations, and every
+in-sample combination is paired with its complement out of sample. PBO is the
+fraction of combinations where the in-sample winner ranks at or below the
+out-of-sample median.
+
+Example without a registry:
+
+```bash
+wqs statistical-validation \
+  --returns-csv data/research/search_returns.csv \
+  --dataset-digest <sha256> \
+  --search-id sma-grid-v2 \
+  --attempted-trials 81 \
+  --failed-trial 'trial-17=insufficient observations' \
+  --effective-trials 40 \
+  --cscv-partitions 8 \
+  --json-output data/research/statistical-validation.json
+```
+
+For stronger completeness guarantees, use experiment UUIDs as CSV column names
+and connect the registry:
+
+```bash
+wqs statistical-validation \
+  --returns-csv data/research/search_returns.csv \
+  --dataset-digest <sha256> \
+  --search-id sma-grid-v2 \
+  --registry-root data/research/registry \
+  --json-output data/research/statistical-validation.json
+```
+
+Registry mode requires every registered trial in the search to have an outcome.
+Successful experiment IDs must exactly match the CSV columns; failed outcomes
+are preserved in the report. The statistical report fails when registry
+coverage is incomplete, when declared trials are omitted, or when required DSR,
+PBO, rank-stability, Bonferroni, or false-discovery gates fail.
+
+Run the deterministic simulation with:
+
+```bash
+.venv/bin/python scripts/statistical_validation_simulation.py
+```
+
+The methodology follows Bailey and López de Prado's Deflated Sharpe Ratio and
+Bailey, Borwein, López de Prado, and Zhu's CSCV/PBO framework. The report remains
+an estimate whose quality depends on complete trial disclosure, representative
+historical data, and defensible assumptions about the effective number of
+independent trials. It does not establish future profitability or authorize
+live trading.

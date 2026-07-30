@@ -46,7 +46,7 @@ for executable in "$PYTHON" "$RUFF" "$MYPY" "$CONSOLE" "$WQS"; do
     fi
 done
 
-echo "1/18 Verifying the installed package outside the repository..."
+echo "1/17 Verifying the installed package outside the repository..."
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 (
@@ -111,9 +111,6 @@ from world_quant_system.research import (
     SQLiteHistoricalDatasetStore,
     SQLitePointInTimeStore,
     SecurityLifecycle,
-    StatisticalReturnsMatrix,
-    StatisticalValidationPolicy,
-    StatisticalValidationReport,
     UniverseMembership,
 )
 from world_quant_system.research.robustness import (
@@ -125,9 +122,6 @@ from world_quant_system.research.robustness_models import (
     RobustnessPolicy,
     RobustnessReport,
     WalkForwardPlan,
-)
-from world_quant_system.research.statistical_validation import (
-    DeterministicStatisticalValidator,
 )
 
 print(f"Package: {world_quant_system.__file__}")
@@ -200,13 +194,6 @@ print(
     f"{build_stress_scenarios.__name__}"
 )
 print(
-    "Statistical validation: "
-    f"{StatisticalReturnsMatrix.__name__}, "
-    f"{StatisticalValidationPolicy.__name__}, "
-    f"{StatisticalValidationReport.__name__}, "
-    f"{DeterministicStatisticalValidator.__name__}"
-)
-print(
     "Corporate actions: "
     f"{CorporateActionRecord.__name__}, "
     f"{CorporateActionType.__name__}, "
@@ -235,20 +222,20 @@ print(
 '
 )
 
-echo "2/18 Compiling source and tests..."
+echo "2/17 Compiling source and tests..."
 "$PYTHON" -m compileall -q src tests
 
-echo "3/18 Running tests..."
+echo "3/17 Running tests..."
 "$PYTHON" -m pytest -q
 
-echo "4/18 Running Ruff..."
+echo "4/17 Running Ruff..."
 rm -rf build dist
 "$RUFF" check .
 
-echo "5/18 Running mypy..."
+echo "5/17 Running mypy..."
 "$MYPY" src tests
 
-echo "6/18 Verifying fail-closed network behavior..."
+echo "6/17 Verifying fail-closed network behavior..."
 "$PYTHON" -c '
 import asyncio
 import tempfile
@@ -386,41 +373,38 @@ async def verify() -> None:
 asyncio.run(verify())
 '
 
-echo "7/18 Running deterministic data-quality simulation..."
+echo "7/17 Running deterministic data-quality simulation..."
 "$PYTHON" scripts/quality_gate_backtest.py
 
-echo "8/18 Running normalized-storage replay simulation..."
+echo "8/17 Running normalized-storage replay simulation..."
 "$PYTHON" scripts/normalized_replay_backtest.py
 
-echo "9/18 Running deterministic strategy backtest simulation..."
+echo "9/17 Running deterministic strategy backtest simulation..."
 "$PYTHON" scripts/strategy_backtest.py
 
-echo "10/18 Running deterministic research-validity simulation..."
+echo "10/17 Running deterministic research-validity simulation..."
 "$PYTHON" scripts/research_validity_simulation.py
 
-echo "11/18 Running point-in-time data-integrity simulation..."
+echo "11/17 Running point-in-time data-integrity simulation..."
 "$PYTHON" scripts/point_in_time_simulation.py
 
-echo "12/18 Running corporate-action and delisting-economics simulation..."
+echo "12/17 Running corporate-action and delisting-economics simulation..."
 "$PYTHON" scripts/corporate_action_simulation.py
 
-echo "13/18 Running historical-dataset integrity simulation..."
+echo "13/17 Running historical-dataset integrity simulation..."
 "$PYTHON" scripts/historical_dataset_simulation.py
 
-echo "14/18 Running robustness and walk-forward simulation..."
+echo "14/17 Running robustness and walk-forward simulation..."
 "$PYTHON" scripts/robustness_validation_simulation.py
 
-echo "15/18 Running statistical-validation and overfitting simulation..."
-"$PYTHON" scripts/statistical_validation_simulation.py
-
-echo "16/18 Testing module entry point..."
+echo "15/17 Testing module entry point..."
 MODULE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 \
         "$PYTHON" -m world_quant_system
 )"
 
-echo "17/18 Testing console entry point..."
+echo "16/17 Testing console entry point..."
 CONSOLE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$CONSOLE"
@@ -434,7 +418,7 @@ if [[ "$MODULE_OUTPUT" != "$CONSOLE_OUTPUT" ]]; then
     exit 1
 fi
 
-echo "18/18 Testing research CLI entry point..."
+echo "17/17 Testing research CLI entry point..."
 CLI_HELP="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$WQS" --help
@@ -443,8 +427,7 @@ if [[ "$CLI_HELP" != *"backtest"* || "$CLI_HELP" != *"research"* \
     || "$CLI_HELP" != *"point-in-time"* \
     || "$CLI_HELP" != *"corporate-actions"* \
     || "$CLI_HELP" != *"dataset"* \
-    || "$CLI_HELP" != *"robustness"* \
-    || "$CLI_HELP" != *"statistical-validation"* ]]; then
+    || "$CLI_HELP" != *"robustness"* ]]; then
     echo "ERROR: Research CLI does not expose required commands."
     exit 1
 fi

@@ -115,31 +115,6 @@ from world_quant_system.research.robustness_models import (
 from world_quant_system.research.robustness_reporting import (
     AtomicJsonRobustnessReportWriter,
 )
-from world_quant_system.research.statistical_validation import (
-    DeterministicStatisticalValidator,
-    build_registry_audit,
-    parse_statistical_returns_csv,
-)
-from world_quant_system.research.statistical_validation_models import (
-    CscvSplitResult,
-    DeflatedSharpeResult,
-    FailedStatisticalTrial,
-    ProbabilityBacktestOverfittingResult,
-    RankStabilityResult,
-    StatisticalRegistryAudit,
-    StatisticalReturnsMatrix,
-    StatisticalTrialStatus,
-    StatisticalValidationConfigurationError,
-    StatisticalValidationEligibilityError,
-    StatisticalValidationError,
-    StatisticalValidationIntegrityError,
-    StatisticalValidationPolicy,
-    StatisticalValidationReport,
-    TrialStatistics,
-)
-from world_quant_system.research.statistical_validation_reporting import (
-    AtomicJsonStatisticalValidationReportWriter,
-)
 
 __all__ = [
     "BenchmarkLink",
@@ -239,23 +214,4 @@ __all__ = [
     "WalkForwardPlan",
     "classify_market_regime",
     "sma_parameter_grid",
-    "AtomicJsonStatisticalValidationReportWriter",
-    "CscvSplitResult",
-    "DeflatedSharpeResult",
-    "DeterministicStatisticalValidator",
-    "FailedStatisticalTrial",
-    "ProbabilityBacktestOverfittingResult",
-    "RankStabilityResult",
-    "StatisticalRegistryAudit",
-    "StatisticalReturnsMatrix",
-    "StatisticalTrialStatus",
-    "StatisticalValidationConfigurationError",
-    "StatisticalValidationEligibilityError",
-    "StatisticalValidationError",
-    "StatisticalValidationIntegrityError",
-    "StatisticalValidationPolicy",
-    "StatisticalValidationReport",
-    "TrialStatistics",
-    "build_registry_audit",
-    "parse_statistical_returns_csv",
 ]

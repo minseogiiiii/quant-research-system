@@ -31,7 +31,6 @@ from world_quant_system.data import (
 from world_quant_system.domain import CandleInterval
 from world_quant_system.replay import ReplayConfig, ReplayError
 from world_quant_system.research import (
-    AtomicJsonStatisticalValidationReportWriter,
     CorporateActionBacktestContext,
     CorporateActionPolicy,
     CorporateActionRecord,
@@ -39,13 +38,11 @@ from world_quant_system.research import (
     DataAvailabilityRecord,
     DelistingReason,
     DelistingRecord,
-    DeterministicStatisticalValidator,
     ExperimentOutcome,
     ExperimentRecord,
     ExperimentSnapshot,
     ExperimentSpec,
     ExperimentStatus,
-    FailedStatisticalTrial,
     FractionalSharePolicy,
     HistoricalDatasetImporter,
     HistoricalDatasetImportSpec,
@@ -68,14 +65,9 @@ from world_quant_system.research import (
     SQLiteExperimentRegistry,
     SQLiteHistoricalDatasetStore,
     SQLitePointInTimeStore,
-    StatisticalRegistryAudit,
-    StatisticalValidationPolicy,
-    StatisticalValidationReport,
     UniverseMembership,
-    build_registry_audit,
     canonical_json_object,
     corporate_action_policy_json,
-    parse_statistical_returns_csv,
     point_in_time_policy_json,
 )
 from world_quant_system.research.robustness import (
@@ -217,48 +209,6 @@ def build_parser() -> argparse.ArgumentParser:
     robustness.add_argument("--downtrend-threshold", default="-0.05")
     robustness.add_argument("--high-volatility-threshold", type=float, default=0.30)
     robustness.add_argument("--json-output", type=Path)
-
-    statistical = subparsers.add_parser(
-        "statistical-validation",
-        help=(
-            "Run deterministic Deflated Sharpe, CSCV/PBO, rank-stability, "
-            "and multiple-testing controls."
-        ),
-    )
-    statistical.add_argument("--returns-csv", type=Path, required=True)
-    statistical.add_argument("--dataset-digest", required=True)
-    statistical.add_argument("--search-id", required=True)
-    statistical.add_argument("--attempted-trials", type=int)
-    statistical.add_argument("--effective-trials", type=int)
-    statistical.add_argument("--selected-trial-id")
-    statistical.add_argument(
-        "--failed-trial",
-        action="append",
-        default=[],
-        help="Repeatable failed trial in trial_id=failure_reason form.",
-    )
-    statistical.add_argument("--registry-root", type=Path)
-    statistical.add_argument("--annualization-periods", type=int, default=252)
-    statistical.add_argument("--minimum-observations", type=int, default=60)
-    statistical.add_argument("--cscv-partitions", type=int, default=8)
-    statistical.add_argument("--significance-level", default="0.05")
-    statistical.add_argument("--false-discovery-rate", default="0.05")
-    statistical.add_argument(
-        "--minimum-dsr-probability",
-        default="0.95",
-    )
-    statistical.add_argument("--maximum-pbo", default="0.05")
-    statistical.add_argument("--ranking-split-fraction", default="0.50")
-    statistical.add_argument("--minimum-rank-correlation", type=float, default=0.0)
-    statistical.add_argument(
-        "--allow-without-bonferroni",
-        action="store_true",
-    )
-    statistical.add_argument(
-        "--allow-without-fdr",
-        action="store_true",
-    )
-    statistical.add_argument("--json-output", type=Path)
 
     dataset = subparsers.add_parser(
         "dataset",
@@ -601,16 +551,6 @@ def main(argv: list[str] | None = None) -> None:
             if arguments.json_output is not None:
                 AtomicJsonRobustnessReportWriter(arguments.json_output).write(report)
             return
-        if arguments.command == "statistical-validation":
-            statistical_report = asyncio.run(
-                _run_statistical_validation(arguments)
-            )
-            print(_format_statistical_validation_report(statistical_report))
-            if arguments.json_output is not None:
-                AtomicJsonStatisticalValidationReportWriter(
-                    arguments.json_output
-                ).write(statistical_report)
-            return
         if arguments.command == "dataset":
             print(asyncio.run(_run_dataset(arguments)))
             return
@@ -847,93 +787,6 @@ async def _build_point_in_time_symbol_contexts(
             )
         )
     return tuple(contexts)
-
-
-async def _run_statistical_validation(
-    arguments: argparse.Namespace,
-) -> StatisticalValidationReport:
-    matrix = parse_statistical_returns_csv(arguments.returns_csv)
-    registry_audit: StatisticalRegistryAudit | None = None
-    failed_trials: tuple[FailedStatisticalTrial, ...]
-    if arguments.registry_root is not None:
-        if arguments.failed_trial:
-            raise ResearchError(
-                "Manual failed trials cannot be combined with registry validation."
-            )
-        registry = SQLiteExperimentRegistry(arguments.registry_root)
-        registry_audit, failed_trials = await build_registry_audit(
-            registry=registry,
-            search_id=arguments.search_id,
-            matrix_trial_ids=matrix.trial_ids,
-        )
-        attempted_trial_count = registry_audit.declared_total_trials
-        if (
-            arguments.attempted_trials is not None
-            and arguments.attempted_trials != attempted_trial_count
-        ):
-            raise ResearchError(
-                "Attempted trial count conflicts with the experiment registry."
-            )
-    else:
-        if arguments.attempted_trials is None:
-            raise ResearchError(
-                "--attempted-trials is required without --registry-root."
-            )
-        attempted_trial_count = arguments.attempted_trials
-        failed_trials = tuple(
-            _failed_statistical_trial(value) for value in arguments.failed_trial
-        )
-    policy = StatisticalValidationPolicy(
-        annualization_periods=arguments.annualization_periods,
-        minimum_observations=arguments.minimum_observations,
-        cscv_partitions=arguments.cscv_partitions,
-        significance_level=_decimal(
-            arguments.significance_level,
-            "significance level",
-        ),
-        false_discovery_rate=_decimal(
-            arguments.false_discovery_rate,
-            "false-discovery rate",
-        ),
-        minimum_deflated_sharpe_probability=_decimal(
-            arguments.minimum_dsr_probability,
-            "minimum DSR probability",
-        ),
-        maximum_probability_backtest_overfitting=_decimal(
-            arguments.maximum_pbo,
-            "maximum PBO",
-        ),
-        ranking_split_fraction=_decimal(
-            arguments.ranking_split_fraction,
-            "ranking split fraction",
-        ),
-        minimum_rank_correlation=arguments.minimum_rank_correlation,
-        require_bonferroni_pass=not arguments.allow_without_bonferroni,
-        require_false_discovery_pass=not arguments.allow_without_fdr,
-    )
-    return DeterministicStatisticalValidator(
-        matrix=matrix,
-        dataset_digest=arguments.dataset_digest,
-        search_id=arguments.search_id,
-        attempted_trial_count=attempted_trial_count,
-        effective_trial_count=arguments.effective_trials,
-        selected_trial_id=arguments.selected_trial_id,
-        failed_trials=failed_trials,
-        registry_audit=registry_audit,
-        policy=policy,
-    ).run()
-
-
-def _failed_statistical_trial(value: str) -> FailedStatisticalTrial:
-    trial_id, separator, reason = value.partition("=")
-    if not separator:
-        raise ResearchError(
-            "Failed trials must use trial_id=failure_reason form."
-        )
-    return FailedStatisticalTrial(
-        trial_id=trial_id.strip(),
-        failure_reason=reason.strip(),
-    )
 
 
 async def _run_robustness(arguments: argparse.Namespace) -> RobustnessReport:
@@ -1523,45 +1376,6 @@ def _format_holdout_consumption(consumption: HoldoutConsumption) -> str:
             f"Consumed at:         {consumption.consumed_at.isoformat()}",
         )
     )
-
-
-def _format_statistical_validation_report(
-    report: StatisticalValidationReport,
-) -> str:
-    selected = next(
-        item
-        for item in report.trial_statistics
-        if item.trial_id == report.selected_trial_id
-    )
-    pbo = report.probability_backtest_overfitting
-    return "\n".join(
-        (
-            "Execution mode: STATISTICAL_RESEARCH",
-            "Network access: DISABLED",
-            "Live trading: DISABLED",
-            "Order submission: DISABLED",
-            "",
-            f"Report ID:           {report.report_id}",
-            f"Search ID:           {report.search_id}",
-            f"Attempted trials:    {report.attempted_trial_count}",
-            f"Successful trials:   {len(report.trial_statistics)}",
-            f"Failed trials:       {len(report.failed_trials)}",
-            f"Omitted trials:      {report.omitted_trial_count}",
-            f"Selected trial:      {report.selected_trial_id}",
-            f"Raw annual Sharpe:   {selected.annualized_sharpe_ratio:.6f}",
-            "Deflated Sharpe prob:"
-            f" {report.deflated_sharpe.deflated_sharpe_probability:.2%}",
-            "PBO:                 "
-            f"{pbo.probability_backtest_overfitting:.2%}",
-            "OOS loss probability:"
-            f" {pbo.probability_out_of_sample_loss:.2%}",
-            "Rank correlation:    "
-            f"{report.rank_stability.spearman_rank_correlation:.6f}",
-            f"Policy result:       {'PASS' if report.passed else 'FAIL'}",
-            f"Report digest:       {report.report_digest}",
-        )
-    )
-
 
 def _format_robustness_report(report: RobustnessReport) -> str:
     return "\n".join(
