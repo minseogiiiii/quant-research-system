@@ -46,7 +46,7 @@ for executable in "$PYTHON" "$RUFF" "$MYPY" "$CONSOLE" "$WQS"; do
     fi
 done
 
-echo "1/16 Verifying the installed package outside the repository..."
+echo "1/17 Verifying the installed package outside the repository..."
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 (
@@ -113,6 +113,16 @@ from world_quant_system.research import (
     SecurityLifecycle,
     UniverseMembership,
 )
+from world_quant_system.research.robustness import (
+    DeterministicRobustnessRunner,
+    StandardBacktestRunFactory,
+    build_stress_scenarios,
+)
+from world_quant_system.research.robustness_models import (
+    RobustnessPolicy,
+    RobustnessReport,
+    WalkForwardPlan,
+)
 
 print(f"Package: {world_quant_system.__file__}")
 print(f"Client: {TossHttpClient.__name__}")
@@ -175,6 +185,15 @@ print(
     f"{MissingSessionPolicy.__name__}"
 )
 print(
+    "Robustness validation: "
+    f"{WalkForwardPlan.__name__}, "
+    f"{RobustnessPolicy.__name__}, "
+    f"{RobustnessReport.__name__}, "
+    f"{DeterministicRobustnessRunner.__name__}, "
+    f"{StandardBacktestRunFactory.__name__}, "
+    f"{build_stress_scenarios.__name__}"
+)
+print(
     "Corporate actions: "
     f"{CorporateActionRecord.__name__}, "
     f"{CorporateActionType.__name__}, "
@@ -203,20 +222,20 @@ print(
 '
 )
 
-echo "2/16 Compiling source and tests..."
+echo "2/17 Compiling source and tests..."
 "$PYTHON" -m compileall -q src tests
 
-echo "3/16 Running tests..."
+echo "3/17 Running tests..."
 "$PYTHON" -m pytest -q
 
-echo "4/16 Running Ruff..."
+echo "4/17 Running Ruff..."
 rm -rf build dist
 "$RUFF" check .
 
-echo "5/16 Running mypy..."
+echo "5/17 Running mypy..."
 "$MYPY" src tests
 
-echo "6/16 Verifying fail-closed network behavior..."
+echo "6/17 Verifying fail-closed network behavior..."
 "$PYTHON" -c '
 import asyncio
 import tempfile
@@ -354,35 +373,38 @@ async def verify() -> None:
 asyncio.run(verify())
 '
 
-echo "7/16 Running deterministic data-quality simulation..."
+echo "7/17 Running deterministic data-quality simulation..."
 "$PYTHON" scripts/quality_gate_backtest.py
 
-echo "8/16 Running normalized-storage replay simulation..."
+echo "8/17 Running normalized-storage replay simulation..."
 "$PYTHON" scripts/normalized_replay_backtest.py
 
-echo "9/16 Running deterministic strategy backtest simulation..."
+echo "9/17 Running deterministic strategy backtest simulation..."
 "$PYTHON" scripts/strategy_backtest.py
 
-echo "10/16 Running deterministic research-validity simulation..."
+echo "10/17 Running deterministic research-validity simulation..."
 "$PYTHON" scripts/research_validity_simulation.py
 
-echo "11/16 Running point-in-time data-integrity simulation..."
+echo "11/17 Running point-in-time data-integrity simulation..."
 "$PYTHON" scripts/point_in_time_simulation.py
 
-echo "12/16 Running corporate-action and delisting-economics simulation..."
+echo "12/17 Running corporate-action and delisting-economics simulation..."
 "$PYTHON" scripts/corporate_action_simulation.py
 
-echo "13/16 Running historical-dataset integrity simulation..."
+echo "13/17 Running historical-dataset integrity simulation..."
 "$PYTHON" scripts/historical_dataset_simulation.py
 
-echo "14/16 Testing module entry point..."
+echo "14/17 Running robustness and walk-forward simulation..."
+"$PYTHON" scripts/robustness_validation_simulation.py
+
+echo "15/17 Testing module entry point..."
 MODULE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 \
         "$PYTHON" -m world_quant_system
 )"
 
-echo "15/16 Testing console entry point..."
+echo "16/17 Testing console entry point..."
 CONSOLE_OUTPUT="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$CONSOLE"
@@ -396,7 +418,7 @@ if [[ "$MODULE_OUTPUT" != "$CONSOLE_OUTPUT" ]]; then
     exit 1
 fi
 
-echo "16/16 Testing research CLI entry point..."
+echo "17/17 Testing research CLI entry point..."
 CLI_HELP="$(
     cd "$TMP_DIR"
     env -u PYTHONPATH PYTHONNOUSERSITE=1 "$WQS" --help
@@ -404,7 +426,8 @@ CLI_HELP="$(
 if [[ "$CLI_HELP" != *"backtest"* || "$CLI_HELP" != *"research"* \
     || "$CLI_HELP" != *"point-in-time"* \
     || "$CLI_HELP" != *"corporate-actions"* \
-    || "$CLI_HELP" != *"dataset"* ]]; then
+    || "$CLI_HELP" != *"dataset"* \
+    || "$CLI_HELP" != *"robustness"* ]]; then
     echo "ERROR: Research CLI does not expose required commands."
     exit 1
 fi

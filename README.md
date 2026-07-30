@@ -943,3 +943,48 @@ This release does not download data, estimate future profitability, or enable
 broker orders. Exchange calendars beyond weekday-plus-holiday validation,
 provider-specific acquisition adapters, large multi-symbol files, and
 walk-forward robustness analysis remain later phases.
+
+## Robustness & Walk-Forward Validation v1
+
+The research layer includes a deterministic robustness harness for frozen
+historical datasets. It does not search for or promise profitable strategies.
+It tests whether an existing strategy survives chronological out-of-sample
+windows, nearby parameters, higher costs, and delayed execution assumptions.
+
+Core rules:
+
+- every run requires a frozen historical dataset digest
+- train, validation, and test windows are explicit half-open intervals
+- test windows must advance strictly through time
+- all strategy variants and stress scenarios run in deterministic order
+- SMA parameter perturbations retain every valid neighboring combination
+- commission and slippage assumptions can be stressed together
+- execution delay is implemented by delaying observed targets without exposing
+  future candles
+- reports emphasize median and worst test returns, worst drawdown,
+  out-of-sample degradation, regime results, and pass rate
+- report identity excludes creation time, so identical research inputs produce
+  the same report digest
+- the CLI remains networkless and cannot submit broker orders
+
+Example:
+
+```bash
+wqs robustness \
+  --normalized-root data/normalized \
+  --symbol 005930 \
+  --historical-dataset-digest <sha256> \
+  --fold '2020-01-01,2022-01-01,2022-01-01,2023-01-01,2023-01-01,2024-01-01' \
+  --strategy sma-cross \
+  --base-short-window 20 \
+  --base-long-window 100 \
+  --short-offset -2 --short-offset 0 --short-offset 2 \
+  --long-offset -10 --long-offset 0 --long-offset 10 \
+  --cost-multiplier 1 --cost-multiplier 1.5 --cost-multiplier 2 \
+  --execution-delay 1 --execution-delay 2 \
+  --json-output data/research/robustness.json
+```
+
+The resulting pass or failure is a research-policy decision, not evidence of
+future returns. A strategy that fails remains recorded rather than being
+silently discarded.

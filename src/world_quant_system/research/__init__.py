@@ -94,6 +94,27 @@ from world_quant_system.research.point_in_time_store import (
     SQLitePointInTimeStore,
 )
 from world_quant_system.research.registry import SQLiteExperimentRegistry
+from world_quant_system.research.robustness_models import (
+    MarketRegime,
+    PhaseResult,
+    RegimeSummary,
+    RobustnessCaseResult,
+    RobustnessConfigurationError,
+    RobustnessError,
+    RobustnessInvariantError,
+    RobustnessPhase,
+    RobustnessPolicy,
+    RobustnessReport,
+    RobustnessStrategySpec,
+    StressScenario,
+    WalkForwardFold,
+    WalkForwardPlan,
+    classify_market_regime,
+    sma_parameter_grid,
+)
+from world_quant_system.research.robustness_reporting import (
+    AtomicJsonRobustnessReportWriter,
+)
 
 __all__ = [
     "BenchmarkLink",
@@ -176,4 +197,21 @@ __all__ = [
     "corporate_action_policy_json",
     "parse_historical_csv",
     "point_in_time_policy_json",
+    "AtomicJsonRobustnessReportWriter",
+    "MarketRegime",
+    "PhaseResult",
+    "RegimeSummary",
+    "RobustnessCaseResult",
+    "RobustnessConfigurationError",
+    "RobustnessError",
+    "RobustnessInvariantError",
+    "RobustnessPhase",
+    "RobustnessPolicy",
+    "RobustnessReport",
+    "RobustnessStrategySpec",
+    "StressScenario",
+    "WalkForwardFold",
+    "WalkForwardPlan",
+    "classify_market_regime",
+    "sma_parameter_grid",
 ]

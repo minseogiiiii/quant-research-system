@@ -70,6 +70,23 @@ from world_quant_system.research import (
     corporate_action_policy_json,
     point_in_time_policy_json,
 )
+from world_quant_system.research.robustness import (
+    DeterministicRobustnessRunner,
+    StandardBacktestRunFactory,
+    build_stress_scenarios,
+)
+from world_quant_system.research.robustness_models import (
+    RobustnessPolicy,
+    RobustnessReport,
+    RobustnessStrategySpec,
+    StressScenario,
+    WalkForwardFold,
+    WalkForwardPlan,
+    sma_parameter_grid,
+)
+from world_quant_system.research.robustness_reporting import (
+    AtomicJsonRobustnessReportWriter,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -143,6 +160,55 @@ def build_parser() -> argparse.ArgumentParser:
         choices=tuple(policy.value for policy in FractionalSharePolicy),
         default=FractionalSharePolicy.REJECT.value,
     )
+
+    robustness = subparsers.add_parser(
+        "robustness",
+        help="Run deterministic parameter, cost, delay, and walk-forward tests.",
+    )
+    robustness.add_argument("--normalized-root", type=Path, required=True)
+    robustness.add_argument("--symbol", required=True)
+    robustness.add_argument(
+        "--interval",
+        choices=tuple(interval.value for interval in CandleInterval),
+        default=CandleInterval.DAY_1.value,
+    )
+    robustness.add_argument("--historical-dataset-digest", required=True)
+    robustness.add_argument(
+        "--fold",
+        action="append",
+        required=True,
+        help=(
+            "Repeatable six-value fold: train_start,train_end,"
+            "validation_start,validation_end,test_start,test_end."
+        ),
+    )
+    robustness.add_argument(
+        "--strategy",
+        choices=("buy-and-hold", "sma-cross"),
+        default="sma-cross",
+    )
+    robustness.add_argument("--base-short-window", type=int, default=20)
+    robustness.add_argument("--base-long-window", type=int, default=100)
+    robustness.add_argument("--short-offset", action="append", type=int)
+    robustness.add_argument("--long-offset", action="append", type=int)
+    robustness.add_argument("--cost-multiplier", action="append")
+    robustness.add_argument("--execution-delay", action="append", type=int)
+    robustness.add_argument("--initial-cash", default="10000000")
+    robustness.add_argument("--commission-bps", default="15")
+    robustness.add_argument("--slippage-bps", default="10")
+    robustness.add_argument("--max-volume-participation", default="0.10")
+    robustness.add_argument("--annualization-periods", type=int)
+    robustness.add_argument("--page-size", type=int, default=1000)
+    robustness.add_argument("--pass-only", action="store_true")
+    robustness.add_argument("--minimum-observations", type=int, default=20)
+    robustness.add_argument("--minimum-test-return", default="0")
+    robustness.add_argument("--maximum-drawdown", default="-0.50")
+    robustness.add_argument("--maximum-return-degradation", default="-0.25")
+    robustness.add_argument("--required-pass-rate", default="0.60")
+    robustness.add_argument("--uptrend-threshold", default="0.05")
+    robustness.add_argument("--downtrend-threshold", default="-0.05")
+    robustness.add_argument("--high-volatility-threshold", type=float, default=0.30)
+    robustness.add_argument("--json-output", type=Path)
 
     dataset = subparsers.add_parser(
         "dataset",
@@ -479,6 +545,12 @@ def main(argv: list[str] | None = None) -> None:
             if arguments.json_output is not None:
                 AtomicJsonBacktestSummaryWriter(arguments.json_output).write(result)
             return
+        if arguments.command == "robustness":
+            report = asyncio.run(_run_robustness(arguments))
+            print(_format_robustness_report(report))
+            if arguments.json_output is not None:
+                AtomicJsonRobustnessReportWriter(arguments.json_output).write(report)
+            return
         if arguments.command == "dataset":
             print(asyncio.run(_run_dataset(arguments)))
             return
@@ -715,6 +787,111 @@ async def _build_point_in_time_symbol_contexts(
             )
         )
     return tuple(contexts)
+
+
+async def _run_robustness(arguments: argparse.Namespace) -> RobustnessReport:
+    root = arguments.normalized_root.expanduser().resolve()
+    database = root / "normalized.sqlite3"
+    if not database.is_file():
+        raise BacktestConfigurationError(
+            f"Normalized database does not exist: {database}"
+        )
+    interval = CandleInterval(arguments.interval)
+    plan = _walk_forward_plan_from_arguments(arguments.fold)
+    strategies: tuple[RobustnessStrategySpec, ...]
+    if arguments.strategy == "buy-and-hold":
+        strategies = (RobustnessStrategySpec(name="buy-and-hold"),)
+    else:
+        strategies = sma_parameter_grid(
+            base_short_window=arguments.base_short_window,
+            base_long_window=arguments.base_long_window,
+            short_offsets=tuple(arguments.short_offset or (0,)),
+            long_offsets=tuple(arguments.long_offset or (0,)),
+        )
+    scenarios: tuple[StressScenario, ...] = build_stress_scenarios(
+        cost_multipliers=tuple(
+            _decimal(value, "cost multiplier")
+            for value in (arguments.cost_multiplier or ("1",))
+        ),
+        execution_delays=tuple(arguments.execution_delay or (1,)),
+    )
+    policy = RobustnessPolicy(
+        minimum_observations=arguments.minimum_observations,
+        minimum_test_return=_decimal(
+            arguments.minimum_test_return,
+            "minimum test return",
+        ),
+        maximum_drawdown=_decimal(
+            arguments.maximum_drawdown,
+            "maximum drawdown",
+        ),
+        maximum_return_degradation=_decimal(
+            arguments.maximum_return_degradation,
+            "maximum return degradation",
+        ),
+        required_pass_rate=_decimal(
+            arguments.required_pass_rate,
+            "required pass rate",
+        ),
+        uptrend_threshold=_decimal(
+            arguments.uptrend_threshold,
+            "uptrend threshold",
+        ),
+        downtrend_threshold=_decimal(
+            arguments.downtrend_threshold,
+            "downtrend threshold",
+        ),
+        high_volatility_threshold=arguments.high_volatility_threshold,
+    )
+    base_config = BacktestConfig(
+        replay=ReplayConfig(
+            symbols=(arguments.symbol,),
+            interval=interval,
+            include_warnings=not arguments.pass_only,
+            page_size=arguments.page_size,
+        ),
+        initial_cash=_decimal(arguments.initial_cash, "initial cash"),
+        commission_bps=_decimal(arguments.commission_bps, "commission bps"),
+        slippage_bps=_decimal(arguments.slippage_bps, "slippage bps"),
+        max_volume_participation=_decimal(
+            arguments.max_volume_participation,
+            "maximum volume participation",
+        ),
+        annualization_periods=_resolve_annualization_periods(
+            interval,
+            arguments.annualization_periods,
+        ),
+        historical_dataset_digest=arguments.historical_dataset_digest,
+    )
+    reader = SQLiteNormalizedMarketDataStore(root)
+    return await DeterministicRobustnessRunner(
+        run_factory=StandardBacktestRunFactory(reader),
+        base_config=base_config,
+        plan=plan,
+        strategies=strategies,
+        scenarios=scenarios,
+        policy=policy,
+    ).run()
+
+
+def _walk_forward_plan_from_arguments(values: list[str]) -> WalkForwardPlan:
+    folds: list[WalkForwardFold] = []
+    for fold_number, value in enumerate(values, start=1):
+        parts = tuple(part.strip() for part in value.split(","))
+        if len(parts) != 6 or any(not part for part in parts):
+            raise BacktestConfigurationError(
+                "Each --fold must contain six comma-separated ISO timestamps."
+            )
+        boundaries = tuple(_parse_research_boundary(part) for part in parts)
+        folds.append(
+            WalkForwardFold(
+                fold_number=fold_number,
+                train=ResearchWindow(boundaries[0], boundaries[1]),
+                validation=ResearchWindow(boundaries[2], boundaries[3]),
+                test=ResearchWindow(boundaries[4], boundaries[5]),
+            )
+        )
+    return WalkForwardPlan(tuple(folds))
 
 
 async def _run_dataset(arguments: argparse.Namespace) -> str:
@@ -1199,6 +1376,29 @@ def _format_holdout_consumption(consumption: HoldoutConsumption) -> str:
             f"Consumed at:         {consumption.consumed_at.isoformat()}",
         )
     )
+
+def _format_robustness_report(report: RobustnessReport) -> str:
+    return "\n".join(
+        (
+            "Execution mode: ROBUSTNESS_RESEARCH",
+            "Network access: DISABLED",
+            "Live trading: DISABLED",
+            "Order submission: DISABLED",
+            "",
+            f"Report ID:           {report.report_id}",
+            f"Walk-forward folds:  {len(report.plan.folds)}",
+            f"Robustness cases:    {len(report.cases)}",
+            f"Median test return:  {report.median_test_return:.4%}",
+            f"Worst test return:   {report.worst_test_return:.4%}",
+            "Median OOS change:   "
+            f"{report.median_return_degradation:.4%}",
+            f"Worst drawdown:      {report.worst_maximum_drawdown:.4%}",
+            f"Pass rate:           {report.pass_rate:.2%}",
+            f"Policy result:       {'PASS' if report.passed else 'FAIL'}",
+            f"Report digest:       {report.report_digest}",
+        )
+    )
+
 
 def _format_security_lifecycle(lifecycle: SecurityLifecycle) -> str:
     return "\n".join(
