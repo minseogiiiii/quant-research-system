@@ -513,6 +513,7 @@ class BacktestConfig:
     max_volume_participation: Decimal = Decimal("0.10")
     annualization_periods: int = 252
     data_context_digest: str | None = None
+    historical_dataset_digest: str | None = None
     initial_symbol: str | None = None
     corporate_action_context_digest: str | None = None
     dividend_tax_model_digest: str | None = None
@@ -567,6 +568,11 @@ class BacktestConfig:
         _require_positive_int(self.annualization_periods, "Annualization periods")
         if self.data_context_digest is not None:
             _validate_sha256(self.data_context_digest, "Data context digest")
+        if self.historical_dataset_digest is not None:
+            _validate_sha256(
+                self.historical_dataset_digest,
+                "Historical dataset digest",
+            )
         if self.corporate_action_context_digest is not None:
             _validate_sha256(
                 self.corporate_action_context_digest,
@@ -612,6 +618,10 @@ class BacktestConfig:
         }
         if self.data_context_digest is not None:
             document["data_context_digest"] = self.data_context_digest
+        if self.historical_dataset_digest is not None:
+            document["historical_dataset_digest"] = (
+                self.historical_dataset_digest
+            )
         if self.corporate_action_context_digest is not None:
             document["corporate_action_context_digest"] = (
                 self.corporate_action_context_digest
@@ -731,6 +741,10 @@ def backtest_config_document(config: BacktestConfig) -> dict[str, object]:
     }
     if config.data_context_digest is not None:
         document["data_context_digest"] = config.data_context_digest
+    if config.historical_dataset_digest is not None:
+        document["historical_dataset_digest"] = (
+            config.historical_dataset_digest
+        )
     if config.corporate_action_context_digest is not None:
         document["corporate_action_context_digest"] = (
             config.corporate_action_context_digest

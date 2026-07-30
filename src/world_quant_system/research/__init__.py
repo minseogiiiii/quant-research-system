@@ -19,6 +19,33 @@ from world_quant_system.research.corporate_action_models import (
 from world_quant_system.research.corporate_action_store import (
     SQLiteCorporateActionStore,
 )
+from world_quant_system.research.historical_dataset_ingestion import (
+    HistoricalDatasetImporter,
+    ParsedHistoricalCsv,
+    parse_historical_csv,
+)
+from world_quant_system.research.historical_dataset_models import (
+    BenchmarkLink,
+    HistoricalDatasetConfigurationError,
+    HistoricalDatasetConflictError,
+    HistoricalDatasetEligibilityError,
+    HistoricalDatasetError,
+    HistoricalDatasetFormat,
+    HistoricalDatasetFrozenError,
+    HistoricalDatasetImportSpec,
+    HistoricalDatasetIntegrityError,
+    HistoricalDatasetIssue,
+    HistoricalDatasetIssueCode,
+    HistoricalDatasetManifest,
+    HistoricalDatasetNotFoundError,
+    HistoricalDatasetPolicy,
+    HistoricalDatasetSnapshot,
+    HistoricalDatasetState,
+    MissingSessionPolicy,
+)
+from world_quant_system.research.historical_dataset_store import (
+    SQLiteHistoricalDatasetStore,
+)
 from world_quant_system.research.models import (
     ExperimentOutcome,
     ExperimentRecord,
@@ -69,6 +96,26 @@ from world_quant_system.research.point_in_time_store import (
 from world_quant_system.research.registry import SQLiteExperimentRegistry
 
 __all__ = [
+    "BenchmarkLink",
+    "HistoricalDatasetConfigurationError",
+    "HistoricalDatasetConflictError",
+    "HistoricalDatasetEligibilityError",
+    "HistoricalDatasetError",
+    "HistoricalDatasetFormat",
+    "HistoricalDatasetFrozenError",
+    "HistoricalDatasetImportSpec",
+    "HistoricalDatasetImporter",
+    "HistoricalDatasetIntegrityError",
+    "HistoricalDatasetIssue",
+    "HistoricalDatasetIssueCode",
+    "HistoricalDatasetManifest",
+    "HistoricalDatasetNotFoundError",
+    "HistoricalDatasetPolicy",
+    "HistoricalDatasetSnapshot",
+    "HistoricalDatasetState",
+    "MissingSessionPolicy",
+    "ParsedHistoricalCsv",
+    "SQLiteHistoricalDatasetStore",
     "AsOfPolicy",
     "AvailabilityPolicy",
     "DataAvailabilityRecord",
@@ -127,5 +174,6 @@ __all__ = [
     "UniverseMembership",
     "canonical_json_object",
     "corporate_action_policy_json",
+    "parse_historical_csv",
     "point_in_time_policy_json",
 ]

@@ -839,3 +839,107 @@ backtest digests, idempotent writes, conflict rejection, future-known action
 rejection, split basis preservation, after-sale dividend attribution,
 symbol continuity, and explicit zero-value delisting loss. The simulation and
 CLI remain networkless; live trading and broker order submission stay disabled.
+
+## Historical Dataset Integrity & Ingestion v1
+
+The research system can now turn a strict local CSV file into an immutable,
+reproducible historical dataset snapshot without using the network. Import is
+routed through the existing raw archive, quality gate, normalizer, and
+normalized SQLite store rather than bypassing earlier safety layers.
+
+Required CSV columns, in this exact order, are:
+
+```text
+timestamp,symbol,open,high,low,close,volume,currency
+```
+
+Timestamps must be ISO-8601 values with an explicit UTC offset matching the
+configured IANA timezone. Rows must be strictly increasing, contain one symbol
+and currency, and satisfy the existing `Candle` and quality-gate invariants.
+For daily data, expected weekdays and explicit holidays are used to detect
+missing sessions. The default policy rejects a missing session; `warn` retains
+an immutable warning in the manifest.
+
+Each dataset manifest pins:
+
+- provider, exchange, symbol, interval, timezone, and currency
+- source-file SHA-256 and normalized-data digest
+- item count and exact UTC time range
+- quality policy and final quality status
+- code commit
+- point-in-time context digest
+- corporate-action context digest
+- deterministic dataset ID and dataset digest
+
+The catalog stores raw, quality, and normalized data below a dataset-specific
+root and verifies all three layers before returning a snapshot:
+
+```text
+data/historical_datasets/
+├── historical_datasets.sqlite3
+├── manifests/
+└── datasets/
+    └── <dataset-id>/
+        ├── raw/
+        ├── quality/
+        └── normalized/
+```
+
+Import a networkless CSV:
+
+```bash
+wqs dataset import \
+  --root data/historical_datasets \
+  --source-file samsung.csv \
+  --provider localcsv \
+  --exchange KRX \
+  --symbol 005930 \
+  --interval 1d \
+  --timezone Asia/Seoul \
+  --currency KRW \
+  --code-commit <git-commit> \
+  --point-in-time-context-digest <sha256> \
+  --corporate-action-context-digest <sha256> \
+  --holiday 2020-01-01
+```
+
+Verify and freeze the imported snapshot before research use:
+
+```bash
+wqs dataset validate \
+  --root data/historical_datasets \
+  --dataset-id <uuid>
+
+wqs dataset freeze \
+  --root data/historical_datasets \
+  --dataset-id <uuid>
+```
+
+Inspection and listing remain networkless:
+
+```bash
+wqs dataset inspect --root data/historical_datasets --dataset-id <uuid>
+wqs dataset list --root data/historical_datasets
+```
+
+A benchmark link can be created only after both datasets are frozen and their
+interval, UTC range, timezone, currency, and exact normalized event timestamps
+match:
+
+```bash
+wqs dataset link-benchmark \
+  --root data/historical_datasets \
+  --dataset-id <strategy-dataset-uuid> \
+  --benchmark-dataset-id <benchmark-dataset-uuid>
+```
+
+The deterministic simulation is available at:
+
+```bash
+.venv/bin/python scripts/historical_dataset_simulation.py
+```
+
+This release does not download data, estimate future profitability, or enable
+broker orders. Exchange calendars beyond weekday-plus-holiday validation,
+provider-specific acquisition adapters, large multi-symbol files, and
+walk-forward robustness analysis remain later phases.

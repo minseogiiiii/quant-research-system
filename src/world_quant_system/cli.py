@@ -44,7 +44,12 @@ from world_quant_system.research import (
     ExperimentSpec,
     ExperimentStatus,
     FractionalSharePolicy,
+    HistoricalDatasetImporter,
+    HistoricalDatasetImportSpec,
+    HistoricalDatasetPolicy,
+    HistoricalDatasetSnapshot,
     HoldoutConsumption,
+    MissingSessionPolicy,
     ParameterSearchAudit,
     PointInTimeAccessGrant,
     PointInTimeBacktestContext,
@@ -58,6 +63,7 @@ from world_quant_system.research import (
     SecurityLifecycle,
     SQLiteCorporateActionStore,
     SQLiteExperimentRegistry,
+    SQLiteHistoricalDatasetStore,
     SQLitePointInTimeStore,
     UniverseMembership,
     canonical_json_object,
@@ -137,6 +143,81 @@ def build_parser() -> argparse.ArgumentParser:
         choices=tuple(policy.value for policy in FractionalSharePolicy),
         default=FractionalSharePolicy.REJECT.value,
     )
+
+    dataset = subparsers.add_parser(
+        "dataset",
+        help="Import, validate, freeze, and inspect historical research datasets.",
+    )
+    dataset_subparsers = dataset.add_subparsers(
+        dest="dataset_command",
+        required=True,
+    )
+    import_dataset = dataset_subparsers.add_parser(
+        "import",
+        help="Import one strict networkless CSV through the trusted data pipeline.",
+    )
+    import_dataset.add_argument("--root", type=Path, required=True)
+    import_dataset.add_argument("--source-file", type=Path, required=True)
+    import_dataset.add_argument("--provider", required=True)
+    import_dataset.add_argument("--exchange", required=True)
+    import_dataset.add_argument("--symbol", required=True)
+    import_dataset.add_argument(
+        "--interval",
+        choices=tuple(interval.value for interval in CandleInterval),
+        required=True,
+    )
+    import_dataset.add_argument("--timezone", required=True)
+    import_dataset.add_argument("--currency", required=True)
+    import_dataset.add_argument("--code-commit", required=True)
+    import_dataset.add_argument("--point-in-time-context-digest", required=True)
+    import_dataset.add_argument("--corporate-action-context-digest", required=True)
+    import_dataset.add_argument(
+        "--missing-session-policy",
+        choices=tuple(policy.value for policy in MissingSessionPolicy),
+        default=MissingSessionPolicy.REJECT.value,
+    )
+    import_dataset.add_argument(
+        "--holiday",
+        action="append",
+        default=[],
+        help="Expected exchange holiday in YYYY-MM-DD form; repeat as needed.",
+    )
+
+    validate_dataset = dataset_subparsers.add_parser(
+        "validate",
+        help="Verify manifest, raw bytes, quality report, and normalized digest.",
+    )
+    validate_dataset.add_argument("--root", type=Path, required=True)
+    validate_dataset.add_argument("--dataset-id", required=True)
+
+    freeze_dataset = dataset_subparsers.add_parser(
+        "freeze",
+        help="Freeze an imported immutable dataset for research use.",
+    )
+    freeze_dataset.add_argument("--root", type=Path, required=True)
+    freeze_dataset.add_argument("--dataset-id", required=True)
+
+    inspect_dataset = dataset_subparsers.add_parser(
+        "inspect",
+        help="Inspect one historical dataset snapshot.",
+    )
+    inspect_dataset.add_argument("--root", type=Path, required=True)
+    inspect_dataset.add_argument("--dataset-id", required=True)
+
+    link_benchmark = dataset_subparsers.add_parser(
+        "link-benchmark",
+        help="Link two frozen and exactly aligned historical datasets.",
+    )
+    link_benchmark.add_argument("--root", type=Path, required=True)
+    link_benchmark.add_argument("--dataset-id", required=True)
+    link_benchmark.add_argument("--benchmark-dataset-id", required=True)
+
+    list_datasets = dataset_subparsers.add_parser(
+        "list",
+        help="List historical dataset snapshots in deterministic order.",
+    )
+    list_datasets.add_argument("--root", type=Path, required=True)
+    list_datasets.add_argument("--limit", type=int, default=1000)
 
     corporate_actions = subparsers.add_parser(
         "corporate-actions",
@@ -398,6 +479,9 @@ def main(argv: list[str] | None = None) -> None:
             if arguments.json_output is not None:
                 AtomicJsonBacktestSummaryWriter(arguments.json_output).write(result)
             return
+        if arguments.command == "dataset":
+            print(asyncio.run(_run_dataset(arguments)))
+            return
         if arguments.command == "corporate-actions":
             print(asyncio.run(_run_corporate_actions(arguments)))
             return
@@ -631,6 +715,70 @@ async def _build_point_in_time_symbol_contexts(
             )
         )
     return tuple(contexts)
+
+
+async def _run_dataset(arguments: argparse.Namespace) -> str:
+    store = SQLiteHistoricalDatasetStore(arguments.root.expanduser().resolve())
+    command = arguments.dataset_command
+    if command == "import":
+        holidays = tuple(
+            sorted(date.fromisoformat(value) for value in arguments.holiday)
+        )
+        spec = HistoricalDatasetImportSpec(
+            provider=arguments.provider,
+            exchange=arguments.exchange.upper(),
+            symbol=arguments.symbol.upper(),
+            interval=CandleInterval(arguments.interval),
+            currency=arguments.currency.upper(),
+            code_commit=arguments.code_commit,
+            point_in_time_context_digest=arguments.point_in_time_context_digest,
+            corporate_action_context_digest=(
+                arguments.corporate_action_context_digest
+            ),
+            policy=HistoricalDatasetPolicy(
+                timezone=arguments.timezone,
+                missing_session_policy=MissingSessionPolicy(
+                    arguments.missing_session_policy
+                ),
+                holidays=holidays,
+            ),
+        )
+        snapshot = await HistoricalDatasetImporter(store).import_csv(
+            arguments.source_file,
+            spec,
+        )
+        return _format_dataset_snapshot(snapshot)
+    if command == "validate":
+        return _format_dataset_snapshot(await store.verify(arguments.dataset_id))
+    if command == "freeze":
+        return _format_dataset_snapshot(await store.freeze(arguments.dataset_id))
+    if command == "inspect":
+        return _format_dataset_snapshot(
+            await store.get_snapshot(arguments.dataset_id)
+        )
+    if command == "link-benchmark":
+        link = await store.link_benchmark(
+            arguments.dataset_id,
+            arguments.benchmark_dataset_id,
+        )
+        return "\n".join(
+            (
+                f"Benchmark link ID: {link.link_id}",
+                f"Dataset ID:        {link.dataset_id}",
+                f"Benchmark ID:      {link.benchmark_dataset_id}",
+                f"Alignment digest:  {link.alignment_digest}",
+            )
+        )
+    if command == "list":
+        snapshots = await store.list_snapshots(limit=arguments.limit)
+        if not snapshots:
+            return "No historical datasets found."
+        return "\n".join(
+            f"{snapshot.manifest.dataset_id} | {snapshot.state.value} | "
+            f"{snapshot.manifest.symbols[0]} | {snapshot.manifest.item_count} items"
+            for snapshot in snapshots
+        )
+    _unreachable()
 
 
 async def _run_corporate_actions(arguments: argparse.Namespace) -> str:
@@ -929,6 +1077,29 @@ def _canonical_json_argument(value: str, field_name: str) -> str:
     if not isinstance(parsed, dict):
         raise ValueError(f"{field_name.capitalize()} JSON must be an object.")
     return canonical_json_object(parsed)
+
+
+def _format_dataset_snapshot(snapshot: HistoricalDatasetSnapshot) -> str:
+    manifest = snapshot.manifest
+    issue_count = len(manifest.issues)
+    return "\n".join(
+        (
+            f"Dataset ID:          {manifest.dataset_id}",
+            f"State:               {snapshot.state.value}",
+            f"Dataset digest:      {snapshot.dataset_digest}",
+            f"Source SHA-256:      {manifest.source_sha256}",
+            f"Normalized digest:  {manifest.normalized_digest}",
+            f"Provider:             {manifest.provider}",
+            f"Exchange:             {manifest.exchange}",
+            f"Symbol:               {manifest.symbols[0]}",
+            f"Interval:             {manifest.interval.value}",
+            f"Timezone:             {manifest.timezone}",
+            f"Items:                {manifest.item_count}",
+            f"Quality status:       {manifest.quality_status.value}",
+            f"Integrity warnings:   {issue_count}",
+            "Network access:       DISABLED",
+        )
+    )
 
 
 def _format_research_registration(record: ExperimentRecord) -> str:
