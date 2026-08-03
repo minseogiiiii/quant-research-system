@@ -1578,3 +1578,44 @@ Do not place these values in Git, command-line arguments, JSON, SQLite, logs, or
 reports.
 
 The environment or Keychain remains owned by the caller; this phase zeroizes only the loaded boundary buffers and synthetic token buffers it creates.
+
+## Disabled Write Transport Integration v1
+
+This stage connects the order-write dry-run, human approval, credential lease,
+and final broker transport boundary without enabling an external request.
+
+Safety properties:
+
+- the official Toss host and `POST /api/v1/orders` path are pinned
+- approval is bound to one challenge, request digest, and account fingerprint
+- the token lease must be active, purpose-bound, account-bound, and redacted
+- the kill switch must remain `NORMAL`
+- redirects and automatic order retries are disabled
+- the only transport implementation returns `TRANSPORT_BLOCKED`
+- `SUBMITTING`, `SUBMITTED`, `ACCEPTED`, and `FILLED` are not transport states
+- network-call, redirect, and broker-write counts remain zero
+- reports contain fingerprints and redacted headers, never raw credentials
+
+Run the deterministic no-network integration simulation with:
+
+```bash
+.venv/bin/python scripts/disabled_write_transport_simulation.py
+```
+
+Inspect the contract with:
+
+```bash
+wqs-write-transport-certify show-contract
+```
+
+The `certify-fixture` command is an offline certification workflow using
+explicitly fake credentials. It does not issue a real OAuth token and cannot
+submit, modify, cancel, or retry an order.
+
+```text
+External network transport: DISABLED
+Broker writes: DISABLED
+Automatic order retries: DISABLED
+Final state: TRANSPORT_BLOCKED
+Live trading: DISABLED
+```
