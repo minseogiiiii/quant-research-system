@@ -1272,3 +1272,65 @@ Run the deterministic synthetic validation with:
 A decision of `ready_for_forward_shadow_research` permits only the next offline
 or no-order forward-shadow research stage. It is not permission for paper or
 live trading and does not establish future profitability.
+## Forward Shadow Mode v1
+
+Forward Shadow Mode advances an append-only, crash-safe research checkpoint as
+new strategy-return observations arrive. It is intentionally separated from
+broker execution and consumes only externally supplied JSONL observation
+batches plus the point-in-time evidence manifest produced by prior research
+stages.
+
+Safety posture:
+
+- execution mode: `FORWARD_SHADOW`
+- network access: disabled
+- broker provider: none
+- live trading: disabled
+- order submission: disabled
+
+The forward runner enforces:
+
+- timezone-aware observation and receipt timestamps
+- bounded future clock skew
+- strictly increasing observation sequences and timestamps
+- exact candidate-set agreement with the evidence manifest
+- exactly-once observation identity and idempotent batch replay
+- append-only evidence-manifest extension; prior evidence cannot be removed or
+  modified
+- point-in-time promotion, suspension, retirement, and evidence-age checks
+- next-observation virtual allocation execution
+- equal-weight and capped inverse-volatility allocation
+- minimum cash and maximum candidate-weight controls
+- one-way turnover limits and explicit simulated transaction costs
+- stale-feed fail-closed suspension
+- drawdown-triggered fail-closed suspension
+- hash-chained decision journal and immutable observation IDs
+- atomic checkpoint and batch-report persistence
+- deterministic checkpoint identity independent of report creation time
+
+Run one observation batch:
+
+```bash
+wqs-forward-shadow \
+  --evidence-manifest data/research/shadow-evidence.json \
+  --observations-jsonl data/forward-shadow/observations.jsonl \
+  --state-file data/forward-shadow/state.json \
+  --allocation capped_inverse_volatility \
+  --rebalance-every-observations 5 \
+  --execution-delay-observations 1 \
+  --maximum-observation-lateness-seconds 900 \
+  --maximum-drawdown-before-halt -0.30 \
+  --json-output reports/forward-shadow-batch.json
+```
+
+An external scheduler may invoke this command after a read-only collector has
+written a complete observation batch. This command does not poll a network,
+read a brokerage account, create an order, or submit an order. A successful run
+means only that research shadow state advanced consistently; it is not paper or
+live trading approval and does not establish future profitability.
+
+Run the deterministic synthetic restart and idempotency simulation with:
+
+```bash
+.venv/bin/python scripts/forward_shadow_simulation.py
+```

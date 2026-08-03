@@ -14,6 +14,7 @@ world-quant-system = "world_quant_system.app:main"
 wqs = "world_quant_system.cli:main"
 wqs-portfolio = "world_quant_system.research.portfolio_promotion_cli:main"
 wqs-shadow = "world_quant_system.research.historical_shadow_cli:main"
+wqs-forward-shadow = "world_quant_system.research.forward_shadow_cli:main"
 
 [build-system]
 requires = ["setuptools>=80,<83"]
