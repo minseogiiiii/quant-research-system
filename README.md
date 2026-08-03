@@ -1334,3 +1334,96 @@ Run the deterministic synthetic restart and idempotency simulation with:
 ```bash
 .venv/bin/python scripts/forward_shadow_simulation.py
 ```
+
+## Broker Paper Execution & Reconciliation v1
+
+This stage adds a broker-neutral safety foundation between Forward Shadow Mode
+and any future external paper-broker transport.
+
+It implements:
+
+- offline certification of sandbox or paper account snapshots;
+- strict account, endpoint, provider, environment, and currency fingerprints;
+- long-only, integer-quantity, limit-order-only policy enforcement;
+- deterministic intent IDs and deterministic `client_order_id` values;
+- mandatory broker-side client-order-ID idempotency capability;
+- stale market-data and stale account-snapshot rejection;
+- order, notional, position, open-order, and cash-reserve limits;
+- crash-safe SQLite order state and hash-chained order events;
+- recovery of uncertain submissions by deterministic client order ID;
+- explicit `NORMAL`, `SOFT_HALT`, `CANCEL_ONLY`, and `HARD_HALT` states;
+- deterministic internal-versus-broker reconciliation;
+- fail-closed halts for unknown orders, fills, positions, cash differences, or
+  certified-environment mismatches;
+- atomic certification, pre-trade, reconciliation, and inspection reports;
+- a dedicated offline CLI named `wqs-paper`;
+- a deterministic in-memory paper broker used only by simulation tests.
+
+The CLI has no HTTP client, credentials, broker token, account query transport,
+or order submission command. Actual external paper-broker connectivity remains
+a separate certification stage.
+
+Safety posture:
+
+```text
+Execution mode: PAPER_SAFETY_FOUNDATION
+External broker transport: DISABLED
+Supported environment declarations: SANDBOX or PAPER
+Margin: DISABLED
+Short selling: DISABLED
+Fractional quantities: DISABLED
+Live endpoint: UNREPRESENTABLE
+Live trading: DISABLED
+```
+
+### Offline certification
+
+```bash
+wqs-paper certify \
+  --account-snapshot examples/paper_account_snapshot.example.json \
+  --policy examples/paper_execution_policy.example.json \
+  --evaluated-at 2026-08-03T20:00:00Z \
+  --require-order-submission \
+  --json-output reports/paper-certification.json
+```
+
+### Offline pre-trade validation
+
+```bash
+wqs-paper validate-intent \
+  --account-snapshot examples/paper_account_snapshot.example.json \
+  --market-snapshot examples/paper_market_snapshot.example.json \
+  --intent examples/paper_order_intent.example.json \
+  --policy examples/paper_execution_policy.example.json \
+  --store data/paper/paper-execution.sqlite3 \
+  --evaluated-at 2026-08-03T20:00:00Z \
+  --json-output reports/pretrade-decision.json
+```
+
+This command validates the order intent but never sends it anywhere.
+
+### Offline reconciliation
+
+```bash
+wqs-paper reconcile \
+  --internal-ledger examples/paper_internal_ledger.example.json \
+  --account-snapshot examples/paper_account_snapshot.example.json \
+  --policy examples/paper_execution_policy.example.json \
+  --store data/paper/paper-execution.sqlite3 \
+  --compared-at 2026-08-03T20:00:00Z \
+  --json-output reports/paper-reconciliation.json
+```
+
+A discrepancy is recorded and activates the recommended kill switch. The
+implementation never overwrites internal or broker values to hide a mismatch.
+
+### Deterministic safety simulation
+
+```bash
+python scripts/paper_execution_simulation.py
+```
+
+The simulation verifies idempotent submission, timeout-after-acceptance
+recovery, reconciliation, and kill-switch behavior using a networkless in-memory
+paper broker. It is not evidence of investment profitability and is not approval
+for external paper or live trading.

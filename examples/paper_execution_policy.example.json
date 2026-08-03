@@ -1,0 +1,20 @@
+{
+  "allowed_symbols": [
+    "ABC"
+  ],
+  "cash_reconciliation_tolerance": "0.01",
+  "currency": "USD",
+  "expected_account_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "expected_endpoint_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "expected_environment": "sandbox",
+  "expected_provider": "certified-paper-provider",
+  "maximum_account_age_seconds": 60,
+  "maximum_limit_deviation_bps": "100",
+  "maximum_market_age_seconds": 60,
+  "maximum_open_orders": 5,
+  "maximum_order_notional": "10000",
+  "maximum_order_quantity": 100,
+  "maximum_position_quantity": 200,
+  "minimum_cash_reserve_fraction": "0.1",
+  "require_marketable_limit": true
+}

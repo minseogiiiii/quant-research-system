@@ -1,0 +1,13 @@
+{
+  "account_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "captured_at": "2026-08-03T20:00:00Z",
+  "cash": {
+    "buying_power": "100000",
+    "currency": "USD",
+    "settled_cash": "100000"
+  },
+  "fill_ids": [],
+  "orders": [],
+  "positions": [],
+  "snapshot_digest": "26fd9eb0d402ef23914a0f05a83f1fdfd15646f8df39b8ae3eea401eb2373495"
+}

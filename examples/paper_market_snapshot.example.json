@@ -1,0 +1,9 @@
+{
+  "ask": "100",
+  "bid": "99.9",
+  "captured_at": "2026-08-03T20:00:00Z",
+  "last": "99.95",
+  "source": "offline_snapshot",
+  "source_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "symbol": "ABC"
+}
