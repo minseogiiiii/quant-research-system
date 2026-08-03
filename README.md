@@ -1470,3 +1470,71 @@ Run the synthetic, networkless capture certification:
 The example capture is synthetic and is not evidence from a real brokerage
 account. A later stage may add an explicitly reviewed read-only transport, but
 order submission, modification, and cancellation remain out of scope.
+
+## Toss Order Write Dry-Run & Safety Certification v1
+
+This phase compiles an internal paper-order intent into the pinned Toss order-create
+contract without loading credentials or sending a request. It exists to validate the
+write boundary before any external transport can be considered.
+
+Pinned contract:
+
+- OpenAPI version `1.2.9`
+- base URL `https://openapi.tossinvest.com`
+- `POST /api/v1/orders`
+- OAuth bearer and `X-Tossinvest-Account` are required by the official contract
+- `clientOrderId` is constrained to the official 36-character maximum
+
+The v1 compiler is intentionally narrower than the broker contract:
+
+- quantity-based orders only
+- whole-share, long-only intents
+- `LIMIT` orders only
+- `DAY` time in force only
+- no margin, leverage, shorting, amount orders, market orders, modify, or cancel
+- orders below the pinned high-value-confirmation threshold only
+- a current PASS read-only certification report is mandatory
+- account, market, policy, and intent identities are digest-bound
+- stale data, a non-normal kill switch, excess cash/position/notional risk, or a
+  mismatched account fingerprint fails closed
+
+A successful run produces a redacted compiled request, deterministic request digest,
+and expiring human-approval challenge. It then passes the request to
+`NoWriteDryRunTransport`, which always records:
+
+```text
+External network transport: DISABLED
+Credentials loaded: NO
+Broker write count: 0
+Order submission: NOT SUBMITTED
+Live trading: DISABLED
+```
+
+The package contains no network client dependency and exposes no order submission,
+modification, replacement, or cancellation function. The compiled request uses only a
+redacted bearer placeholder and a SHA-256 account fingerprint. It never persists an
+access token or raw account sequence.
+
+Show the pinned contract:
+
+```bash
+wqs-order-write-certify show-contract
+```
+
+Run the deterministic example certification:
+
+```bash
+wqs-order-write-certify certify-dry-run \
+  --read-only-report examples/toss_read_only_certification_report.example.json \
+  --intent examples/toss_order_write_intent.example.json \
+  --account examples/toss_order_write_account.example.json \
+  --market examples/toss_order_write_market.example.json \
+  --policy examples/toss_order_write_policy.example.json \
+  --evaluated-at 2026-08-03T21:31:00Z \
+  --json-output reports/toss-order-write-dry-run.json
+```
+
+This phase is not broker paper trading and is not permission to place an order. The
+next phase must isolate credentials and preserve the default-deny transport boundary;
+actual write activation remains prohibited unless a separately certified environment
+and explicit human-controlled release process exist.
