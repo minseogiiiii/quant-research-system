@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "dataset_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "return_matrix_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "events": [
+    {
+      "candidate_id": "carry-v1",
+      "strategy_name": "carry",
+      "strategy_version": "1",
+      "state": "promoted",
+      "effective_at": "2024-03-01T00:00:00Z",
+      "available_at": "2024-03-02T00:00:00Z",
+      "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reason": "portfolio promotion evidence completed"
+    },
+    {
+      "candidate_id": "quality-v1",
+      "strategy_name": "quality",
+      "strategy_version": "1",
+      "state": "promoted",
+      "effective_at": "2024-03-05T00:00:00Z",
+      "available_at": "2024-03-06T00:00:00Z",
+      "evidence_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "reason": "portfolio promotion evidence completed"
+    },
+    {
+      "candidate_id": "trend-v1",
+      "strategy_name": "trend",
+      "strategy_version": "1",
+      "state": "promoted",
+      "effective_at": "2024-03-10T00:00:00Z",
+      "available_at": "2024-03-11T00:00:00Z",
+      "evidence_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "reason": "portfolio promotion evidence completed"
+    },
+    {
+      "candidate_id": "trend-v1",
+      "strategy_name": "trend",
+      "strategy_version": "1",
+      "state": "suspended",
+      "effective_at": "2024-08-01T00:00:00Z",
+      "available_at": "2024-08-02T00:00:00Z",
+      "evidence_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "reason": "shadow stability limit breached"
+    }
+  ]
+}

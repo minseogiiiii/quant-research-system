@@ -1209,3 +1209,66 @@ insufficient_evidence
 `promoted_for_shadow_research` is permission to continue offline or shadow
 research only. It is not evidence of future profitability and is never live-trading
 eligibility.
+## Historical Shadow Portfolio Simulation v1
+
+Historical Shadow Portfolio Simulation v1 replays promoted strategy sleeves in
+strict timestamp order. It remains research-only and does not connect to a
+network, broker, account, paper-trading endpoint, or order API.
+
+The simulation enforces:
+
+- point-in-time evidence visibility using `available_at`
+- promoted, suspended, and retired candidate states
+- evidence-age expiration
+- decisions after the current observation and execution no earlier than a later
+  observation
+- equal-weight and capped inverse-volatility allocation using only returns
+  observed at the decision timestamp
+- candidate-weight, cash-reserve, turnover, and drawdown-halt limits
+- transaction costs charged when a pending allocation executes
+- deterministic decision journal, ledger, report UUID, and SHA-256 digest
+- equal-weight, double-cost, extra-delay, and largest-candidate-removed scenarios
+- fail-closed readiness decisions for the later forward-shadow research stage
+
+Candidate returns use the same CSV layout as `wqs-portfolio`: `timestamp`
+followed by at least two sorted or unsorted candidate columns. The parser sorts
+candidate IDs deterministically and requires one finite return greater than
+`-1` for every candidate and timestamp.
+
+The point-in-time evidence manifest uses schema version 1 and pins the exact
+`return_matrix_digest`; a different CSV fails closed. Each event contains a
+candidate ID, strategy identity, `promoted`, `suspended`, or `retired` state,
+`effective_at`, `available_at`, immutable evidence digest, and reason. A state is
+never visible before `available_at`, even when its effective timestamp is
+earlier. See `examples/historical_shadow_evidence_manifest.example.json`.
+
+Run the offline CLI with:
+
+```bash
+wqs-shadow \
+  --evidence-manifest data/research/historical-shadow-evidence.json \
+  --returns-csv data/research/candidate-oos-returns.csv \
+  --allocation capped_inverse_volatility \
+  --initial-equity 1000000 \
+  --rebalance-frequency 5 \
+  --volatility-lookback 20 \
+  --execution-delay-periods 1 \
+  --minimum-active-candidates 2 \
+  --minimum-cash-weight 0.05 \
+  --maximum-candidate-weight 0.40 \
+  --maximum-one-way-turnover 1 \
+  --transaction-cost-bps 10 \
+  --maximum-evidence-age-days 120 \
+  --maximum-drawdown-before-halt -0.30 \
+  --json-output reports/historical-shadow-v1.json
+```
+
+Run the deterministic synthetic validation with:
+
+```bash
+.venv/bin/python scripts/historical_shadow_simulation.py
+```
+
+A decision of `ready_for_forward_shadow_research` permits only the next offline
+or no-order forward-shadow research stage. It is not permission for paper or
+live trading and does not establish future profitability.
