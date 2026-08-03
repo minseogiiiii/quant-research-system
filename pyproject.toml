@@ -18,6 +18,7 @@ wqs-forward-shadow = "world_quant_system.research.forward_shadow_cli:main"
 wqs-paper = "world_quant_system.paper_execution.cli:main"
 wqs-broker-certify = "world_quant_system.broker_certification.cli:main"
 wqs-order-write-certify = "world_quant_system.order_write_certification.cli:main"
+wqs-credential-certify = "world_quant_system.credential_isolation.cli:main"
 
 [build-system]
 requires = ["setuptools>=80,<83"]

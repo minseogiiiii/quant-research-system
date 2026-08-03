@@ -1538,3 +1538,43 @@ This phase is not broker paper trading and is not permission to place an order. 
 next phase must isolate credentials and preserve the default-deny transport boundary;
 actual write activation remains prohibited unless a separately certified environment
 and explicit human-controlled release process exist.
+
+## Credential Boundary & Token Isolation v1
+
+This phase adds a networkless credential boundary that may read Toss credential
+material from fixed environment-variable names, an injected macOS Keychain reader, or explicit test fixtures, but
+never serializes raw client IDs, client secrets, account IDs, or token strings.
+
+The implementation provides mutable loaded-secret buffers with best-effort explicit zeroization,
+SHA-256-only credential descriptors, purpose-bound opaque token leases,
+expiration and revocation checks, kill-switch enforcement, redacted
+Authorization proofs, leak scanning, deterministic certification reports, and
+atomic JSON output.
+
+The token issuer used by certification is synthetic and performs no network
+request. It exists only to test token lifecycle and secret handling. OAuth token
+issuance, external HTTP transport, broker writes, order submission, order
+modification, order cancellation, and live trading remain disabled.
+
+Example commands:
+
+```bash
+wqs-credential-certify show-contract
+wqs-credential-certify certify-fixture \
+  --fixture examples/credential_isolation_fixture.example.json \
+  --policy examples/credential_isolation_policy.example.json \
+  --evaluated-at 2026-08-03T22:30:00Z \
+  --json-output reports/credential-isolation.json
+```
+
+Environment certification reads only these fixed names:
+
+- `WQS_TOSS_CLIENT_ID`
+- `WQS_TOSS_CLIENT_SECRET`
+- `WQS_TOSS_ACCOUNT_ID`
+- `WQS_TOSS_CREDENTIAL_VERSION`
+
+Do not place these values in Git, command-line arguments, JSON, SQLite, logs, or
+reports.
+
+The environment or Keychain remains owned by the caller; this phase zeroizes only the loaded boundary buffers and synthetic token buffers it creates.
