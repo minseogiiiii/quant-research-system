@@ -1427,3 +1427,46 @@ The simulation verifies idempotent submission, timeout-after-acceptance
 recovery, reconciliation, and kill-switch behavior using a networkless in-memory
 paper broker. It is not evidence of investment profitability and is not approval
 for external paper or live trading.
+
+## Toss Read-Only Adapter Contract Certification v1
+
+This stage certifies only the official Toss Securities Open API read-only
+contract for account, holdings, and order-history evidence. The public
+documentation identifies `https://openapi.tossinvest.com` as the API server and
+does not document a separate paper or sandbox server, so this stage does not
+pretend that a paper endpoint exists.
+
+Safety boundaries:
+
+- external network transport is absent and disabled by default
+- credentials and access tokens are never loaded by this module
+- captured response JSON is the only certification input
+- only GET account, holdings, and order-history operations are allowlisted
+- create, modify, cancel, conditional-order, and live-order paths are rejected
+- `Authorization` values are redacted from all request evidence
+- account selection is pinned by a SHA-256 fingerprint
+- unknown order statuses, conflicting duplicates, missing request IDs, and
+  repeated pagination tokens fail closed
+- response-size, page-count, clock-skew, retry-budget, and rate-limit evidence
+  are audited
+- certification reports are deterministic and written atomically
+
+Show the fixed contract:
+
+```bash
+.venv/bin/wqs-broker-certify show-contract
+```
+
+Run the synthetic, networkless capture certification:
+
+```bash
+.venv/bin/wqs-broker-certify certify-captures \
+  --policy examples/toss_read_only_certification_policy.example.json \
+  --captures examples/toss_read_only_capture_bundle.example.json \
+  --certified-at 2026-08-03T21:30:00Z \
+  --json-output reports/toss-read-only-certification.json
+```
+
+The example capture is synthetic and is not evidence from a real brokerage
+account. A later stage may add an explicitly reviewed read-only transport, but
+order submission, modification, and cancellation remain out of scope.
