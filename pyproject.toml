@@ -12,6 +12,7 @@ dependencies = [
 [project.scripts]
 world-quant-system = "world_quant_system.app:main"
 wqs = "world_quant_system.cli:main"
+wqs-portfolio = "world_quant_system.research.portfolio_promotion_cli:main"
 
 [build-system]
 requires = ["setuptools>=80,<83"]

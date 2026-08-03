@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "dataset_digest": "<frozen-historical-dataset-sha256>",
+  "candidates": [
+    {
+      "candidate_id": "<experiment-or-strategy-candidate-id>",
+      "strategy_name": "<strategy-name>",
+      "strategy_version": "<strategy-version>",
+      "backtest_report": "<path-to-backtest-report.json>",
+      "backtest_report_sha256": "<sha256-of-backtest-report>",
+      "robustness_report": "<path-to-robustness-report.json>",
+      "robustness_report_sha256": "<sha256-of-robustness-report>",
+      "statistical_report": "<path-to-statistical-report.json>",
+      "statistical_report_sha256": "<sha256-of-statistical-report>"
+    }
+  ]
+}

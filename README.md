@@ -1076,3 +1076,136 @@ an estimate whose quality depends on complete trial disclosure, representative
 historical data, and defensible assumptions about the effective number of
 independent trials. It does not establish future profitability or authorize
 live trading.
+## Research-to-Portfolio Promotion & Risk Engine v1
+
+This networkless research layer evaluates whether individually validated strategy
+candidates can be combined into a sufficiently diversified, cost-aware portfolio.
+It does not generate alpha, authorize live trading, connect to a broker, or submit
+orders.
+
+### Required evidence
+
+The engine requires two aligned local inputs:
+
+1. A candidate evidence manifest bound to one frozen historical-dataset digest.
+2. A wide CSV of periodic net out-of-sample returns using the same timestamps and
+   comparable cost/execution assumptions for every candidate.
+
+The return file uses:
+
+```text
+timestamp,<candidate-id-1>,<candidate-id-2>,...
+2022-01-03T00:00:00Z,0.0012,-0.0004,...
+```
+
+Timestamps must be timezone-aware and strictly increasing. Every return must be
+finite and greater than `-1`. Candidate columns are sorted internally, and every
+manifest candidate must have exactly one matching return column.
+
+Each candidate manifest entry pins the exact SHA-256 of its backtest, robustness,
+and statistical-validation JSON reports. Every report must be bound to the same
+frozen dataset. Robustness and statistical reports must expose their deterministic
+`report_digest` and `passed` state. Any missing report, digest mismatch, dataset
+mismatch, omitted return column, or conflicting economic evidence fails closed.
+
+When available, turnover is read from `metrics.turnover` in the backtest report.
+The cost-to-gross-profit ratio is derived as:
+
+```text
+(commission_cost + slippage_cost)
+-----------------------------------------------------------
+(final_equity - initial_equity + commission_cost + slippage_cost)
+```
+
+The derived ratio is used only when gross profit is positive. Optional manifest
+assertions must exactly match the report-derived values.
+
+An example manifest is installed at:
+
+```text
+examples/portfolio_promotion_candidate_manifest.example.json
+```
+
+### Candidate promotion gates
+
+A candidate is `eligible`, `rejected`, or `insufficient_evidence`. The policy can
+require:
+
+- passed robustness and statistical validation;
+- minimum aligned OOS observations;
+- positive or minimum cumulative net return;
+- maximum drawdown within a configured limit;
+- bounded turnover; and
+- bounded cost-to-gross-profit ratio.
+
+Rejected and insufficient candidates remain in the deterministic report with exact
+reasons. They are never silently discarded.
+
+### Diversification and allocation
+
+The engine calculates Pearson, Spearman, and loss-period correlations. Candidates
+that exceed either the ordinary or loss-period threshold are grouped into stable
+redundancy clusters.
+
+Two deterministic allocation methods are available:
+
+- `equal_weight`
+- `capped_inverse_volatility`
+
+Inverse-volatility weights use only observations strictly before the rebalance
+timestamp. Candidate caps, redundancy-cluster caps, rebalance frequency, and a
+minimum cash reserve are enforced. Unallocatable capital remains cash rather than
+violating a limit.
+
+### Portfolio validation and stress tests
+
+The base portfolio is evaluated in chronological folds, retaining each fold's
+return, drawdown, pass/fail state, and reasons. The final promotion gate can require
+a minimum walk-forward pass rate.
+
+Every run also includes these deterministic scenarios:
+
+- base allocation cost;
+- adverse allocation cost;
+- severe allocation cost;
+- common-loss amplification; and
+- removal of the largest average-weight candidate.
+
+Reported portfolio metrics include cumulative and annualized return, annualized
+volatility, Sharpe, Sortino, maximum drawdown, expected shortfall, turnover,
+allocation cost, average cash weight, and effective strategy count.
+
+### CLI
+
+The installer adds the separate research-only command `wqs-portfolio` so the
+existing default application and `wqs` CLI do not need risky edits.
+
+```bash
+wqs-portfolio \
+  --candidate-manifest data/research/portfolio/candidates.json \
+  --returns-csv data/research/portfolio/oos_returns.csv \
+  --allocation capped_inverse_volatility \
+  --minimum-candidate-observations 120 \
+  --volatility-lookback 60 \
+  --rebalance-frequency 20 \
+  --minimum-cash-weight 0.05 \
+  --maximum-candidate-weight 0.30 \
+  --maximum-cluster-weight 0.45 \
+  --adverse-cost-bps 10 \
+  --severe-cost-bps 25 \
+  --walk-forward-folds 4 \
+  --minimum-fold-pass-rate 0.75 \
+  --json-output data/research/portfolio/promotion-report.json
+```
+
+Possible final decisions are:
+
+```text
+promoted_for_shadow_research
+rejected
+insufficient_evidence
+```
+
+`promoted_for_shadow_research` is permission to continue offline or shadow
+research only. It is not evidence of future profitability and is never live-trading
+eligibility.
