@@ -20,6 +20,7 @@ wqs-broker-certify = "world_quant_system.broker_certification.cli:main"
 wqs-order-write-certify = "world_quant_system.order_write_certification.cli:main"
 wqs-credential-certify = "world_quant_system.credential_isolation.cli:main"
 wqs-write-transport-certify = "world_quant_system.disabled_write_transport.cli:main"
+wqs-toss-live-read-certify = "world_quant_system.toss_live_read.cli:main"
 
 [build-system]
 requires = ["setuptools>=80,<83"]

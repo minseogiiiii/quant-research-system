@@ -1619,3 +1619,27 @@ Automatic order retries: DISABLED
 Final state: TRANSPORT_BLOCKED
 Live trading: DISABLED
 ```
+
+## Toss Read-Only Live Transport Certification v1
+
+This stage adds an explicitly enabled, read-only live transport boundary for the
+official Toss Open API. It performs one OAuth client-credentials request and
+then reads accounts, holdings, open orders, and paginated closed orders.
+
+Safety properties:
+
+- exact official HTTPS host and port only
+- no proxy inheritance and no redirects
+- only `POST /oauth2/token` is permitted; every broker API call is GET
+- account sequence is selected from `GET /api/v1/accounts` before other calls
+- account number, account sequence, access token, client ID, and client secret
+  are never written to the certification report
+- unknown order status and pagination cycles fail closed
+- bounded retries apply only to GET requests; OAuth is never automatically
+  reissued during a certification run
+- broker write count and order submission remain zero
+- live network access requires `WQS_ENABLE_TOSS_LIVE_READ_ONLY=YES`
+
+The installer and default test suite use injected fake transport data and make
+no external request. Real certification must be run separately by the user
+with credentials stored only in the documented environment variables.
