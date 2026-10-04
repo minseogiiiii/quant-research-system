@@ -1,18 +1,21 @@
 # V-Lab Backtest Validation Audit
 
-This document audits the parts of World Quant System that are most relevant to
-a skeptical quantitative-research or financial-risk reviewer. It deliberately
-prioritizes temporal integrity, reproducibility, explicit assumptions, and
-failure handling over headline backtest returns.
+This document audits the parts of the Quantitative Research & Backtesting
+System that are most relevant to a skeptical quantitative-research or
+financial-risk reviewer. It deliberately prioritizes temporal integrity,
+reproducibility, explicit assumptions, and failure handling over headline
+backtest returns.
 
-The canonical validation is synthetic by design. It is a software and
-research-process test, **not historical evidence of alpha**.
+Synthetic validation remains a software/accounting test. A separate pinned SPY
+experiment now demonstrates the same execution path on historical market data.
+Neither is evidence of persistent alpha.
 
 ## A. Exact current test status
 
 A clean GitHub Actions run on Ubuntu with Python 3.12 completed successfully.
 
-Reference validation run: `37167658048`
+Reference validation run including the historical experiment:
+`37171307159`
 
 - pytest: **534 passed**
 - Ruff: **all checks passed**
@@ -93,6 +96,59 @@ The validation workflow also generates:
 
 Both figures explicitly label themselves as synthetic validation rather than
 historical performance.
+
+## B2. Pinned historical SPY experiment
+
+The portfolio example downloads daily SPY OHLCV from the public
+`quantstart/qstrader` repository at pinned commit
+`e6d86a3ac3dc507b26e27b1f20c2949a69438ef7`. The exact downloaded bytes
+reproduced SHA-256
+`0968f804c2594ec6fd2d0624e4271b8e351169946260f31e32c6048189ec8098`.
+
+The raw CSV is not vendored into this repository.
+
+The protocol was frozen before the final holdout:
+
+- SMA 20 / 100
+- 15 bps commission
+- 10 bps slippage
+- 10% maximum volume participation
+- development: 2000-01-03 through 2004-12-31
+- validation: 2005-01-03 through 2006-12-29
+- stress holdout: 2007-01-03 through 2009-12-31
+
+No parameter grid was searched for this example.
+
+Reproduced results:
+
+| Period | SMA return | Passive price return | SMA max drawdown | Passive max drawdown |
+| --- | ---: | ---: | ---: | ---: |
+| Development | -3.76% | -16.00% | -25.41% | -49.14% |
+| Validation | 7.93% | 17.27% | -5.61% | -7.59% |
+| 2007-2009 holdout | 11.51% | -21.28% | -17.06% | -56.45% |
+
+The validation underperformance is deliberately retained. The holdout result is
+a stress-period observation, not a claim of general alpha.
+
+The holdout SMA annualized volatility was **11.4509%** and Sharpe was
+**0.374775**. Three completed round trips were all losing trades, while the
+final open position remained marked to market and contributed to ending equity.
+Two buy intents were rejected for insufficient cash after next-open movement
+and modeled costs. This accounting detail is intentionally disclosed rather
+than hidden behind the positive total-return number.
+
+Committed historical evidence:
+
+- `reports/historical-spy/README.md`
+- `reports/historical-spy/holdout-sma-backtest.json`
+- `reports/historical-spy/holdout-buy-and-hold.json`
+
+Reference holdout run digest:
+`ea3b776cef94bb256468ac957e056504dc16560ff600053ee845aad8e89caa3f`.
+
+Important limitations: this is one ETF, raw OHLC price return rather than
+dividend-adjusted total return, a public historical snapshot rather than an
+institutional point-in-time feed, and a fixed-bps execution-cost model.
 
 ## C. Validated anti-lookahead safeguards
 
@@ -175,9 +231,9 @@ features of every historical strategy backtest.
   explicit annualization convention.
 - Drawdown and periodic risk metrics use replay snapshots rather than an
   intrabar mark-to-market path.
-- The repository does not bundle a production historical market dataset.
-  Therefore it does not, by itself, reproduce a real historical-return or
-  historical-Sharpe claim.
+- The repository now reproduces one pinned historical SPY example, but it does
+  not bundle the upstream raw CSV and does not claim an institutional
+  historical market-data feed.
 - The synthetic `005930` label must not be interpreted as Samsung Electronics
   historical market data.
 - Corporate actions can be supplied through an explicit point-in-time
@@ -309,8 +365,8 @@ makes that raw comparison unreliable.
 
 ### 10. What is the most important next improvement?
 
-Add a small, frozen, redistributable or explicitly downloadable historical
-dataset with a documented development/evaluation boundary and point-in-time
-metadata, then publish exact reproducible historical artifacts and figures.
-Only after that evidence exists should execution realism or strategy
-complexity be expanded.
+The highest-value next improvement is not another strategy. It is stronger
+historical-data provenance: an institutional-quality or explicitly
+point-in-time market-data source with corporate-action completeness and a
+separate exchange-open timestamp. That would reduce the largest remaining
+evidence gap without increasing strategy complexity.
