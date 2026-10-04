@@ -2,9 +2,6 @@ name: Validation
 
 on:
   pull_request:
-  push:
-    branches:
-      - audit/vlab-backtest-validation
   workflow_dispatch:
 
 permissions:
