@@ -1,31 +1,64 @@
 [project]
 name = "world-quant-system"
 version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.12"
+description = "Broker-neutral foundation for a safe quantitative trading system."
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
 dependencies = [
-    "httpx>=0.28.1",
-    "pydantic>=2.13.4",
-    "pydantic-settings>=2.14.2",
-    "structlog>=26.1.0",
-    "tenacity>=9.1.4",
+    "pydantic>=2.13.4,<3",
+    "pydantic-settings>=2.14.2,<3",
 ]
 
 [project.scripts]
-world-quant-system = "world_quant_system:main"
+world-quant-system = "world_quant_system.app:main"
+wqs = "world_quant_system.cli:main"
+wqs-portfolio = "world_quant_system.research.portfolio_promotion_cli:main"
+wqs-shadow = "world_quant_system.research.historical_shadow_cli:main"
+wqs-forward-shadow = "world_quant_system.research.forward_shadow_cli:main"
+wqs-paper = "world_quant_system.paper_execution.cli:main"
+wqs-broker-certify = "world_quant_system.broker_certification.cli:main"
+wqs-order-write-certify = "world_quant_system.order_write_certification.cli:main"
+wqs-credential-certify = "world_quant_system.credential_isolation.cli:main"
+wqs-write-transport-certify = "world_quant_system.disabled_write_transport.cli:main"
+wqs-toss-live-read-certify = "world_quant_system.toss_live_read.cli:main"
 
 [build-system]
-requires = ["uv_build>=0.11.29,<0.12.0"]
-build-backend = "uv_build"
+requires = ["setuptools>=80,<83"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["world_quant_system*"]
 
 [dependency-groups]
 dev = [
-    "mypy>=2.3.0",
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
-    "ruff>=0.15.22",
+    "mypy>=2.3.0,<3",
+    "pytest>=9.1.1,<10",
+    "pytest-asyncio>=1.4.0,<2",
+    "ruff>=0.15.22,<0.16",
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
 testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-config",
+    "--strict-markers",
+    "--import-mode=importlib",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+extend-exclude = ["build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true

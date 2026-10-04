@@ -1,0 +1,20 @@
+{
+  "provider": "toss",
+  "base_url": "https://openapi.tossinvest.com",
+  "pinned_openapi_version": "1.2.9",
+  "required_account_type": "BROKERAGE",
+  "timeout_seconds": 10.0,
+  "maximum_response_bytes": 2000000,
+  "maximum_read_attempts": 3,
+  "maximum_retry_delay_seconds": 5.0,
+  "closed_order_lookback_days": 30,
+  "closed_order_page_size": 100,
+  "maximum_closed_order_pages": 20,
+  "enable_variable": "WQS_ENABLE_TOSS_LIVE_READ_ONLY",
+  "enable_value": "YES",
+  "redirects_enabled": false,
+  "proxy_inheritance_enabled": false,
+  "broker_writes_enabled": false,
+  "token_persistence_enabled": false,
+  "account_persistence_enabled": false
+}

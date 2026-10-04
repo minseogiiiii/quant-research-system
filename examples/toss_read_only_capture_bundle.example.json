@@ -1,0 +1,104 @@
+{
+  "captured_at": "2026-08-03T21:29:30Z",
+  "account_seq": "1",
+  "operations": {
+    "accounts": [
+      {
+        "status_code": 200,
+        "headers": {
+          "X-Request-Id": "req-accounts-001",
+          "X-RateLimit-Limit": "1",
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": "1"
+        },
+        "received_at": "2026-08-03T21:29:00Z",
+        "body": {
+          "result": [
+            {
+              "accountSeq": "1",
+              "accountName": "Synthetic Read-Only Account"
+            }
+          ]
+        }
+      }
+    ],
+    "holdings": [
+      {
+        "status_code": 200,
+        "headers": {
+          "X-Request-Id": "req-holdings-001",
+          "X-RateLimit-Limit": "5",
+          "X-RateLimit-Remaining": "4",
+          "X-RateLimit-Reset": "0.2"
+        },
+        "received_at": "2026-08-03T21:29:05Z",
+        "body": {
+          "result": {
+            "holdings": [
+              {
+                "symbol": "005930",
+                "quantity": "3",
+                "averagePrice": "90000",
+                "currency": "KRW"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "open_orders": [
+      {
+        "status_code": 200,
+        "headers": {
+          "X-Request-Id": "req-open-orders-001",
+          "X-RateLimit-Limit": "5",
+          "X-RateLimit-Remaining": "4",
+          "X-RateLimit-Reset": "0.2"
+        },
+        "received_at": "2026-08-03T21:29:10Z",
+        "body": {
+          "result": {
+            "orders": [
+              {
+                "orderId": "order-open-001",
+                "clientOrderId": "wqs-example-open-001",
+                "symbol": "005930",
+                "side": "BUY",
+                "status": "OPEN",
+                "quantity": "1",
+                "filledQuantity": "0"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "closed_orders": [
+      {
+        "status_code": 200,
+        "headers": {
+          "X-Request-Id": "req-closed-orders-001",
+          "X-RateLimit-Limit": "5",
+          "X-RateLimit-Remaining": "4",
+          "X-RateLimit-Reset": "0.2"
+        },
+        "received_at": "2026-08-03T21:29:15Z",
+        "body": {
+          "result": {
+            "orders": [
+              {
+                "orderId": "order-closed-001",
+                "clientOrderId": "wqs-example-closed-001",
+                "symbol": "005930",
+                "side": "BUY",
+                "status": "FILLED",
+                "quantity": "1",
+                "filledQuantity": "1"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

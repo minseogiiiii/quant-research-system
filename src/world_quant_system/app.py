@@ -7,13 +7,16 @@ from world_quant_system.config.settings import Settings
 from world_quant_system.domain.models import Position, Quote
 
 
-async def build_demo_report() -> str:
-    settings = Settings()
+async def build_demo_report(
+    settings: Settings | None = None,
+) -> str:
+    app_settings = settings or Settings()
 
     quote = Quote(
         symbol="005930",
         price=Decimal("95000"),
         timestamp=datetime.now(UTC),
+        currency="KRW",
         source="mock",
     )
 
@@ -42,12 +45,13 @@ async def build_demo_report() -> str:
 
     return "\n".join(
         [
-            f"Environment: {settings.kis_env.value.upper()}",
+            (f"Execution mode: {app_settings.execution_mode.value.upper()}"),
+            (f"Broker provider: {app_settings.broker_provider.value.upper()}"),
             "Live trading: DISABLED",
             "",
             "Samsung Electronics",
             f"Symbol: {latest_quote.symbol}",
-            f"Price: {latest_quote.price:,.0f} KRW",
+            f"Price: {latest_quote.price:,.0f} {latest_quote.currency}",
             f"Source: {latest_quote.source}",
             "",
             "Account positions:",

@@ -1,0 +1,21 @@
+{
+  "allowed_symbols": [
+    "005930"
+  ],
+  "currency": "KRW",
+  "expected_account_fingerprint": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+  "high_value_order_threshold": "100000000",
+  "human_approval_ttl_seconds": 300,
+  "market": "KR",
+  "maximum_account_age_seconds": 120,
+  "maximum_certification_age_seconds": 3600,
+  "maximum_limit_deviation_bps": "100",
+  "maximum_market_age_seconds": 120,
+  "maximum_open_orders": 5,
+  "maximum_order_notional": "1000000",
+  "maximum_order_quantity": 10,
+  "maximum_position_quantity": 10,
+  "minimum_cash_reserve_fraction": "0.1",
+  "price_tick": "100",
+  "require_marketable_limit": true
+}

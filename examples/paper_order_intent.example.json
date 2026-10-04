@@ -1,0 +1,14 @@
+{
+  "client_order_id": "wqs-d01809267ff0843d62a3c634b29a",
+  "created_at": "2026-08-03T20:00:00Z",
+  "decision_id": "forward-shadow-decision-example",
+  "intent_id": "d01809267ff0843d62a3c634b29a9fef4c0f73cb3357af1b3cf7a7fd03bb7efa",
+  "limit_price": "100",
+  "market_snapshot_digest": "b62c3c5156da24a0c6559b43cae68b27a995b6dec11b9ac942040b271c017ff5",
+  "order_type": "limit",
+  "quantity": 10,
+  "reason": "example paper-only marketable limit intent",
+  "side": "buy",
+  "strategy_id": "validated-portfolio-v1",
+  "symbol": "ABC"
+}

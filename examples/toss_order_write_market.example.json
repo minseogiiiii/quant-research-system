@@ -1,0 +1,12 @@
+{
+  "ask": "95000",
+  "bid": "94900",
+  "captured_at": "2026-08-03T21:30:30Z",
+  "currency": "KRW",
+  "last": "95000",
+  "lower_limit_price": "66500",
+  "snapshot_digest": "45b9ca77b8f325ffdd6b1752bf341c9bd2da730bd48c81c40619beb8cb5318b9",
+  "source_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "symbol": "005930",
+  "upper_limit_price": "123500"
+}

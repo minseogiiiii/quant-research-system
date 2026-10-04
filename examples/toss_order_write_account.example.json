@@ -1,0 +1,16 @@
+{
+  "account_fingerprint": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+  "buying_power": "10000000",
+  "captured_at": "2026-08-03T21:30:30Z",
+  "currency": "KRW",
+  "open_order_count": 1,
+  "positions": [
+    {
+      "quantity": 3,
+      "symbol": "005930"
+    }
+  ],
+  "settled_cash": "10000000",
+  "snapshot_digest": "de0af421eee11bdb8007edcaeb1f245465731453bf7c3dcdc19d63642e7f4278",
+  "source_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

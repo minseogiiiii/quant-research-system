@@ -1,0 +1,183 @@
+{
+  "account_fingerprint": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+  "accounts": [
+    {
+      "account_fingerprint": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "account_name": "Synthetic Read-Only Account",
+      "account_seq": "1",
+      "raw_digest": "da712f099140c0f160d4f334ca58b3c2b8a52f8d2fb9e71783d7cc760960dbfd"
+    }
+  ],
+  "base_url": "https://openapi.tossinvest.com",
+  "certified_at": "2026-08-03T21:30:00Z",
+  "findings": [
+    {
+      "code": "NETWORK_TRANSPORT_DISABLED",
+      "message": "Certification used captured responses; external network transport remains disabled.",
+      "operation": null,
+      "severity": "info"
+    },
+    {
+      "code": "WRITE_SURFACE_ABSENT",
+      "message": "The certified surface contains GET operations only and cannot submit, modify, or cancel orders.",
+      "operation": null,
+      "severity": "info"
+    }
+  ],
+  "holdings": [
+    {
+      "average_price": "90000",
+      "currency": "KRW",
+      "quantity": "3",
+      "raw_digest": "ad1914d94f50e0785a9d902452c9a097851aba0592b4a7465e74ac0143196fe5",
+      "symbol": "005930"
+    }
+  ],
+  "network_transport_enabled": false,
+  "operations": [
+    {
+      "item_count": 1,
+      "operation": "accounts",
+      "page_count": 1,
+      "rate_limits": [
+        {
+          "limit": 1,
+          "remaining": 0,
+          "reset_seconds": 1.0,
+          "retry_after_seconds": null
+        }
+      ],
+      "request": {
+        "body_present": false,
+        "headers": {
+          "authorization": "<redacted>"
+        },
+        "method": "GET",
+        "operation": "accounts",
+        "url": "https://openapi.tossinvest.com/api/v1/accounts"
+      },
+      "request_ids": [
+        "req-accounts-001"
+      ],
+      "response_digests": [
+        "9104d436a2238eab34cb7a1a492c3e5ea65b057df83b10a6cdb6ef777fb4f418"
+      ]
+    },
+    {
+      "item_count": 1,
+      "operation": "holdings",
+      "page_count": 1,
+      "rate_limits": [
+        {
+          "limit": 5,
+          "remaining": 4,
+          "reset_seconds": 0.2,
+          "retry_after_seconds": null
+        }
+      ],
+      "request": {
+        "body_present": false,
+        "headers": {
+          "authorization": "<redacted>",
+          "x-tossinvest-account": "1"
+        },
+        "method": "GET",
+        "operation": "holdings",
+        "url": "https://openapi.tossinvest.com/api/v1/holdings"
+      },
+      "request_ids": [
+        "req-holdings-001"
+      ],
+      "response_digests": [
+        "ea46b196279b4103dbec7d93b19854ad4151d3049673d0cc4809d3f454cf8a17"
+      ]
+    },
+    {
+      "item_count": 1,
+      "operation": "open_orders",
+      "page_count": 1,
+      "rate_limits": [
+        {
+          "limit": 5,
+          "remaining": 4,
+          "reset_seconds": 0.2,
+          "retry_after_seconds": null
+        }
+      ],
+      "request": {
+        "body_present": false,
+        "headers": {
+          "authorization": "<redacted>",
+          "x-tossinvest-account": "1"
+        },
+        "method": "GET",
+        "operation": "open_orders",
+        "url": "https://openapi.tossinvest.com/api/v1/orders?status=OPEN"
+      },
+      "request_ids": [
+        "req-open-orders-001"
+      ],
+      "response_digests": [
+        "6b11aca64807cf81e8231b90cd972fb9bdf00e56488e806114fef4c3f7e3976f"
+      ]
+    },
+    {
+      "item_count": 1,
+      "operation": "closed_orders",
+      "page_count": 1,
+      "rate_limits": [
+        {
+          "limit": 5,
+          "remaining": 4,
+          "reset_seconds": 0.2,
+          "retry_after_seconds": null
+        }
+      ],
+      "request": {
+        "body_present": false,
+        "headers": {
+          "authorization": "<redacted>",
+          "x-tossinvest-account": "1"
+        },
+        "method": "GET",
+        "operation": "closed_orders",
+        "url": "https://openapi.tossinvest.com/api/v1/orders?status=CLOSED"
+      },
+      "request_ids": [
+        "req-closed-orders-001"
+      ],
+      "response_digests": [
+        "aeb163b4db514511353d7c31d232aca875325cc06edc9e1fb086122921ede163"
+      ]
+    }
+  ],
+  "orders": [
+    {
+      "client_order_id": "wqs-example-closed-001",
+      "filled_quantity": "1",
+      "order_id": "order-closed-001",
+      "quantity": "1",
+      "raw_digest": "abedb9680633ee9f771037cb46f1d8032f2410259b29761caf1f25e69b7c692c",
+      "side": "BUY",
+      "status": "FILLED",
+      "symbol": "005930"
+    },
+    {
+      "client_order_id": "wqs-example-open-001",
+      "filled_quantity": "0",
+      "order_id": "order-open-001",
+      "quantity": "1",
+      "raw_digest": "fbf071d13c29ca07a2eeb8f7bd9ea2f48df9777dd5363f4470ef860e65ed7a95",
+      "side": "BUY",
+      "status": "OPEN",
+      "symbol": "005930"
+    }
+  ],
+  "policy_digest": "fbeed6e15014dd86c029c33bcdf7e64e3f3e7049a4e286b4321265ab82c078b5",
+  "provider": "TOSSINVEST",
+  "report_digest": "a0f9587a41409af177e0eb26dc606378f20dbc375db05c76db6222e7b1ea64c4",
+  "report_id": "f998702b-5de4-5577-8759-57ea6011aef9",
+  "schema_version": 1,
+  "status": "pass",
+  "write_operations_enabled": false
+}

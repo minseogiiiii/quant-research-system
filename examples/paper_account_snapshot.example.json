@@ -1,0 +1,27 @@
+{
+  "captured_at": "2026-08-03T20:00:00Z",
+  "cash": {
+    "buying_power": "100000",
+    "currency": "USD",
+    "settled_cash": "100000"
+  },
+  "fills": [],
+  "orders": [],
+  "positions": [],
+  "profile": {
+    "account_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "cancellation": true,
+    "client_order_id_idempotency": true,
+    "currency": "USD",
+    "endpoint_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "environment": "sandbox",
+    "fractional_quantity": false,
+    "margin": false,
+    "paper_order_submission": true,
+    "provider": "certified-paper-provider",
+    "read_only_access": true,
+    "short_selling": false
+  },
+  "snapshot_digest": "30a190bbd6c3abb4672f87b42d6b52130bb6f9880f7188a19d633e4aa375ba68",
+  "source_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}

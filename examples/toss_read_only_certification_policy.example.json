@@ -1,0 +1,18 @@
+{
+  "provider": "TOSSINVEST",
+  "base_url": "https://openapi.tossinvest.com",
+  "expected_account_fingerprint": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+  "required_operations": [
+    "accounts",
+    "holdings",
+    "open_orders",
+    "closed_orders"
+  ],
+  "maximum_response_bytes": 2000000,
+  "maximum_pages_per_operation": 100,
+  "maximum_attempts": 3,
+  "base_backoff_seconds": 0.25,
+  "maximum_backoff_seconds": 2.0,
+  "allowed_clock_skew_seconds": 300,
+  "require_request_id": true
+}

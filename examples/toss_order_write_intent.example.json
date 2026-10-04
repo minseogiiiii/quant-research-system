@@ -1,0 +1,14 @@
+{
+  "client_order_id": "wqs-687b25c577a46bd4541ea489f6c9",
+  "created_at": "2026-08-03T21:30:45Z",
+  "decision_id": "forward-shadow-order-write-dry-run-example",
+  "intent_id": "687b25c577a46bd4541ea489f6c9a3bb1313b4e39fb4a6f4a786e0107264af5c",
+  "limit_price": "95000",
+  "market_snapshot_digest": "45b9ca77b8f325ffdd6b1752bf341c9bd2da730bd48c81c40619beb8cb5318b9",
+  "order_type": "limit",
+  "quantity": 1,
+  "reason": "offline order-write dry-run example",
+  "side": "buy",
+  "strategy_id": "validated-portfolio-v1",
+  "symbol": "005930"
+}
