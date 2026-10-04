@@ -29,3 +29,13 @@ jobs:
 
       - name: Run clean validation suite
         run: ./scripts/check.sh
+
+      - name: Generate synthetic validation figures
+        run: .venv/bin/python scripts/generate_validation_figures.py --output-dir reports/validation
+
+      - name: Upload validation figures
+        uses: actions/upload-artifact@v7
+        with:
+          name: synthetic-validation-figures
+          path: reports/validation/*.svg
+          if-no-files-found: error
