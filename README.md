@@ -1,12 +1,10 @@
 # Quantitative Research & Backtesting System
 
+[![Validation](https://github.com/minseogiiiii/quant-research-system/actions/workflows/validation.yml/badge.svg?branch=main)](https://github.com/minseogiiiii/quant-research-system/actions/workflows/validation.yml)
+
 A deterministic Python research system built to make historical strategy
 evaluation auditable, with explicit controls for data availability, look-ahead
 bias, execution timing, costs, overfitting, and reproducibility.
-
-> Portfolio positioning: this project is presented as **Quantitative Research &
-> Backtesting System**. The GitHub repository name `world-quant-system` is a
-> legacy name and does not imply affiliation with WorldQuant.
 
 ## Key Verified Evidence
 
@@ -42,7 +40,9 @@ market data
 → walk-forward / robustness / overfitting checks
 ```
 
-The core research path is under:
+### Core quantitative research path
+
+The primary research implementation is under:
 
 ```text
 src/world_quant_system/data/
