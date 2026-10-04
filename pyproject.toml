@@ -1,7 +1,7 @@
 [project]
 name = "world-quant-system"
 version = "0.1.0"
-description = "Broker-neutral foundation for a safe quantitative trading system."
+description = "Auditable quantitative research and backtesting system with point-in-time data, anti-lookahead validation, and reproducible experiments."
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
