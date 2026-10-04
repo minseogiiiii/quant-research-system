@@ -12,17 +12,17 @@ research-process test, **not historical evidence of alpha**.
 
 A clean GitHub Actions run on Ubuntu with Python 3.12 completed successfully.
 
-Validation run: `37167411823`
+Reference validation run: `37167658048`
 
-- pytest: **534 passed in 13.84s**
+- pytest: **534 passed**
 - Ruff: **all checks passed**
 - mypy: **no issues found in 255 source files**
 - deterministic project gate: **18/18 stages completed**
 - final status: **All project checks passed**
 - canonical JSON summaries generated successfully
 - two reproducible synthetic-validation SVG figures generated successfully
-- validation artifact SHA-256:
-  `06fc19db47f82b6ae556c1cbb8ed2bd79fdcf2943a64ae800adacdb1ed87e9ad`
+- workflow artifacts are uploaded immutably with a GitHub-recorded SHA-256
+  digest for each run
 
 The workflow performs a locked, non-editable installation, verifies imports
 outside the repository, compiles source/tests, runs pytest/Ruff/mypy, exercises
