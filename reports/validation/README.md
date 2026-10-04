@@ -10,9 +10,11 @@ performance**.
 - `synthetic-sma-crossover.json`
 - `synthetic-buy-and-hold.json`
 
-The snapshots were reproduced in clean GitHub Actions validation run
-`37167411823`. The same run produced validation artifact SHA-256
-`06fc19db47f82b6ae556c1cbb8ed2bd79fdcf2943a64ae800adacdb1ed87e9ad`.
+The snapshots are reproduced by the clean GitHub Actions validation workflow.
+A reference successful run reproducing the metrics below is `37167658048`.
+GitHub records an immutable digest for each uploaded workflow artifact; the
+artifact digest is intentionally not embedded in this directory because this
+README is itself part of the uploaded artifact.
 
 The canonical SMA simulation reproduced:
 
