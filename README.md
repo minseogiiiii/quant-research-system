@@ -66,6 +66,14 @@ A real historical performance claim should be made only from a frozen dataset
 with explicit point-in-time eligibility, a documented development/evaluation
 boundary, reproduced artifacts, and stated execution/cost assumptions.
 
+The latest clean validation reproduces the synthetic SMA run with 480 events,
+32.4509% total return, 42.2469% passive benchmark return, -8.0778% maximum
+drawdown, 2.6367% annualized volatility, and a 5.622373 Sharpe ratio. Those
+values are intentionally shown only as **synthetic accounting/validation
+outputs**, not as historical performance. Exact machine-readable summaries and
+regeneration commands are in
+[`reports/validation/`](reports/validation/README.md).
+
 ## Reproduce the validation evidence
 
 After setup, run:
