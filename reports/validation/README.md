@@ -10,11 +10,14 @@ performance**.
 - `synthetic-sma-crossover.json`
 - `synthetic-buy-and-hold.json`
 
-The snapshots are reproduced by the clean GitHub Actions validation workflow.
-A reference successful run reproducing the metrics below is `37167658048`.
-GitHub records an immutable digest for each uploaded workflow artifact; the
-artifact digest is intentionally not embedded in this directory because this
-README is itself part of the uploaded artifact.
+The snapshots are reproduced by the clean GitHub Actions validation workflow
+on `main`. GitHub records an immutable digest for each uploaded workflow
+artifact; the artifact digest is intentionally not embedded in this directory
+because this README is itself part of the uploaded artifact.
+
+The canonical SMA simulation uses the symbol label `005930` for deterministic
+test data. That label is **not Samsung Electronics historical market data** and
+must not be interpreted as such.
 
 The canonical SMA simulation reproduced:
 
