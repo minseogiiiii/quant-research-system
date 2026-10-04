@@ -1,3 +1,4 @@
+import math
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -50,3 +51,37 @@ def test_metrics_compute_return_and_drawdown() -> None:
     assert metrics.annualized_volatility is None
     assert metrics.sharpe_ratio is None
     assert metrics.sortino_ratio is None
+
+
+def test_metrics_risk_ratios_match_manual_periodic_return_check() -> None:
+    equity = Decimal("100")
+    points = [_point(0, "100")]
+    for index in range(1, 21):
+        periodic_return = Decimal("0.01") if index % 2 else Decimal("-0.01")
+        equity *= Decimal("1") + periodic_return
+        points.append(_point(index, format(equity, "f")))
+
+    metrics = calculate_performance_metrics(
+        initial_equity=Decimal("100"),
+        equity_curve=tuple(points),
+        trades=(),
+        turnover_notional=Decimal("0"),
+        annualization_periods=252,
+        benchmark_start_price=None,
+        benchmark_end_price=None,
+    )
+
+    expected_volatility = Decimal("0.01")
+    annualized_expected = float(expected_volatility) * math.sqrt(252)
+
+    assert metrics.annualized_volatility is not None
+    assert math.isclose(
+        metrics.annualized_volatility,
+        annualized_expected,
+        rel_tol=0,
+        abs_tol=1e-12,
+    )
+    assert metrics.sharpe_ratio is not None
+    assert math.isclose(metrics.sharpe_ratio, 0.0, rel_tol=0, abs_tol=1e-12)
+    assert metrics.sortino_ratio is not None
+    assert math.isclose(metrics.sortino_ratio, 0.0, rel_tol=0, abs_tol=1e-12)
