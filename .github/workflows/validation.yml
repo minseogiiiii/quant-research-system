@@ -1,0 +1,50 @@
+name: Validation
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          version: latest-known
+
+      - name: Install Python 3.12
+        run: uv python install 3.12
+
+      - name: Run clean validation suite
+        run: ./scripts/check.sh
+
+      - name: Generate canonical synthetic artifacts
+        run: |
+          .venv/bin/python scripts/strategy_backtest.py --output-dir reports/validation
+          .venv/bin/python scripts/generate_validation_figures.py --output-dir reports/validation
+
+      - name: Upload synthetic validation artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: synthetic-validation-artifacts
+          path: reports/validation/*
+          if-no-files-found: error
+
+      - name: Run pinned SPY historical experiment
+        run: .venv/bin/python scripts/historical_spy_experiment.py --output-dir reports/historical-spy
+
+      - name: Upload historical experiment artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: historical-spy-experiment
+          path: reports/historical-spy/*
+          if-no-files-found: error

@@ -236,3 +236,65 @@ def test_partial_fills_record_requested_and_filled_quantities() -> None:
     assert result.orders[1].requested_quantity == 99
     assert result.orders[1].quantity == 1
     assert result.equity_curve[-1].quantity == 2
+
+
+def test_future_price_mutation_cannot_change_past_state() -> None:
+    baseline_records = _records(
+        (
+            ("10", "10"),
+            ("11", "11"),
+            ("12", "12"),
+            ("13", "13"),
+            ("14", "14"),
+        )
+    )
+    mutated_records = _records(
+        (
+            ("10", "10"),
+            ("11", "11"),
+            ("12", "12"),
+            ("130", "1"),
+            ("140", "1"),
+        )
+    )
+    cutoff = baseline_records[2].candle.timestamp
+
+    def run(records: tuple[NormalizedCandleRecord, ...]) -> BacktestRunResult:
+        return asyncio.run(
+            StrategyBacktestEngine(
+                InMemoryNormalizedCandleReader(records),
+                _config(),
+                SmaCrossoverStrategy(short_window=1, long_window=2),
+            ).run()
+        )
+
+    baseline = run(baseline_records)
+    mutated = run(mutated_records)
+
+    assert tuple(
+        signal for signal in baseline.signals if signal.generated_at <= cutoff
+    ) == tuple(
+        signal for signal in mutated.signals if signal.generated_at <= cutoff
+    )
+    assert tuple(
+        record.order
+        for record in baseline.orders
+        if record.order.requested_at <= cutoff
+    ) == tuple(
+        record.order
+        for record in mutated.orders
+        if record.order.requested_at <= cutoff
+    )
+    assert tuple(
+        fill for fill in baseline.fills if fill.filled_at <= cutoff
+    ) == tuple(
+        fill for fill in mutated.fills if fill.filled_at <= cutoff
+    )
+    assert tuple(
+        point for point in baseline.equity_curve if point.timestamp <= cutoff
+    ) == tuple(
+        point for point in mutated.equity_curve if point.timestamp <= cutoff
+    )
+
+    assert baseline.run_digest != mutated.run_digest
+    assert baseline.signals[-1] != mutated.signals[-1]
