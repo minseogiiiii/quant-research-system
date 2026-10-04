@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from dataclasses import dataclass
 from html import escape
 from pathlib import Path
-from typing import Sequence
 
+from world_quant_system.backtest.models import PortfolioSnapshot
 from world_quant_system.backtest.simulation import run_strategy_backtest_simulation
 
 
@@ -82,23 +83,23 @@ def generate_validation_figures(output_dir: Path) -> tuple[Path, Path]:
 
 
 def _cumulative_returns(
-    curve: Sequence[object],
+    curve: Sequence[PortfolioSnapshot],
     initial_equity: float,
 ) -> tuple[float, ...]:
     if initial_equity <= 0:
         raise ValueError("Initial equity must be positive.")
     values: list[float] = []
     for point in curve:
-        total_equity = float(getattr(point, "total_equity"))
+        total_equity = float(point.total_equity)
         values.append((total_equity / initial_equity - 1.0) * 100.0)
     return tuple(values)
 
 
-def _drawdowns(curve: Sequence[object]) -> tuple[float, ...]:
+def _drawdowns(curve: Sequence[PortfolioSnapshot]) -> tuple[float, ...]:
     values: list[float] = []
     peak: float | None = None
     for point in curve:
-        equity = float(getattr(point, "total_equity"))
+        equity = float(point.total_equity)
         peak = equity if peak is None else max(peak, equity)
         drawdown = 0.0 if peak == 0 else (equity / peak - 1.0) * 100.0
         values.append(drawdown)
