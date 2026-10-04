@@ -367,7 +367,7 @@ def _parse(raw: bytes) -> tuple[NormalizedCandleRecord, ...]:
                 raw_content_sha256=raw_sha,
                 quality_report_id=str(uuid5(_REPORT_NAMESPACE, identity)),
                 normalized_at=observed_at + timedelta(minutes=1),
-                normalizer_version="historical-example-1.0.0",
+                normalizer_version="1.0.0",
                 content_sha256=raw_sha,
                 schema_version=1,
                 lineage_count=1,
