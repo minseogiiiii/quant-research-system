@@ -38,3 +38,13 @@ jobs:
           name: synthetic-validation-artifacts
           path: reports/validation/*
           if-no-files-found: error
+
+      - name: Run pinned SPY historical experiment
+        run: .venv/bin/python scripts/historical_spy_experiment.py --output-dir reports/historical-spy
+
+      - name: Upload historical experiment artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: historical-spy-experiment
+          path: reports/historical-spy/*
+          if-no-files-found: error
