@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from decimal import Decimal
 from pathlib import Path
 
 from world_quant_system.backtest.reporting import AtomicJsonBacktestSummaryWriter
@@ -74,7 +75,7 @@ def _optional_number(value: float | None) -> str:
     return "N/A" if value is None else f"{value:.6f}"
 
 
-def _optional_decimal_percent(value: object) -> str:
+def _optional_decimal_percent(value: Decimal | None) -> str:
     if value is None:
         return "N/A"
     return f"{value * 100:.4f}%"
