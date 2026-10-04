@@ -1,15 +1,109 @@
 # World Quant System
 
-Broker-neutral foundation for a quantitative trading system built around:
+A broker-neutral quantitative research and backtesting system designed to make
+historical experiments **auditable before they are made impressive**. The
+primary goal is not to maximize a backtest return; it is to make data lineage,
+timing, execution assumptions, validation boundaries, and statistical claims
+explicit and reproducible.
 
-1. Research efficiency
-2. Deterministic risk controls
-3. Broker independence
-4. Fail-closed integrations
+## Backtest integrity at a glance
 
-The current project is intentionally limited to mock and networkless behavior.
-It contains no live-order API, access token, brokerage credential, or real HTTP
-transport.
+The research path is intentionally separated into auditable stages:
+
+```text
+market data
+→ immutable capture and quality checks
+→ normalized / point-in-time eligible data
+→ deterministic replay
+→ signal after the current close is observed
+→ earliest execution at a later candle open
+→ portfolio and corporate-action accounting
+→ performance verification
+→ research-validity, walk-forward, and overfitting checks
+```
+
+The repository validation workflow currently verifies:
+
+- **534 passing tests** in a clean Python 3.12 environment
+- Ruff with all checks passing
+- mypy with no issues in **255 source files**
+- deterministic replay and final-run digests
+- rejection of same-candle and backward-time fills
+- a future-data mutation invariant: changing observations strictly after a
+  cutoff cannot change prior signals, order intents, fills, or equity state
+- point-in-time availability checks for data and universe membership
+- fail-closed, one-time untouched-holdout consumption
+- chronological walk-forward and statistical overfitting validation
+- deterministic transaction-cost and slippage accounting
+
+These are software and research-process guarantees. They are not evidence that
+a strategy will be profitable.
+
+## Signal vs. execution timing
+
+The default strategy backtest convention is:
+
+```text
+candle t close becomes observable
+→ signal is generated at t
+→ target-position order remains pending
+→ earliest permitted fill is candle t+1 open
+```
+
+The execution model raises an invariant error if an order is evaluated on a
+candle whose timestamp is not strictly later than the signal timestamp. The
+test suite also mutates future prices and verifies that state at or before the
+cutoff is unchanged.
+
+## What the demonstrated returns mean
+
+`scripts/strategy_backtest.py` uses deterministic **synthetic candles** to
+exercise timing, accounting, costs, partial fills, and reproducibility. Any
+return printed by that simulation is a software-validation result, **not a
+historical investment result, alpha estimate, or forecast of profitability**.
+
+A real historical performance claim should be made only from a frozen dataset
+with explicit point-in-time eligibility, a documented development/evaluation
+boundary, reproduced artifacts, and stated execution/cost assumptions.
+
+## Reproduce the validation evidence
+
+After setup, run:
+
+```bash
+./scripts/check.sh
+```
+
+This performs the clean project validation gate: non-editable locked
+installation, import verification outside the repository, compilation, pytest,
+Ruff, mypy, fail-closed network checks, and deterministic data, replay,
+backtest, research-validity, point-in-time, corporate-action, robustness, and
+statistical-validation simulations.
+
+For the V-Lab-focused evidence review, assumptions, safe claims, prohibited
+claims, and technical interview questions, see
+[`docs/VLAB_BACKTEST_AUDIT.md`](docs/VLAB_BACKTEST_AUDIT.md).
+
+## Scope and limitations
+
+- The core strategy backtester is single-symbol, long-only, and whole-share.
+- Commission and slippage models are transparent deterministic approximations,
+  not a full market-impact, queue-position, or exchange-microstructure model.
+- Risk ratios use a zero risk-free rate; daily runs default to 252
+  annualization periods.
+- The repository does not bundle a production historical market dataset, so it
+  does not by itself establish a historical-return or historical-Sharpe claim.
+- Corporate actions can be supplied through an explicit point-in-time timeline,
+  but the project does not claim a complete broker-specific corporate-action
+  feed.
+- Live trading remains deliberately separated from the validated research
+  workflow.
+
+The broader system is built around research efficiency, deterministic risk
+controls, broker independence, and fail-closed integrations. The current
+validated project remains intentionally constrained: it does not expose a live
+order-submission path from the research backtester or store brokerage
+credentials in the repository.
 
 ## Current execution modes
 
@@ -351,12 +445,14 @@ This simulation validates software behavior with synthetic candles. Its returns
 are not historical investment results and do not predict future profitability.
 
 Backtest v1 uses a zero risk-free rate, whole-share long-only orders, generic
-basis-point fees, and deterministic fixed slippage. Exchange taxes, tick-size
-rounding, dividends, splits, delistings, and other corporate actions must be
-handled by later market-specific models or by correctly adjusted input data.
-Open positions contribute to total return and drawdown; closed-trade statistics
-include completed round trips only. A position still open at the final candle is
-marked at that close and is not charged a hypothetical same-candle exit cost.
+basis-point fees, and deterministic fixed slippage. Corporate actions can be
+provided through the repository's explicit point-in-time corporate-action
+timeline; the project does not claim a complete broker-specific action feed.
+Exchange taxes, tick-size rounding, market impact, and queue-position effects
+remain simplified or outside the v1 execution model. Open positions contribute
+to total return and drawdown; closed-trade statistics include completed round
+trips only. A position still open at the final candle is marked at that close
+and is not charged a hypothetical same-candle exit cost.
 
 ### Research CLI
 
