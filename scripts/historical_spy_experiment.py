@@ -6,7 +6,6 @@ import asyncio
 import csv
 import hashlib
 import io
-import json
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
@@ -97,7 +96,11 @@ async def run(output_dir: Path) -> None:
         selected = tuple(
             record
             for record in records
-            if window.start <= record.candle.timestamp.astimezone(_NY).date() <= window.end
+            if (
+                window.start
+                <= record.candle.timestamp.astimezone(_NY).date()
+                <= window.end
+            )
         )
         if len(selected) < LONG_WINDOW + 20:
             raise RuntimeError(
@@ -497,7 +500,7 @@ def _write_figure(
         )
     )
     styles = (("#111111", None), ("#666666", "10 6"))
-    for (label, values), (stroke, dash) in zip(series, styles, strict=True):
+    for (_, values), (stroke, dash) in zip(series, styles, strict=True):
         points = " ".join(
             f"{x(index):.2f},{y(value):.2f}"
             for index, value in enumerate(values)
