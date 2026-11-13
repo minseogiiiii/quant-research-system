@@ -36,9 +36,13 @@ if(typeof WebSocket!=='function'){
       const m=JSON.parse(raw),ch=m.channel||m.type||'unknown';
       state.channel_count[ch]=(state.channel_count[ch]||0)+1;
       for(const e of m.events||[]){
-        if(Object.hasOwn(state.counts,e.product_id)){
-          if(ch==='l2_data'&&(e.type==='snapshot'||e.type==='update'))state.counts[e.product_id][e.type]++;
-          if(ch==='market_trades'&&Array.isArray(e.trades))state.counts[e.product_id].trades+=e.trades.length;
+        if(ch==='market_trades'&&Array.isArray(e.trades)){
+          for(const trade of e.trades){
+            if(Object.hasOwn(state.counts,trade.product_id))state.counts[trade.product_id].trades++;
+          }
+        }
+        if(Object.hasOwn(state.counts,e.product_id) && ch==='l2_data' && (e.type==='snapshot'||e.type==='update')){
+          state.counts[e.product_id][e.type]++;
         }
       }
     }catch(ex){state.error_count++;state.errors.push(String(ex).slice(0,120));}
