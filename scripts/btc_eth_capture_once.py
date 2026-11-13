@@ -45,7 +45,7 @@ try:
     for product in ("BTC-USD", "ETH-USD"):
         slug = product.split("-")[0].lower() + "_coinbase_spot_5m"
         relative_url = "/api/v3/brokerage/market/products/" + product + "/candles"
-        params = urlencode({"start": start, "end": end,
+        params = urlencode({"start": start, "end": end - 1,
                             "granularity": "FIVE_MINUTE", "limit": 300})
         url = "https://api.coinbase.com" + relative_url + "?" + params
         request = Request(url, headers={"Accept": "application/json",
@@ -105,6 +105,7 @@ try:
             "retrieved_at_utc": received_at,
             "rows": len(expected), "expected_rows": len(expected),
             "pages": [{"from_sec": start, "to_sec": end,
+                       "http_request_end_sec_inclusive": end - 1,
                        "raw_response_sha256": hashlib.sha256(raw).hexdigest(),
                        "raw_response_bytes": len(raw), "count": len(candles),
                        "raw_file": f"raw/{slug}/0000.json",
