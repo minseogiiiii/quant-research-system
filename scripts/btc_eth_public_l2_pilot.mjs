@@ -29,7 +29,7 @@ if(typeof WebSocket!=='function'){
     if(completed)return;
     const raw=typeof evt.data==='string'?evt.data:evt.data.toString();
     const size=Buffer.byteLength(raw,'utf8');
-    if(size>1_000_000||state.payload_bytes+size>8_000_000){state.errors.push('message/capture byte cap exceeded');state.error_count++;finish('limit');return;}
+    if(size>8_000_000||state.payload_bytes+size>24_000_000){state.errors.push('message/capture byte cap exceeded');state.error_count++;finish('limit');return;}
     const row={received_utc:new Date().toISOString(),local_monotonic_ns:process.hrtime.bigint().toString(),raw_text:raw,sha256:crypto.createHash('sha256').update(raw).digest('hex')};
     fs.writeSync(f,JSON.stringify(row)+'\n');hash.update(raw+'\n');state.records++;state.payload_bytes+=size;
     try{
