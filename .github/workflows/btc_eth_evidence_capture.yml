@@ -42,3 +42,22 @@ jobs:
           path: l2_evidence/
           if-no-files-found: warn
           retention-days: 14
+
+  reconnect_reference_pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v7
+      - name: Capture two read-only BTC/ETH WebSocket sessions with deliberate reconnect and public REST book
+        run: |
+          node --version
+          node --check scripts/btc_eth_reconnect_reference_pilot.mjs
+          node scripts/btc_eth_reconnect_reference_pilot.mjs
+      - name: Retain full raw and audit status, even if source failed
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: btc-eth-controlled-reconnect-rest-reference
+          path: reconnect_evidence/
+          if-no-files-found: warn
+          retention-days: 30
