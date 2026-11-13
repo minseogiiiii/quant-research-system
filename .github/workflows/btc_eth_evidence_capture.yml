@@ -1,0 +1,26 @@
+name: BTC ETH Public Candle Evidence (isolated)
+on:
+  push:
+    branches:
+      - evidence/btc-eth-candles-20261113
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  historical_candles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+      - name: Capture raw Coinbase responses without credentials or orders
+        run: python scripts/btc_eth_capture_once.py
+      - name: Preserve audit evidence (including failure status)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: btc-eth-public-candles-20261108
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 30
