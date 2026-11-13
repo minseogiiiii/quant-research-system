@@ -24,3 +24,21 @@ jobs:
           path: evidence/
           if-no-files-found: warn
           retention-days: 30
+
+  live_l2_20s:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+      - name: Record 20 seconds of read-only public BTC ETH L2 and market trades
+        run: |
+          node --version
+          node scripts/btc_eth_public_l2_pilot.mjs
+      - name: Archive L2 evidence even when incomplete
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: btc-eth-public-l2-pilot-20s
+          path: l2_evidence/
+          if-no-files-found: warn
+          retention-days: 14
