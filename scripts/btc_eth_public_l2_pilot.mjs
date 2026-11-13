@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 fs.mkdirSync('l2_evidence', {recursive:true});
 const f = fs.openSync('l2_evidence/raw_websocket_payloads.jsonl','w');
-const state = {status:'INCOMPLETE',products:['BTC-USD','ETH-USD'],channels:['level2','market_trades','heartbeats'],endpoint:'wss://advanced-trade-ws.coinbase.com',start_utc:new Date().toISOString(),records:0,payload_bytes:0,error_count:0,hash_is_of_utf8_text_not_wire_frames:true,receive_time_is_local_not_exchange_time:true,verified_sequence_integrity:false,verified_profitability:false,orders_enabled:false,counts:{'BTC-USD':{snapshot:0,update:0,trades:0},'ETH-USD':{snapshot:0,update:0,trades:0}},channel_count:{},errors:[]};
+const state = {status:'INCOMPLETE',products:['BTC-USD','ETH-USD'],channels:['level2','market_trades','heartbeats'],endpoint:'wss://advanced-trade-ws.coinbase.com',start_utc:new Date().toISOString(),records:0,payload_bytes:0,error_count:0,hash_is_of_utf8_text_not_wire_frames:true,receive_time_is_local_not_exchange_time:true,capture_duration_ms:35000,verified_sequence_integrity:false,verified_profitability:false,orders_enabled:false,counts:{'BTC-USD':{snapshot:0,update:0,trades:0},'ETH-USD':{snapshot:0,update:0,trades:0}},channel_count:{},errors:[]};
 const hash=crypto.createHash('sha256');
 let completed=false, closed=false, client;
 function finish(reason){
@@ -49,5 +49,5 @@ if(typeof WebSocket!=='function'){
   });
   client.addEventListener('error',ev=>{state.error_count++;state.errors.push(String(ev.message||'WebSocket error'));});
   client.addEventListener('close',ev=>{if(!completed){closed=true;state.errors.push('Socket closed: '+ev.code);finish('early_close');}});
-  setTimeout(()=>finish('20s_sampling_complete'),20000);
+  setTimeout(()=>finish('35s_sampling_complete'),35000);
 }
