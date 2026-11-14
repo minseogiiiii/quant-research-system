@@ -1,0 +1,4 @@
+Evidence-only one-hour BTC-USD / ETH-USD public WebSocket source capture.
+Trigger: opt-in source archival validation for v14 P0, 2026-11-14.
+No exchange credentials; no orders. Archive and source validity must be reviewed independently.
+Source branch: evidence/v14-reconnect-fault-guard
