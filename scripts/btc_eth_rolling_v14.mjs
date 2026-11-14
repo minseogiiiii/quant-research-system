@@ -95,8 +95,8 @@ function finish(reason){if(stopped)return;stopped=true;clearInterval(timer);clea
  meta.complete_sequence_per_connection=meta.connections.every(x=>!x.integrity_fault);
  meta.all_connections_have_snapshots=meta.connections.length>0&&meta.connections.every(x=>products.every(p=>x.snapshots[p]));
  const ready=meta.connections.length===1&&meta.connections.every(x=>x.became_ready&&x.heartbeat_count>0&&products.every(p=>x.updates[p]>0));
- if(reason==='DURATION_REACHED'&&faultAfterMessages&&!injectedFault){meta.status='CAPTURE_INCOMPLETE_OR_INVALID';meta.injection_not_triggered=true;}
  if(reason==='DURATION_REACHED'&&ready&&meta.faults.length===0&&!faultAfterMessages){meta.status='CAPTURE_COMPLETED_NO_GAPS_UNVERIFIED_MARKET_TRUTH';meta.ready_for_research=true;}
+ else if(reason==='DURATION_REACHED'&&faultAfterMessages&&!injectedFault){meta.status='CAPTURE_INCOMPLETE_OR_INVALID';meta.injection_not_triggered=true;}
  else if(reason==='DURATION_REACHED'&&meta.messages>0){meta.status='CAPTURE_COMPLETED_WITH_QUARANTINED_GAPS';}
  else meta.status='CAPTURE_INCOMPLETE_OR_INVALID';
  persist();console.log(JSON.stringify({directory:root,status:meta.status,messages:meta.messages,chunks:meta.chunks.length,connections:meta.connections.length,faults:meta.faults.length}));
