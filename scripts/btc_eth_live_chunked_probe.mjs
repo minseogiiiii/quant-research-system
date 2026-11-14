@@ -57,7 +57,10 @@ function finish(reason){if(stopped)return;stopped=true;clearInterval(timer);clea
 function fail(reason){if(stopped)return;
  meta.faults.push({connection_id:c?.id??null,at_utc:utc(),reason:String(reason).slice(0,280)});
  if(c){c.integrity_fault=true;c.state='QUARANTINED';c.ended_utc=utc();}
- try{ws?.close();closeChunk();}catch(e){return finish('DISK_FAILURE');}
+ try{ws?.close();}catch(e){meta.faults.push({connection_id:c?.id??null,at_utc:utc(),reason:'SOCKET_CLOSE_ERROR:'+String(e).slice(0,250)});}
+ try{closeChunk();}catch(e){
+  meta.faults.push({connection_id:c?.id??null,at_utc:utc(),reason:'ARCHIVE_ERROR:'+String(e).slice(0,250)});
+  return finish('DISK_FAILURE');}
  if(reconnects>=3)return finish('RECONNECT_BUDGET');
  reconnects++;backoff=setTimeout(connect,500*reconnects);}
 function connect(){if(stopped)return;c={id:meta.connections.length,state:'CONNECTING',started_utc:utc(),messages:0,
