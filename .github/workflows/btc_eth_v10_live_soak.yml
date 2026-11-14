@@ -1,8 +1,9 @@
-name: BTC ETH V10 Chunked Public Data Soak
+name: BTC ETH V10 V12 Chunked Public Data Soak
 on:
   push:
     branches:
       - evidence/v10-live-chunked-soak
+      - evidence/v12-durable-source-soak
   workflow_dispatch:
 
 permissions:
@@ -14,6 +15,8 @@ jobs:
     timeout-minutes: 8
     env:
       SOAK_DURATION_SECONDS: '180'
+      SOAK_DISK_RESERVE_BYTES: '268435456'
+      SOAK_ARCHIVE_BUDGET_BYTES: '419430400'
     steps:
       - uses: actions/checkout@v7
       - name: Confirm runtime and source syntax
@@ -26,7 +29,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: btc-eth-v10-live-chunked-180s
+          name: btc-eth-v10-v12-live-chunked-180s
           path: soak_evidence/
           if-no-files-found: warn
           retention-days: 14
