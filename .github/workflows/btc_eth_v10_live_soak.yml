@@ -4,6 +4,7 @@ on:
     branches:
       - evidence/v10-live-chunked-soak
       - evidence/v12-durable-source-soak
+      - evidence/v12-ten-minute-soak
   workflow_dispatch:
 
 permissions:
@@ -12,9 +13,9 @@ permissions:
 jobs:
   chunked_public_soak:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 16
     env:
-      SOAK_DURATION_SECONDS: '180'
+      SOAK_DURATION_SECONDS: '600'
       SOAK_DISK_RESERVE_BYTES: '268435456'
       SOAK_ARCHIVE_BUDGET_BYTES: '419430400'
     steps:
@@ -23,13 +24,13 @@ jobs:
         run: |
           node --version
           node --check scripts/btc_eth_live_chunked_probe.mjs
-      - name: Run public BTC ETH 180s chunked archival probe (NO ORDERS)
+      - name: Run public BTC ETH 600s chunked archival probe (NO ORDERS)
         run: node scripts/btc_eth_live_chunked_probe.mjs
       - name: Retain original WS payload chunks and failure records
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: btc-eth-v10-v12-live-chunked-180s
+          name: btc-eth-v12-live-chunked-600s
           path: soak_evidence/
           if-no-files-found: warn
           retention-days: 14
