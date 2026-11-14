@@ -1,5 +1,12 @@
 name: BTC ETH One-Hour Public Source Soak (manual only)
 on:
+  # A push changing ONLY this sentinel path deliberately starts the one-hour job
+  # on the evidence branch; installing the workflow alone does not run it.
+  push:
+    branches:
+      - evidence/v14-reconnect-fault-guard
+    paths:
+      - .github/one_hour_source_run_request.txt
   workflow_dispatch:
 
 permissions:
