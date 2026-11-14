@@ -1,0 +1,61 @@
+name: BTC ETH v14 Controlled WS Reconnect Audit
+on:
+  push:
+    branches:
+      - evidence/v14-reconnect-fault-guard
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  clean_reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      SOAK_DURATION_SECONDS: '120'
+      SOAK_CHUNK_LIMIT_BYTES: '524288'
+      SOAK_RAW_BUDGET_BYTES: '1000000000'
+      SOAK_ARCHIVE_BUDGET_BYTES: '1258291200'
+      SOAK_DISK_RESERVE_BYTES: '268435456'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate JS syntax
+        run: node --check scripts/btc_eth_rolling_v14.mjs
+      - name: Source capture without fault injection
+        run: node scripts/btc_eth_rolling_v14.mjs
+      - name: Preserve clean original sources
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: btc-eth-v14-clean-120s
+          path: soak_evidence/
+          if-no-files-found: error
+          retention-days: 14
+  controlled_disconnect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      SOAK_DURATION_SECONDS: '120'
+      SOAK_CHUNK_LIMIT_BYTES: '524288'
+      SOAK_RAW_BUDGET_BYTES: '1000000000'
+      SOAK_ARCHIVE_BUDGET_BYTES: '1258291200'
+      SOAK_DISK_RESERVE_BYTES: '268435456'
+      SOAK_TEST_DISCONNECT_AFTER_MESSAGES: '180'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate JS syntax
+        run: node --check scripts/btc_eth_rolling_v14.mjs
+      - name: Confirm intentional disconnection produces fail-closed nonzero status
+        run: |
+          set +e
+          node scripts/btc_eth_rolling_v14.mjs
+          result=$?
+          set -e
+          test "$result" -eq 2
+      - name: Preserve quarantined original source and fault report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: btc-eth-v14-injected-disconnect-120s
+          path: soak_evidence/
+          if-no-files-found: error
+          retention-days: 14
