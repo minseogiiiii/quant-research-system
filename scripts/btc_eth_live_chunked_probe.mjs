@@ -97,6 +97,7 @@ function fail(reason){if(stopped)return;
   meta.faults.push({connection_id:c?.id??null,at_utc:utc(),reason:'ARCHIVE_ERROR:'+String(e).slice(0,250)});
   return finish('DISK_FAILURE');}
  if(/ARCHIVE_BUDGET_EXCEEDED|DISK_RESERVE_EXCEEDED|PARTIAL_DISK_WRITE|SIZE_CAP|ARCHIVE_ERROR/.test(String(reason)))return finish('NONRECOVERABLE_STORAGE_LIMIT');
+ if(/ARCHIVE_BUDGET_EXCEEDED|DISK_RESERVE_EXCEEDED|PARTIAL_DISK_WRITE|SIZE_CAP|ARCHIVE_ERROR/.test(String(reason)))return finish('NONRECOVERABLE_STORAGE_LIMIT');
  if(reconnects>=3)return finish('RECONNECT_BUDGET');
  reconnects++;backoff=setTimeout(connect,500*reconnects);}
 function connect(){if(stopped)return;c={id:meta.connections.length,state:'CONNECTING',started_utc:utc(),messages:0,
