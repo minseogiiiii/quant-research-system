@@ -1,0 +1,32 @@
+name: BTC ETH V10 Chunked Public Data Soak
+on:
+  push:
+    branches:
+      - evidence/v10-live-chunked-soak
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chunked_public_soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SOAK_DURATION_SECONDS: '180'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Confirm runtime and source syntax
+        run: |
+          node --version
+          node --check scripts/btc_eth_live_chunked_probe.mjs
+      - name: Run public BTC ETH 180s chunked archival probe (NO ORDERS)
+        run: node scripts/btc_eth_live_chunked_probe.mjs
+      - name: Retain original WS payload chunks and failure records
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: btc-eth-v10-live-chunked-180s
+          path: soak_evidence/
+          if-no-files-found: warn
+          retention-days: 14
