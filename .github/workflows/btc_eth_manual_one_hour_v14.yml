@@ -1,0 +1,37 @@
+name: BTC ETH One-Hour Public Source Soak (manual only)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  one_hour_public_archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 78
+    env:
+      SOAK_DURATION_SECONDS: '3600'
+      SOAK_CHUNK_LIMIT_BYTES: '8000000'
+      SOAK_RAW_BUDGET_BYTES: '1250000000'
+      SOAK_ARCHIVE_BUDGET_BYTES: '1600000000'
+      SOAK_DISK_RESERVE_BYTES: '1073741824'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check free capacity and syntax before reading public data
+        run: |
+          node --version
+          node --check scripts/btc_eth_rolling_v14.mjs
+          df -h .
+          free_bytes=$(df -B1 --output=avail . | tail -1 | tr -d ' ')
+          test "$free_bytes" -gt 3200000000
+      - name: Bounded one-hour public BTC ETH collection only, no orders
+        run: node scripts/btc_eth_rolling_v14.mjs
+      - name: Archive raw chunks even if source was quarantined or incomplete
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: btc-eth-one-hour-original-source-evidence
+          path: soak_evidence/
+          retention-days: 3
+          compression-level: 6
+          if-no-files-found: warn
