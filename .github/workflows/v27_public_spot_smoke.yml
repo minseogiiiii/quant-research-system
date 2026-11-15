@@ -1,0 +1,91 @@
+name: BTC ETH v27 real public 60s source probe
+
+on:
+  push:
+    branches:
+      - evidence/btc-eth-v27-real-smoke-20261115
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real_public_spot_60s:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SOAK_DURATION_SECONDS: '60'
+      SOAK_RAW_BUDGET_BYTES: '250000000'
+      SOAK_ARCHIVE_BUDGET_BYTES: '350000000'
+      SOAK_CHUNK_LIMIT_BYTES: '8000000'
+      SOAK_DISK_RESERVE_BYTES: '1073741824'
+      SOAK_TEST_FIXTURE: '0'
+      SOAK_TEST_DISCONNECT_AFTER_MESSAGES: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate exact capture script and runtime
+        run: |
+          node --version
+          node --check scripts/btc_eth_rolling_v14.mjs
+          df -h .
+      - name: Public WebSocket raw source collection with zero credentials and orders
+        run: node scripts/btc_eth_rolling_v14.mjs
+      - name: Validate persisted raw archive against manifest (source self-consistency only)
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,pathlib,sys
+          roots=list(pathlib.Path('soak_evidence').glob('coinbase_btc_eth_soak_*'))
+          result={'schema':'v27_workflow_byte_check_v1','source_count':len(roots),'status':'REJECTED','independent_exchange_truth':False,'order_count':0}
+          try:
+              if len(roots)!=1: raise ValueError('NO_UNIQUE_SOURCE_DIRECTORY')
+              root=roots[0]
+              manifest=json.loads((root/'manifest.json').read_text())
+              result['manifest_sha256']=hashlib.sha256((root/'manifest.json').read_bytes()).hexdigest()
+              n=0
+              last={}
+              for chunk in manifest['chunks']:
+                  p=root/chunk['file']
+                  data=p.read_bytes()
+                  if hashlib.sha256(data).hexdigest()!=chunk['archive_sha256']: raise ValueError('CHUNK_HASH')
+                  for line in data.splitlines():
+                      record=json.loads(line)
+                      cid=record['connection_id']
+                      raw=record['raw_text'].encode('utf-8')
+                      if hashlib.sha256(raw).hexdigest()!=record['sha256']:raise ValueError('RAW_HASH')
+                      msg=json.loads(record['raw_text'])
+                      seq=msg['sequence_num']
+                      if cid in last and seq!=last[cid]+1:raise ValueError('SEQ_GAP')
+                      if cid not in last and seq!=0:raise ValueError('SEQ_FIRST_NOT_ZERO')
+                      last[cid]=seq
+                      n+=1
+              result.update({'message_count':n,'chunk_count':len(manifest['chunks']),
+                             'collector_status':manifest.get('status'),
+                             'source_connections':len(manifest.get('connections',[]))})
+              if n!=manifest['messages'] or len(manifest['connections'])!=1 or manifest['faults']:
+                  raise ValueError('SOURCE_COHORT_MISMATCH')
+              if manifest['status']!='CAPTURE_COMPLETED_NO_GAPS_UNVERIFIED_MARKET_TRUTH' or manifest.get('synthetic_fixture'):
+                  raise ValueError('COLLECTOR_NOT_ADMITTED')
+              result['status']='BYTE_CONSISTENT_ONE_CONNECTION_NOT_EXCHANGE_ATTESTED'
+          except Exception as e:
+              result['error']=str(e)[:300]
+          finally:
+              out=pathlib.Path('soak_evidence/v27_workflow_byte_check.json')
+              out.parent.mkdir(parents=True,exist_ok=True)
+              out.write_text(json.dumps(result,sort_keys=True,indent=2)+'\n')
+              print(json.dumps(result,sort_keys=True))
+              if result['status']=='REJECTED':sys.exit(2)
+          PY
+      - name: Retain raw source and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-eth-v27-real-60s-public-source
+          path: soak_evidence/
+          retention-days: 7
+          compression-level: 6
+          if-no-files-found: warn
