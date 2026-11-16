@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Test exact read-only L2 market-state contract without npm dependencies
+        run: node --experimental-strip-types --test tests/marketStateIntegrity.test.mjs
       - name: Install pinned chart and React dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Validate actual TypeScript and Vite production build
