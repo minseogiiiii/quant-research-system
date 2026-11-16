@@ -25,3 +25,18 @@ Before any merge or live label:
 5. Keep source admission, paper OMS risk authorization, and real broker execution physically separate.
 
 All values are research engineering evidence only. `NO CONFIRMED EXECUTABLE ALPHA`. Real orders: 0. Keep `main` unchanged.
+
+
+## 2026-11-16 historical frontend integrity increment
+
+Verified increment only, not a v35 live service deployment or promotion.
+
+- Integration branch frontend/src/unified.tsx now imports the exact-decimal, fail-closed `validateDepth10` gate from `frontend/src/marketStateIntegrity.ts`. Historical L2 side-total inconsistencies, incorrect cumulative depth, crossed books, malformed decimal values, and tiny rounding differences are rejected without IEEE-754 tolerance.
+- New `frontend/tests/marketStateIntegrity.test.mjs`: **7/7 locally passed** against the real frozen v34.1 L2 projection; in GitHub Actions **6 passed, 1 optional real-source test skipped** because source archives are intentionally not committed.
+- Existing Python regression tests run on a separate modified frontend staging copy: **110 passed, 43 subtests passed**. The frozen parent v34.1 original ZIP SHA remains `8304562514657d3a6405255d595a8ce7e1f223eef2f0f15f157b8f18d6dacec8`.
+- GitHub workflow: [CI run 43981493990](https://github.com/minseogiiiii/quant-research-system/actions/runs/43981493990) at `830aff0b28b08b7799e82bd9a2253dcfe5815428` **passed** TypeScript, pinned npm ci, Vite build, read-only L2 unit tests, and new exact asset-manifest verification.
+- New file `frontend/v35_dist_integrity.json` binds index, JS and CSS to the CI artifact; its independently calculated SHA-256 is `1311e3ebc7a94bbee43091230c49f67ace3144bef824655601a564d525f2ba9f`. The artifact source code commit was `b1962e0946aa34e02e0371bd43a9ced3c42ad43a` (subsequent changes were tests, manifest and workflow only).
+- On a disposable extracted v34.1 backend, the CI-built candidate returned 200 for `/research`, catalog and both BTC/ETH depth/recovery routes; intentionally modified CSS caused 503 fail-closed, followed by 200 after restoring the original hash. No raw historical data was changed. This required a **temporary staging-only** adjustment to the legacy v34 pinned manifest path and hash; it is not an authorized production deployment.
+- **Direct Chromium/Playwright local browser navigation remains BLOCKED** (`ERR_BLOCKED_BY_ADMINISTRATOR`). The successful HTTP integration is not an independent browser DOM E2E validation.
+- Original standalone v35 ZIP, `backend/v35_live_state.py`, `backend/v35_live_api.py` and its tests remain **UNRECOVERED** on this branch. Live capture, SSE/gap/resync, full final release regression and real source-admission gates remain UNVERIFIED.
+- Trading writes remain disabled; `main` must remain untouched. Research verdict: `NO CONFIRMED EXECUTABLE ALPHA`.
