@@ -30,6 +30,8 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Validate actual TypeScript and Vite production build
         run: npm run build
+      - name: Verify source-pinned browser assets match v35 candidate manifest
+        run: node --test tests/buildManifest.test.mjs
       - name: Check generated browser bundle files
         run: |
           test -f dist/index.html
