@@ -11,7 +11,7 @@ This branch is an **isolated integration staging branch**, created from the veri
 
 ## Implemented Phase A/B local vertical slice
 
-The companion v30 source package introduces:
+The v30 source package introduces:
 
 - `backend/v30_unified_projection.py`: runs the existing two independent public-source auditors, binds frozen v21/v23 receiver-asof diagnostics to the verified source manifest, and generates bounded 5-minute **receiver-time observed trade update** bars and trade tape.
 - `backend/v30_unified_api.py` and a narrow adaptation of `backend/bridge.py`: read-only `/api/v30/catalog`, `/api/v30/series`, `/api/v30/book` endpoints, with whitelist validation, pagination, time cutoffs and SHA-256 gates.
@@ -19,7 +19,7 @@ The companion v30 source package introduces:
 - `frontend/standalone`: a dependency-free local browser view of the **same readonly API**, for hosts without npm registry access.
 - `tests/test_v30_unified_terminal.py`: HTTP and source integrity adversarial tests.
 
-**GitHub migration status:** the branch exists and this migration record is versioned. The full standalone v29/v30 source and private-independent audits have **not** been imported into GitHub yet. This branch is **not independently buildable as the v30 application** until reviewed source migration commits arrive. Do not mistake the branch creation for completion of migration.
+**GitHub migration status:** source staging is partially complete: v30 projector, readonly API, bridge, the existing React/Funnest frontend entry and datafeed, the unified component, standalone UI, TypeScript contracts and new tests were committed under `btc_eth_terminal/` on this integration branch and their Git blob identities were checked against local fixed-tree code. The remaining standalone v29 dependencies, immutable source archives and generated projection are **NOT** imported into GitHub. Consequently this branch is **not independently buildable as the complete v30 application**. Use the downloadable full v30 ZIP to run locally. No raw archives or secrets were uploaded. Do not mistake the branch creation for completion of migration.
 
 ## Research safeguards
 
