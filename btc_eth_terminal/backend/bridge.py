@@ -500,32 +500,14 @@ class Handler(BaseHTTPRequestHandler):
                 # Asset names must be referenced by the exact Vite index manifest.
                 if parsed.query:
                     raise InputError("Bundled assets do not accept URL arguments")
-                dist=HERE.parent/"frontend"/"dist"
-                index=dist/"index.html"
-                if (dist.is_symlink() or index.is_symlink() or not index.is_file()
-                        or index.stat().st_size>50_000):
-                    self.send_obj(404,{"error":"Audited frontend build unavailable"})
+                from v33_frontend_integrity import get_asset, FrontendIntegrityError
+                try:
+                    payload, content_type=get_asset(parsed.path)
+                except FrontendIntegrityError:
+                    # Fail closed: modified JS/CSS or a spoofed pinned manifest
+                    # must block even /research HTML from being served.
+                    self.send_obj(503,{"error":"Pinned frontend bundle is unavailable or failed SHA-256 integrity"})
                     return
-                index_bytes=index.read_bytes()
-                asset_names={name.decode('ascii') for name in re.findall(
-                    rb'/assets/(index-[A-Za-z0-9_-]+\.(?:js|css))',index_bytes)}
-                if not asset_names:
-                    self.send_obj(404,{"error":"Frontend build manifest unavailable"})
-                    return
-                if parsed.path in ("/research", "/research/index.html"):
-                    payload=index_bytes
-                    content_type="text/html"
-                else:
-                    name=parsed.path[len('/assets/'):]
-                    if name not in asset_names or (dist/"assets").is_symlink():
-                        self.send_obj(404,{"error":"Unknown frontend asset"})
-                        return
-                    target=dist/"assets"/name
-                    if target.is_symlink() or not target.is_file() or target.stat().st_size>8_000_000:
-                        self.send_obj(404,{"error":"Unavailable frontend asset"})
-                        return
-                    payload=target.read_bytes()
-                    content_type="application/javascript" if name.endswith(".js") else "text/css"
                 self.send_response(200)
                 self.send_header("Content-Type", content_type+"; charset=utf-8")
                 self.send_header("Content-Length",str(len(payload)))
