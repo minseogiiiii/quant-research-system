@@ -60,3 +60,10 @@ button:disabled,input:disabled{opacity:.53;cursor:not-allowed}button:disabled:ho
 .legacy-workspace-toggle p{font-size:12px;line-height:1.65;color:#a6b5ca;max-width:830px;}
 .legacy-workspace-toggle button{cursor:pointer;background:#213b5d;color:#edf5ff;border:1px solid #3e5d7e;border-radius:6px;padding:10px 14px;}
 .legacy-source-warning{margin:12px 0;padding:12px 16px;background:#39291e;border:1px solid #8d5b36;border-radius:6px;color:#ffe4aa;font-size:12px;font-weight:700;}
+
+/* v32: explicit accelerated historical replay, not a live trading feed. */
+.uni-replay-controller{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:8px 0 12px;padding:11px 12px;border:1px solid #304a60;background:#122037;border-radius:9px;}
+.uni-replay-controller b{font-size:10px;color:#7ce0cf;letter-spacing:.8px}
+.uni-replay-controller span{color:#98b5cb;font-size:10px;margin-right:auto}
+.uni-replay-controller button{background:#254156;color:#e5f7ff;padding:8px 12px;font-size:11px;}
+.uni-replay-controller button:disabled{opacity:.38;cursor:not-allowed;}

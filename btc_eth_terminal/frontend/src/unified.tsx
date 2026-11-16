@@ -53,6 +53,7 @@ export default function UnifiedTerminal(){
   const [error,setError]=useState<string|null>(null);
   const [loading,setLoading]=useState(true);
   const [mode,setMode]=useState<'chart'|'microstructure'|'evidence'>('chart');
+  const [playing,setPlaying]=useState(false);
   useEffect(()=>{let active=true;json<Catalog>('/api/v30/catalog').then(c=>{if(active){if(c.trading_enabled!==false||c.live_feed!==false||c.source_sha256.length!==64||c.projection_sha256.length!==64)throw new Error('Invalid read-only evidence contract');setCatalog(c);setError(null)}}).catch((e:unknown)=>{if(active)setError(String(e))}).finally(()=>{if(active)setLoading(false)});return ()=>{active=false}},[]);
   useEffect(()=>{if(!catalog)return;let active=true;setLoadedProduct(null);setFeatures([]);setTrades([]);setCandles([]);setError(null);setAsofIndex(null);
     Promise.all([
@@ -64,6 +65,16 @@ export default function UnifiedTerminal(){
   // Never display a previous instrument's features while the newly selected one loads.
   const shownFeatures=loadedProduct===product?features:[];
   const shownTrades=loadedProduct===product?trades:[];
+  // Historical playback advances only over archived receiver-asof diagnostic
+  // points. One step is 5m of observed history, NOT a live price stream.
+  useEffect(()=>{
+    if(!playing||loadedProduct!==product||!features.length)return;
+    const timer=window.setInterval(()=>setAsofIndex(i=>i===null?0:Math.min(i+1,features.length-1)),900);
+    return()=>window.clearInterval(timer);
+  },[playing,loadedProduct,product,features.length]);
+  useEffect(()=>{
+    if(playing&&asofIndex!==null&&asofIndex>=shownFeatures.length-1)setPlaying(false);
+  },[playing,asofIndex,shownFeatures.length]);
   const selectedFeature=shownFeatures.length?shownFeatures[asofIndex??shownFeatures.length-1]:null;
   const cutoff=selectedFeature?.decision_receive_utc_ms??null;
   const activeTrades=useMemo(()=>shownTrades.filter(t=>cutoff===null||t.received_at_ms<=cutoff).slice(-32).reverse(),[shownTrades,cutoff]);
@@ -74,7 +85,11 @@ export default function UnifiedTerminal(){
   const spread=current?.best_bid&&current?.best_ask?Number(current.best_ask)-Number(current.best_bid):null;
   const shownCandles=loadedProduct===product?candles:[];
   const visibleCandleCount=asof===null?shownCandles.length:shownCandles.filter(c=>c.available_at<=asof).length;
-  const onProduct=(p:Product)=>{setProduct(p);setAsofIndex(null)};
+  const onProduct=(p:Product)=>{setPlaying(false);setProduct(p);setAsofIndex(null)};
+  const play=()=>{if(loadedProduct!==product||!shownFeatures.length)return;setAsofIndex(i=>i===null||i>=shownFeatures.length-1?0:i);setPlaying(true)};
+  const pause=()=>setPlaying(false);
+  const step=()=>{if(loadedProduct!==product||!shownFeatures.length)return;setPlaying(false);setAsofIndex(i=>i===null?0:Math.min(i+1,shownFeatures.length-1))};
+  const reset=()=>{setPlaying(false);setAsofIndex(null)};
   return <section className="uni">
     <div className="uni-heading"><div><p className="uni-kicker">INTEGRATED RESEARCH / AUDITED ARCHIVE</p><h2>Market microstructure workstation</h2><p>Coinbase public spot · Real archived observations · Single source lineage</p></div>
       <div className="uni-top-flags"><span className="uni-live-denied">● HISTORICAL REPLAY</span><span className="uni-warning">NO OOS · NO ORDERS</span></div></div>
@@ -82,7 +97,8 @@ export default function UnifiedTerminal(){
     {error?<div className="uni-alert" role="alert">INTEGRITY BLOCK: {error}. Market display withheld. Reload only after source audit.</div>:null}
     {catalog&&!error?<>
       <div className="uni-controls"><div className="uni-switch">{products.map(p=><button type="button" key={p} className={p===product?'active':''} onClick={()=>onProduct(p)}>{p}</button>)}</div>
-      <div className="uni-timing"><span>REPLAY AS-OF</span><select aria-label="Replay as-of time" value={asofIndex===null?'latest':String(asofIndex)} onChange={e=>setAsofIndex(e.target.value==='latest'?null:Number(e.target.value))}><option value="latest">Full history / latest diagnostic</option>{shownFeatures.map((f,i)=><option value={i} key={f.decision_receive_utc_ms}>{iso(f.decision_receive_utc_ms)}</option>)}</select></div></div>
+      <div className="uni-timing"><span>REPLAY AS-OF</span><select aria-label="Replay as-of time" value={asofIndex===null?'latest':String(asofIndex)} onChange={e=>{setPlaying(false);setAsofIndex(e.target.value==='latest'?null:Number(e.target.value))}}><option value="latest">Full history / latest diagnostic</option>{shownFeatures.map((f,i)=><option value={i} key={f.decision_receive_utc_ms}>{iso(f.decision_receive_utc_ms)}</option>)}</select></div></div>
+      <div className="uni-replay-controller" role="group" aria-label="Historical replay controls"><b>ARCHIVE REPLAY</b><span>{playing?"PLAYING":"PAUSED"} · 5m archival grid per 0.9s · NOT LIVE</span><button type="button" aria-label="Play historical replay" disabled={playing||loadedProduct!==product||!shownFeatures.length} onClick={play}>Play</button><button type="button" aria-label="Pause historical replay" disabled={!playing} onClick={pause}>Pause</button><button type="button" aria-label="Step historical replay" disabled={loadedProduct!==product||!shownFeatures.length} onClick={step}>Step</button><button type="button" aria-label="Reset historical replay" disabled={asofIndex===null&&!playing} onClick={reset}>Reset</button></div>
       <div className="uni-stats">
         <article><span>BEST BID (L1)</span><strong>{fmt(current?.best_bid)}</strong><small>USD · archived quote</small></article>
         <article><span>BEST ASK (L1)</span><strong>{fmt(current?.best_ask)}</strong><small>USD · archived quote</small></article>
