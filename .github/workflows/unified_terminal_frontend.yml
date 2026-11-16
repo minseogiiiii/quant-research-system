@@ -1,0 +1,42 @@
+name: Unified terminal frontend production build
+
+on:
+  push:
+    branches:
+      - integration/btc-eth-unified-terminal
+    paths:
+      - 'btc_eth_terminal/frontend/**'
+      - '.github/workflows/unified_terminal_frontend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: btc_eth_terminal/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned chart and React dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate actual TypeScript and Vite production build
+        run: npm run build
+      - name: Check generated browser bundle files
+        run: |
+          test -f dist/index.html
+          test -n "$(find dist/assets -maxdepth 1 -name '*.js' -print -quit)"
+          sha256sum dist/index.html
+      - name: Preserve browser production bundle
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-eth-unified-v31-funnest-dist
+          path: btc_eth_terminal/frontend/dist/
+          retention-days: 7
