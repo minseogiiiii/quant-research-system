@@ -1,0 +1,43 @@
+name: Commit locked frontend dependencies to isolated integration branch
+
+on:
+  push:
+    branches:
+      - integration/btc-eth-unified-terminal
+    paths:
+      - '.github/workflows/v32_commit_lockfile.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  commit-lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: integration/btc-eth-unified-terminal
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Create exact npm lock
+        working-directory: btc_eth_terminal/frontend
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Independently verify package-lock by clean install and build
+        working-directory: btc_eth_terminal/frontend
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Commit only package-lock.json to integration branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- btc_eth_terminal/frontend/package-lock.json
+          if git diff --cached --quiet; then
+            echo "Package lock already matches committed version"
+          else
+            git commit -m "build(v32): pin reproducible frontend dependencies"
+            git push origin HEAD:integration/btc-eth-unified-terminal
+          fi
