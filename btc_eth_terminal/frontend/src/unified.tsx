@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FnChart } from '@funnest/charts-react';
 import type { Datafeed, Bar, SymbolInfo, BarsResult, Resolution } from '@funnest/charts';
+import { validateDepth10 } from './marketStateIntegrity';
 
 const products = ['BTC-USD', 'ETH-USD'] as const;
 type Product = typeof products[number];
@@ -15,19 +16,6 @@ type L2Row = {product:Product;decision_receiver_ms:number;source_age_ms:number|n
 type L2Response = {product:Product;asof_receiver_ms:number;row:L2Row;levels_each_side:number;source_sha256:string;base_projection_sha256:string;l2_projection_sha256:string;receiver_time_only:true;historical_only:true;live_feed:false;oos_approved:false;trading_enabled:false;definition:string};
 type RecoveryEvent = {product:Product;shock_receiver_ms:number;available_at_ms:number;baseline_30s_median_depth_base:string;shock_depth_base:string;recovery_threshold_base:string;recovery_within_30s:boolean;first_recovery_delay_ms:number|null;censored_at_30s:boolean};
 type RecoveryResponse = {product:Product;asof_receiver_ms:number;events:RecoveryEvent[];visible_events_count:number;window_ms:number;source_sha256:string;base_projection_sha256:string;l2_projection_sha256:string;receiver_time_only:true;historical_only:true;live_feed:false;oos_approved:false;trading_enabled:false;eligibility:string;definition:string};
-function admissibleLevels(levels:DepthLevel[],descending:boolean):boolean{
- if(levels.length!==10)return false;
- let previous=descending?Infinity:-Infinity,acc=0;
- for(const l of levels){const price=Number(l.price),quantity=Number(l.quantity),cumulative=Number(l.cumulative_base);
-  if(!Number.isFinite(price)||!Number.isFinite(quantity)||!Number.isFinite(cumulative)||price<=0||quantity<=0||!(descending?price<previous:price>previous))return false;
-  acc+=quantity;
-  if(Math.abs(acc-cumulative)>Math.max(1e-7,acc*1e-9))return false;
-  previous=price;
- }
- return true;
-}
-
-
 async function json<T>(path:string):Promise<T>{
   const r=await fetch(path,{cache:'no-store'});
   const payload:unknown=await r.json();
@@ -189,7 +177,7 @@ export default function UnifiedTerminal(){
         ||r.events.some(e=>e.product!==product||e.available_at_ms>cutoff||e.available_at_ms<e.shock_receiver_ms+30000))
        throw new Error('L2/recovery source and causal contract mismatch');
      const levels=d.row.depth;
-     if(levels&&(!admissibleLevels(levels.bids,true)||!admissibleLevels(levels.asks,false)||Number(levels.bids[0].price)>=Number(levels.asks[0].price)))
+     if(levels&&!validateDepth10(levels))
        throw new Error('Reconstructed depth levels invalid');
      if(levels&&selectedFeature?.status==='DIAGNOSTIC_CAUSAL_L1'
         &&(levels.bids[0].price!==selectedFeature.best_bid||levels.asks[0].price!==selectedFeature.best_ask||levels.bids[0].quantity!==selectedFeature.best_bid_qty||levels.asks[0].quantity!==selectedFeature.best_ask_qty))
