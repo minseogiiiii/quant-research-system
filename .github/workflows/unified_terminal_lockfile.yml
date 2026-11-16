@@ -1,0 +1,42 @@
+name: Unified terminal lockfile reproducibility check
+
+on:
+  push:
+    branches:
+      - integration/btc-eth-unified-terminal
+    paths:
+      - '.github/workflows/unified_terminal_lockfile.yml'
+      - 'btc_eth_terminal/frontend/package.json'
+      - 'btc_eth_terminal/frontend/package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lockfile-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: btc_eth_terminal/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate deterministic npm dependency tree
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Verify clean locked dependency installation
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify locked Funnest TypeScript production build
+        run: npm run build
+      - name: Freeze lockfile and compiled dist for separate inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-eth-v32-lockfile-and-dist
+          path: |
+            btc_eth_terminal/frontend/package-lock.json
+            btc_eth_terminal/frontend/dist/
+          retention-days: 7
+          compression-level: 6
