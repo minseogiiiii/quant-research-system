@@ -148,9 +148,7 @@ function App() {
     setAsof(ms);
   };
 
-  return <main>
-    <header><div><h1>BTC / ETH Research Terminal</h1><p>Coinbase spot 5-minute data integrity pilot · Funnest Charts</p></div>
-      <span className="badge">RESEARCH ONLY · NO ORDERS</span></header>
+  return <main className="terminal-root">
     <UnifiedTerminal />
     <section className="legacy-workspace-toggle" aria-label="Isolated legacy research CSV workspace">
       <h2>Separate historical CSV sandbox</h2>
