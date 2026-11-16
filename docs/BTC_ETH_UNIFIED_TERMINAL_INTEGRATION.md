@@ -37,3 +37,15 @@ The v30 source package introduces:
 3. Supply immutable source SHA manifests and safe artifact retrieval path separately.
 4. Pass original and new CI regression, real Funnest production browser build, API/React contract checks, and approval review.
 5. Merge into main only through an explicit separate decision.
+
+## v31 verified historical terminal
+
+- Full standalone v31 ZIP is the runnable distribution. GitHub branch is still a partial staged code mirror and must not be presented as a complete backend checkout.
+- Fixed UI source commit: `d8555d8e25e7c44b031278801ee305a43df237d3`.
+- Real GitHub Actions Funnest/TypeScript/Vite production build: https://github.com/minseogiiiii/quant-research-system/actions/runs/43794896707
+- Actual compiled frontend can now be served directly by the localhost-only Python bridge at `http://127.0.0.1:8765/research` when extracted from the complete v31 distribution, without running npm.
+- Fixes verified: out-of-order BTC/ETH responses, pending as-of replay data exposure, incomplete five-minute chart intervals, separate legacy CSV source lineage.
+- Fixed-tree 734/734 Python tests passed, 26/26 mediated Chromium browser checks passed, no JavaScript page exceptions; independently extracted v31 distribution passed 54 critical tests and the bounded API/static serving contracts.
+- Existing v30 `backend/data` 208 source files remain byte-identical; no independent blind OOS or confirmed alpha, no live order path.
+- Browser network navigation is blocked in the development host, so direct browser network E2E is not claimed. Actual backend HTTP contracts and mediated real-source Chromium DOM were tested separately.
+- The staging branch does not include original raw data, the full v29 runtime, an npm lockfile, or a deployable brokerage adapter. No auto-merge into main.
