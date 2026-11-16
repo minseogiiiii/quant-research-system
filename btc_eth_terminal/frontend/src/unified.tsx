@@ -22,7 +22,7 @@ async function series<T>(catalog:Catalog,product:Product,kind:string,from:number
   const args=new URLSearchParams({product,kind,from:String(from),to:String(to),limit:'400'});
   if(asof!==null)args.set('asof',String(asof));
   const data=await json<Series<T>>(`/api/v30/series?${args}`);
-  if(data.source_sha256!==catalog.source_sha256 || data.projection_sha256!==catalog.projection_sha256)
+  if(data.product!==product || data.kind!==kind || data.oos_approved!==false || data.live_feed!==false || data.source_sha256!==catalog.source_sha256 || data.projection_sha256!==catalog.projection_sha256)
     throw new Error('Source projection changed. Refresh and re-audit.');
   if(data.next_offset!==null)throw new Error('Result exceeds bounded view; use a smaller range.');
   return data.rows;
@@ -46,23 +46,27 @@ export default function UnifiedTerminal(){
   const [catalog,setCatalog]=useState<Catalog|null>(null);
   const [product,setProduct]=useState<Product>('BTC-USD');
   const [features,setFeatures]=useState<Feature[]>([]);
+  const [loadedProduct,setLoadedProduct]=useState<Product|null>(null);
   const [trades,setTrades]=useState<Trade[]>([]);
   const [asofIndex,setAsofIndex]=useState<number|null>(null);
   const [error,setError]=useState<string|null>(null);
   const [loading,setLoading]=useState(true);
   const [mode,setMode]=useState<'chart'|'microstructure'|'evidence'>('chart');
-  useEffect(()=>{let active=true;json<Catalog>('/api/v30/catalog').then(c=>{if(active){setCatalog(c);setError(null)}}).catch((e:unknown)=>{if(active)setError(String(e))}).finally(()=>{if(active)setLoading(false)});return ()=>{active=false}},[]);
-  useEffect(()=>{if(!catalog)return;let active=true;setFeatures([]);setTrades([]);setError(null);setAsofIndex(null);
+  useEffect(()=>{let active=true;json<Catalog>('/api/v30/catalog').then(c=>{if(active){if(c.trading_enabled!==false||c.live_feed!==false||c.source_sha256.length!==64||c.projection_sha256.length!==64)throw new Error('Invalid read-only evidence contract');setCatalog(c);setError(null)}}).catch((e:unknown)=>{if(active)setError(String(e))}).finally(()=>{if(active)setLoading(false)});return ()=>{active=false}},[]);
+  useEffect(()=>{if(!catalog)return;let active=true;setLoadedProduct(null);setFeatures([]);setTrades([]);setError(null);setAsofIndex(null);
     Promise.all([
       series<Feature>(catalog,product,'features',catalog.source_start_ms,catalog.source_end_ms+1,null),
       series<Trade>(catalog,product,'trades',catalog.source_start_ms,catalog.source_end_ms+1,null),
-    ]).then(([f,t])=>{if(active){setFeatures(f);setTrades(t)}}).catch((e:unknown)=>{if(active)setError(String(e))});return()=>{active=false};
+    ]).then(([f,t])=>{if(active){if(f.some(x=>x.instrument!==product)||t.some(x=>x.product!==product))throw new Error('Cross-product response blocked');setFeatures(f);setTrades(t);setLoadedProduct(product)}}).catch((e:unknown)=>{if(active)setError(String(e))});return()=>{active=false};
   },[catalog,product]);
-  const selectedFeature=features.length?features[asofIndex??features.length-1]:null;
+  // Never display a previous instrument's features while the newly selected one loads.
+  const shownFeatures=loadedProduct===product?features:[];
+  const shownTrades=loadedProduct===product?trades:[];
+  const selectedFeature=shownFeatures.length?shownFeatures[asofIndex??shownFeatures.length-1]:null;
   const cutoff=selectedFeature?.decision_receive_utc_ms??null;
-  const activeTrades=useMemo(()=>trades.filter(t=>cutoff===null||t.received_at_ms<=cutoff).slice(-32).reverse(),[trades,cutoff]);
+  const activeTrades=useMemo(()=>shownTrades.filter(t=>cutoff===null||t.received_at_ms<=cutoff).slice(-32).reverse(),[shownTrades,cutoff]);
   const asof=asofIndex===null?null:cutoff;
-  const historicalFeed=useMemo(()=>catalog?feed(catalog,product,asof):null,[catalog,product,asof]);
+  const historicalFeed=useMemo(()=>catalog&&loadedProduct===product?feed(catalog,product,asof):null,[catalog,product,loadedProduct,asof]);
   const displayError=useCallback((e:unknown)=>setError(String(e)),[]);
   const current=selectedFeature?.status==='DIAGNOSTIC_CAUSAL_L1'?selectedFeature:null;
   const spread=current?.best_bid&&current?.best_ask?Number(current.best_ask)-Number(current.best_bid):null;
@@ -75,7 +79,7 @@ export default function UnifiedTerminal(){
     {error?<div className="uni-alert" role="alert">INTEGRITY BLOCK: {error}. Market display withheld. Reload only after source audit.</div>:null}
     {catalog&&!error?<>
       <div className="uni-controls"><div className="uni-switch">{products.map(p=><button type="button" key={p} className={p===product?'active':''} onClick={()=>onProduct(p)}>{p}</button>)}</div>
-      <div className="uni-timing"><span>REPLAY AS-OF</span><select aria-label="Replay as-of time" value={asofIndex===null?'latest':String(asofIndex)} onChange={e=>setAsofIndex(e.target.value==='latest'?null:Number(e.target.value))}><option value="latest">Full history / latest diagnostic</option>{features.map((f,i)=><option value={i} key={f.decision_receive_utc_ms}>{iso(f.decision_receive_utc_ms)}</option>)}</select></div></div>
+      <div className="uni-timing"><span>REPLAY AS-OF</span><select aria-label="Replay as-of time" value={asofIndex===null?'latest':String(asofIndex)} onChange={e=>setAsofIndex(e.target.value==='latest'?null:Number(e.target.value))}><option value="latest">Full history / latest diagnostic</option>{shownFeatures.map((f,i)=><option value={i} key={f.decision_receive_utc_ms}>{iso(f.decision_receive_utc_ms)}</option>)}</select></div></div>
       <div className="uni-stats">
         <article><span>BEST BID (L1)</span><strong>{fmt(current?.best_bid)}</strong><small>USD · archived quote</small></article>
         <article><span>BEST ASK (L1)</span><strong>{fmt(current?.best_ask)}</strong><small>USD · archived quote</small></article>
@@ -86,7 +90,7 @@ export default function UnifiedTerminal(){
       <div className="uni-tabs" role="tablist" aria-label="Unified terminal workspace">{(['chart','microstructure','evidence']as const).map(tab=><button key={tab} role="tab" aria-selected={mode===tab} className={mode===tab?'active':''} onClick={()=>setMode(tab)}>{({chart:'Chart & trade flow',microstructure:'Microstructure',evidence:'Data evidence'})[tab]}</button>)}</div>
       {mode==='chart'?<div className="uni-chart-layout"><article className="uni-chart-panel"><div className="uni-panel-caption"><div><b>Observed trade-price aggregation</b><small>5m receiver-time OHLC · NOT official venue candles</small></div><span>{allCandles} completed intervals</span></div><div className="uni-chart">{historicalFeed?<FnChart key={`${product}-${asof??'all'}`} datafeed={historicalFeed} symbol={product} resolution="5" colorScheme="dark" locale="en" storageKey={null} drawingToolbar={false} onReady={()=>{}} style={{height:'100%'}}/>:null}</div></article>
         <article className="uni-tape"><div className="uni-panel-caption"><div><b>Archived trade tape</b><small>Feed-reported side retained unchanged</small></div><span>{activeTrades.length} visible</span></div><div className="uni-tape-scroller"><table><thead><tr><th>Receive UTC</th><th>Side*</th><th>Price</th><th>Size</th></tr></thead><tbody>{activeTrades.map(t=><tr key={t.trade_id+'-'+t.message_seq}><td>{iso(t.received_at_ms)}</td><td className={t.side_label_source==='BUY'?'uni-buy':'uni-sell'}>{t.side_label_source}</td><td>{fmt(t.price,2)}</td><td>{fmt(t.size,5)}</td></tr>)}</tbody></table>{!activeTrades.length?<p className="uni-note">No sampled archived trades at this replay cutoff.</p>:null}</div><p className="uni-note">* Side is source metadata, not an assumed aggressor or fill. Only a bounded trade sample is displayed.</p></article></div>:null}
-      {mode==='microstructure'?<div className="uni-two-panel"><article className="uni-flat-panel"><div className="uni-panel-caption"><b>Causal diagnostic observations</b><span>Every 5 minutes</span></div><table><thead><tr><th>UTC decision</th><th>Imbalance</th><th>OFI (base)</th><th>Microprice</th><th>Age</th></tr></thead><tbody>{features.filter(f=>asof===null||f.decision_receive_utc_ms<=asof).map(f=><tr key={f.decision_receive_utc_ms}><td>{iso(f.decision_receive_utc_ms)}</td><td>{fmt(f.best_imbalance,4)}</td><td>{fmt(f.ofi_rolling_5m_base,4)}</td><td>{fmt(f.microprice,2)}</td><td>{f.source_age_ms??'N/A'} ms</td></tr>)}</tbody></table></article><article className="uni-flat-panel"><h3>Methodology & limitations</h3><p>Existing v23 causal L1 engine, reusing frozen receiver-asof decisions. OFI measures signed displayed best-level changes during a five-minute rolling window.</p><p>No future return labels enter these features. No fill probabilities, expected returns, or real broker executions are inferred.</p><p>Historical event order is preserved. Session boundaries, stale quotes and incomplete windows are not silently bridged.</p></article></div>:null}
+      {mode==='microstructure'?<div className="uni-two-panel"><article className="uni-flat-panel"><div className="uni-panel-caption"><b>Causal diagnostic observations</b><span>Every 5 minutes</span></div><table><thead><tr><th>UTC decision</th><th>Imbalance</th><th>OFI (base)</th><th>Microprice</th><th>Age</th></tr></thead><tbody>{shownFeatures.filter(f=>asof===null||f.decision_receive_utc_ms<=asof).map(f=><tr key={f.decision_receive_utc_ms}><td>{iso(f.decision_receive_utc_ms)}</td><td>{fmt(f.best_imbalance,4)}</td><td>{fmt(f.ofi_rolling_5m_base,4)}</td><td>{fmt(f.microprice,2)}</td><td>{f.source_age_ms??'N/A'} ms</td></tr>)}</tbody></table></article><article className="uni-flat-panel"><h3>Methodology & limitations</h3><p>Existing v23 causal L1 engine, reusing frozen receiver-asof decisions. OFI measures signed displayed best-level changes during a five-minute rolling window.</p><p>No future return labels enter these features. No fill probabilities, expected returns, or real broker executions are inferred.</p><p>Historical event order is preserved. Session boundaries, stale quotes and incomplete windows are not silently bridged.</p></article></div>:null}
       {mode==='evidence'?<div className="uni-two-panel"><article className="uni-flat-panel"><h3>Source provenance</h3><dl><dt>Venue</dt><dd>Coinbase Advanced public spot</dd><dt>Instruments</dt><dd>BTC-USD · ETH-USD</dd><dt>Cohort</dt><dd>{catalog.source_cohort}</dd><dt>Messages</dt><dd>{catalog.source_message_count.toLocaleString()}</dd><dt>Receive UTC start</dt><dd>{new Date(catalog.source_start_ms).toISOString()}</dd><dt>Receive UTC end</dt><dd>{new Date(catalog.source_end_ms).toISOString()}</dd><dt>Original manifest SHA-256</dt><dd className="uni-hash">{catalog.source_sha256}</dd><dt>Projection SHA-256</dt><dd className="uni-hash">{catalog.projection_sha256}</dd></dl></article><article className="uni-flat-panel"><h3>Research admission</h3><ul className="uni-evidence"><li>✓ Archived source has two passing independent software replays</li><li>✓ Feature diagnostics matched to the frozen v21/v23 reference</li><li>✕ Exchange time not independently calibrated</li><li>✕ Original Feature/Label PIT not verified</li><li>✕ Untouched blind OOS not evaluated</li><li>✕ Real broker execution not connected</li></ul><div className="uni-research-warning">NO CONFIRMED EXECUTABLE ALPHA</div></article></div>:null}
       <footer className="uni-footer">HISTORICAL SOURCE-AUDITED · RECEIVER-ONLY · PIT NOT VERIFIED. Browser is read-only. All 24h/live trading claims are withheld.</footer>
     </>:<p className="uni-note">No verified unified source can be displayed.</p>}

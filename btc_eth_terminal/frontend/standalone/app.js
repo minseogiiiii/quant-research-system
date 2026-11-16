@@ -3,13 +3,13 @@
  * React/Funnest source is preserved in frontend/src; this fallback is an
  * explicitly distinct runtime, not a claimed Funnest production build.
  */
-const state={catalog:null,product:'BTC-USD',cutoff:null,features:[],trades:[],candles:[],view:'market',blocked:true};
+const state={catalog:null,product:'BTC-USD',cutoff:null,features:[],trades:[],candles:[],view:'market',blocked:true,requestEpoch:0};
 const $=id=>document.getElementById(id);
 function words(el,text){el.textContent=String(text)}
 function format(x,places=2){let n=Number(x);return Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:places,maximumFractionDigits:places}):'N/A'}
 function iso(ms){return new Date(ms).toISOString().slice(11,19)+' UTC'}
 async function get(url){let r=await fetch(url,{cache:'no-store'});let json=await r.json();if(!r.ok)throw Error(json.error||`HTTP ${r.status}`);return json}
-async function fetchSeries(kind,cutoff){let c=state.catalog;let q=new URLSearchParams({product:state.product,kind,from:String(c.source_start_ms),to:String(c.source_end_ms+1),limit:'400'});if(cutoff!==null)q.set('asof',String(cutoff));let result=await get('/api/v30/series?'+q);if(result.source_sha256!==c.source_sha256||result.projection_sha256!==c.projection_sha256||result.next_offset!==null)throw Error('Data lineage or bound violation');return result.rows}
+async function fetchSeries(kind,cutoff,product){let c=state.catalog;let q=new URLSearchParams({product,kind,from:String(c.source_start_ms),to:String(c.source_end_ms+1),limit:'400'});if(cutoff!==null)q.set('asof',String(cutoff));let result=await get('/api/v30/series?'+q);if(result.product!==product||result.kind!==kind||result.source_sha256!==c.source_sha256||result.projection_sha256!==c.projection_sha256||result.next_offset!==null)throw Error('Product, data lineage or bound violation');return result.rows}
 function danger(e){let err=$('error');words(err,'SOURCE INTEGRITY BLOCKED: '+(e instanceof Error?e.message:String(e)));err.hidden=false;$('verified-views').hidden=true;words($('source-status'),'REJECTED');state.blocked=true}
 function cell(row,text,css){let td=document.createElement('td');words(td,text);if(css)td.className=css;row.appendChild(td)}
 function redrawMetrics(){let f=state.features.filter(x=>state.cutoff===null||x.decision_receive_utc_ms<=state.cutoff).at(-1);if(f&&state.cutoff!==null&&state.cutoff-f.decision_receive_utc_ms>5000)f=null;if(!f||f.status!=='DIAGNOSTIC_CAUSAL_L1')f=null;
@@ -27,9 +27,41 @@ function drawCandles(){let canvas=$('chart');let bounds=canvas.getBoundingClient
 }
 function paintTables(){let tb=$('trades');tb.replaceChildren();let trades=state.trades.filter(x=>state.cutoff===null||x.received_at_ms<=state.cutoff).slice(-36).reverse();for(let t of trades){let row=document.createElement('tr');cell(row,iso(t.received_at_ms));cell(row,t.side_label_source,t.side_label_source==='BUY'?'buy':'sell');cell(row,format(t.price));cell(row,format(t.size,5));tb.appendChild(row)}words($('tape-count'),trades.length+' shown');let fb=$('features');fb.replaceChildren();for(let f of state.features.filter(x=>state.cutoff===null||x.decision_receive_utc_ms<=state.cutoff)){let row=document.createElement('tr');cell(row,iso(f.decision_receive_utc_ms));cell(row,format(f.best_bid));cell(row,format(f.best_ask));cell(row,format(f.microprice,3));cell(row,format(f.best_imbalance,4));cell(row,format(f.ofi_rolling_5m_base,4));cell(row,f.source_age_ms===null?'N/A':f.source_age_ms+'ms');cell(row,f.status);fb.appendChild(row)}}
 function provenance(){let c=state.catalog;words($('cohort'),c.source_cohort);words($('messages'),c.source_message_count.toLocaleString());words($('start'),new Date(c.source_start_ms).toISOString());words($('end'),new Date(c.source_end_ms).toISOString());words($('source-sha'),c.source_sha256);words($('projection-sha'),c.projection_sha256)}
-async function loadProduct(){let c=state.catalog;state.blocked=true;$('verified-views').hidden=true;let [f,t,b]=await Promise.all([fetchSeries('features',null),fetchSeries('trades',null),fetchSeries('candles',null)]);state.features=f;state.trades=t;state.candles=b;state.cutoff=null;let select=$('asof');select.replaceChildren();let all=document.createElement('option');all.value='all';all.textContent='Full historical window';select.appendChild(all);for(let x of f){let opt=document.createElement('option');opt.value=String(x.decision_receive_utc_ms);opt.textContent=iso(x.decision_receive_utc_ms);select.appendChild(opt)}select.value='all';state.blocked=false;$('error').hidden=true;$('verified-views').hidden=false;
- document.querySelectorAll('[data-product]').forEach(el=>el.classList.toggle('selected',el.dataset.product===state.product));words($('breadcrumb-product'),state.product);words($('candle-count'),b.length+' completed intervals');words($('replay-state'),'FULL HINDSIGHT');redrawMetrics();drawCandles();paintTables();provenance()}
-async function setCutoff(value){if(state.blocked)return;let requested=value==='all'?null:Number(value);if(requested!==null&&!state.features.some(x=>x.decision_receive_utc_ms===requested))throw Error('Unregistered replay cutoff');let [bars,trades]=await Promise.all([fetchSeries('candles',requested),fetchSeries('trades',requested)]);state.cutoff=requested;state.candles=bars;state.trades=trades;words($('replay-state'),requested===null?'FULL HINDSIGHT':'RECEIVER AS-OF');words($('candle-count'),bars.length+' completed intervals');redrawMetrics();drawCandles();paintTables()}
+// A product change or replay change invalidates every older in-flight request.
+// Otherwise a slow ETH response can overwrite a newly selected BTC workspace.
+async function loadProduct(){
+ const epoch=++state.requestEpoch, product=state.product, c=state.catalog;
+ state.blocked=true; $('verified-views').hidden=true;
+ try{
+  const [f,t,b]=await Promise.all([
+   fetchSeries('features',null,product),fetchSeries('trades',null,product),fetchSeries('candles',null,product)]);
+  if(epoch!==state.requestEpoch||product!==state.product)return;
+  if(f.some(x=>x.instrument!==product)||t.some(x=>x.product!==product))
+   throw Error('Mixed instrument rows rejected');
+  state.features=f;state.trades=t;state.candles=b;state.cutoff=null;
+  let select=$('asof');select.replaceChildren();let all=document.createElement('option');
+  all.value='all';all.textContent='Full historical window';select.appendChild(all);
+  for(let x of f){let opt=document.createElement('option');opt.value=String(x.decision_receive_utc_ms);opt.textContent=iso(x.decision_receive_utc_ms);select.appendChild(opt)}
+  select.value='all';state.blocked=false;$('error').hidden=true;$('verified-views').hidden=false;
+  document.querySelectorAll('[data-product]').forEach(el=>el.classList.toggle('selected',el.dataset.product===product));
+  words($('breadcrumb-product'),product);words($('candle-count'),b.length+' completed intervals');
+  words($('replay-state'),'FULL HINDSIGHT');redrawMetrics();drawCandles();paintTables();provenance();
+ }catch(e){if(epoch===state.requestEpoch)danger(e)}
+}
+async function setCutoff(value){
+ if(state.blocked)return;
+ const epoch=++state.requestEpoch, product=state.product;
+ try{
+  let requested=value==='all'?null:Number(value);
+  if(requested!==null&&!state.features.some(x=>x.decision_receive_utc_ms===requested))throw Error('Unregistered replay cutoff');
+  const [bars,trades]=await Promise.all([fetchSeries('candles',requested,product),fetchSeries('trades',requested,product)]);
+  if(epoch!==state.requestEpoch||product!==state.product)return;
+  if(trades.some(x=>x.product!==product))throw Error('Mixed instrument trade rows rejected');
+  state.cutoff=requested;state.candles=bars;state.trades=trades;
+  words($('replay-state'),requested===null?'FULL HINDSIGHT':'RECEIVER AS-OF');
+  words($('candle-count'),bars.length+' completed intervals');redrawMetrics();drawCandles();paintTables();
+ }catch(e){if(epoch===state.requestEpoch)danger(e)}
+}
 function changeView(v){state.view=v;document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===v));for(let name of ['market','micro','evidence','research','paper'])$('view-'+name).hidden=(v!==name);if(v==='market')drawCandles()}
 async function start(){try{const c=await get('/api/v30/catalog');if(c.trading_enabled!==false||c.live_feed!==false||c.oos_approved!==false)throw Error('Safety contract violated');state.catalog=c;words($('source-status'),'SOURCE-AUDITED');words($('source-subtitle'),`${c.source_message_count.toLocaleString()} messages · SHA fixed`);await loadProduct()}catch(e){danger(e)}}
 document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>changeView(el.dataset.view)));

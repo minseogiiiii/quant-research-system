@@ -98,6 +98,9 @@ function ResearchChart({ ds, catalog, asof, onError }: {
 }
 
 function App() {
+  // Keep legacy CSV research in a separate, deliberately opened workspace.
+  // Its historical source lineage differs from the audited v30 L2 archive.
+  const [legacyOpen,setLegacyOpen]=useState(false);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [selection, setSelection] = useState('');
   const [error, setError] = useState('');
@@ -112,6 +115,7 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if(!legacyOpen)return;
     let live = true;
     void loadCatalog().then(d => {
       if (!live) return;
@@ -120,7 +124,7 @@ function App() {
       if (first) setSelection(datasetKey(first));
     }).catch((e: unknown) => { if (live) setError(errString(e)); });
     return () => { live = false; };
-  }, []);
+  }, [legacyOpen]);
   const datasets = (catalog?.datasets ?? []).filter(isBtcEth);
   const ds = datasets.find(d => datasetKey(d) === selection) ?? null;
 
@@ -148,6 +152,13 @@ function App() {
     <header><div><h1>BTC / ETH Research Terminal</h1><p>Coinbase spot 5-minute data integrity pilot · Funnest Charts</p></div>
       <span className="badge">RESEARCH ONLY · NO ORDERS</span></header>
     <UnifiedTerminal />
+    <section className="legacy-workspace-toggle" aria-label="Isolated legacy research CSV workspace">
+      <h2>Separate historical CSV sandbox</h2>
+      <p>The older five-minute CSV datasets are from a distinct historical source and are NOT interchangeable with the audited Coinbase L2 archive above. Do not merge their observations, time windows, labels or performance.</p>
+      <button type="button" aria-expanded={legacyOpen} onClick={()=>setLegacyOpen(v=>!v)}>{legacyOpen?'Close separate CSV sandbox':'Open separate CSV sandbox'}</button>
+    </section>
+    {legacyOpen ? <section className="legacy-sandbox">
+      <div className="legacy-source-warning" role="note">ISOLATED SOURCE · DECLARED AVAILABILITY ONLY · NOT PART OF THE AUDITED L2 COHORT · NO JOINT OOS OR PNL</div>
     {error && <div className="error" role="alert">{error}{chartBlocked ? ' Price display blocked until the data source is re-audited and the page reloaded.' : ''}</div>}
     <section className="research"><h2>BTC / ETH hypothesis status</h2>
       <div className="cards">{(catalog?.research ?? []).filter(r => r.market === 'BTC/ETH').map(r => <article key={r.id}>
@@ -178,6 +189,7 @@ function App() {
         : <ResearchChart key={`${selection}:${asof ?? 'all'}`} ds={ds} catalog={catalog} asof={asof} onError={onError}/>}
     </> : <div className="empty">No BTC/ETH five-minute OHLCV files have been registered. Run the read-only two-market Coinbase collector, or import existing BTC/ETH feature files after auditing their timestamp columns. No synthetic market prices will be displayed.</div>}
     </section>
+    </section> : null}
     <footer>BTC and ETH only. Coinbase BTC-USD / ETH-USD spot are NOT Binance BTCUSDT / ETHUSDT. Market charting does not prove a strategy is profitable. No live orders, account credentials or future labels are connected.</footer>
   </main>;
 }
