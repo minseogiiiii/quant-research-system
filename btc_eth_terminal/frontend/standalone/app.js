@@ -51,6 +51,8 @@ async function loadProduct(){
 async function setCutoff(value){
  if(state.blocked)return;
  const epoch=++state.requestEpoch, product=state.product;
+ // Never display a previous cutoff's market facts with the newly selected time.
+ $('verified-views').hidden=true;words($('replay-state'),'VERIFYING REPLAY…');
  try{
   let requested=value==='all'?null:Number(value);
   if(requested!==null&&!state.features.some(x=>x.decision_receive_utc_ms===requested))throw Error('Unregistered replay cutoff');
@@ -59,7 +61,7 @@ async function setCutoff(value){
   if(trades.some(x=>x.product!==product))throw Error('Mixed instrument trade rows rejected');
   state.cutoff=requested;state.candles=bars;state.trades=trades;
   words($('replay-state'),requested===null?'FULL HINDSIGHT':'RECEIVER AS-OF');
-  words($('candle-count'),bars.length+' completed intervals');redrawMetrics();drawCandles();paintTables();
+  words($('candle-count'),bars.length+' completed intervals');$('verified-views').hidden=false;redrawMetrics();drawCandles();paintTables();
  }catch(e){if(epoch===state.requestEpoch)danger(e)}
 }
 function changeView(v){state.view=v;document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===v));for(let name of ['market','micro','evidence','research','paper'])$('view-'+name).hidden=(v!==name);if(v==='market')drawCandles()}

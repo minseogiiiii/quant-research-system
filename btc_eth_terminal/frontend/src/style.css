@@ -33,6 +33,7 @@ button:disabled,input:disabled{opacity:.53;cursor:not-allowed}button:disabled:ho
 .uni-panel-caption b{font-size:13px;color:#e5eff9}
 .uni-panel-caption small{display:block;color:#8298ad;font-size:10px;margin-top:4px}
 .uni-chart{height:420px;min-height:340px;overflow:hidden}
+.uni-empty-history{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;background:#101827;border:1px dashed #37516c;border-radius:7px;padding:28px;color:#a7bed2;font-size:12px;line-height:1.8}
 .uni-tape-scroller{max-height:380px;overflow:auto}
 .uni table{width:100%;border-collapse:collapse;font-size:11px}
 .uni th{text-align:left;color:#7e9bb5;letter-spacing:.5px;font-size:10px;padding:8px 5px;border-bottom:1px solid #26394c;white-space:nowrap}

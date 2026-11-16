@@ -494,6 +494,50 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Security-Policy","default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'")
                 self.end_headers(); self.wfile.write(payload)
                 return
+            if parsed.path in ("/research", "/research/index.html") or parsed.path.startswith("/assets/"):
+                # A CI-built React/Funnest bundle, deliberately isolated from the
+                # legacy /terminal fallback and every private market-source path.
+                # Asset names must be referenced by the exact Vite index manifest.
+                if parsed.query:
+                    raise InputError("Bundled assets do not accept URL arguments")
+                dist=HERE.parent/"frontend"/"dist"
+                index=dist/"index.html"
+                if (dist.is_symlink() or index.is_symlink() or not index.is_file()
+                        or index.stat().st_size>50_000):
+                    self.send_obj(404,{"error":"Audited frontend build unavailable"})
+                    return
+                index_bytes=index.read_bytes()
+                asset_names={name.decode('ascii') for name in re.findall(
+                    rb'/assets/(index-[A-Za-z0-9_-]+\.(?:js|css))',index_bytes)}
+                if not asset_names:
+                    self.send_obj(404,{"error":"Frontend build manifest unavailable"})
+                    return
+                if parsed.path in ("/research", "/research/index.html"):
+                    payload=index_bytes
+                    content_type="text/html"
+                else:
+                    name=parsed.path[len('/assets/'):]
+                    if name not in asset_names or (dist/"assets").is_symlink():
+                        self.send_obj(404,{"error":"Unknown frontend asset"})
+                        return
+                    target=dist/"assets"/name
+                    if target.is_symlink() or not target.is_file() or target.stat().st_size>8_000_000:
+                        self.send_obj(404,{"error":"Unavailable frontend asset"})
+                        return
+                    payload=target.read_bytes()
+                    content_type="application/javascript" if name.endswith(".js") else "text/css"
+                self.send_response(200)
+                self.send_header("Content-Type", content_type+"; charset=utf-8")
+                self.send_header("Content-Length",str(len(payload)))
+                self.send_header("Cache-Control","no-store")
+                self.send_header("X-Content-Type-Options","nosniff")
+                self.send_header("X-Frame-Options","DENY")
+                self.send_header("Content-Security-Policy",
+                    "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                    "connect-src 'self'; img-src 'self' data:; font-src 'self' data:; "
+                    "base-uri 'none'; object-src 'none'; frame-ancestors 'none'")
+                self.end_headers();self.wfile.write(payload)
+                return
             args = parse_qs(parsed.query)
             # Strict and stable read-only contract: silently ignored or repeated
             # filters can otherwise cause users to misinterpret a research view.
