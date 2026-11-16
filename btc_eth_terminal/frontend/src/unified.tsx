@@ -9,6 +9,24 @@ type Feature = {instrument:Product;decision_receive_utc_ms:number;status:string;
 type Trade = {received_at_ms:number;message_seq:number;trade_id:string;price:string;size:string;side_label_source:string;product:Product};
 type Catalog = {schema:string;source_sha256:string;projection_sha256:string;source_message_count:number;source_start_ms:number;source_end_ms:number;source_cohort:string;evidence_status:string;live_feed:false;trading_enabled:false;products:{product:Product;candles:number;diagnostics:number;recent_trades:number;observed_trade_updates:number}[]};
 type Series<T> = {product:Product;kind:string;rows:T[];next_offset:number|null;source_sha256:string;projection_sha256:string;oos_approved:false;live_feed:false};
+type DepthLevel = {price:string;quantity:string;cumulative_base:string};
+type L2Depth = {bids:DepthLevel[];asks:DepthLevel[];bid_total_base_10:string;ask_total_base_10:string};
+type L2Row = {product:Product;decision_receiver_ms:number;source_age_ms:number|null;source_sequence:number|null;status:string;depth:L2Depth|null};
+type L2Response = {product:Product;asof_receiver_ms:number;row:L2Row;levels_each_side:number;source_sha256:string;base_projection_sha256:string;l2_projection_sha256:string;receiver_time_only:true;historical_only:true;live_feed:false;oos_approved:false;trading_enabled:false;definition:string};
+type RecoveryEvent = {product:Product;shock_receiver_ms:number;available_at_ms:number;baseline_30s_median_depth_base:string;shock_depth_base:string;recovery_threshold_base:string;recovery_within_30s:boolean;first_recovery_delay_ms:number|null;censored_at_30s:boolean};
+type RecoveryResponse = {product:Product;asof_receiver_ms:number;events:RecoveryEvent[];visible_events_count:number;window_ms:number;source_sha256:string;base_projection_sha256:string;l2_projection_sha256:string;receiver_time_only:true;historical_only:true;live_feed:false;oos_approved:false;trading_enabled:false;eligibility:string;definition:string};
+function admissibleLevels(levels:DepthLevel[],descending:boolean):boolean{
+ if(levels.length!==10)return false;
+ let previous=descending?Infinity:-Infinity,acc=0;
+ for(const l of levels){const price=Number(l.price),quantity=Number(l.quantity),cumulative=Number(l.cumulative_base);
+  if(!Number.isFinite(price)||!Number.isFinite(quantity)||!Number.isFinite(cumulative)||price<=0||quantity<=0||!(descending?price<previous:price>previous))return false;
+  acc+=quantity;
+  if(Math.abs(acc-cumulative)>Math.max(1e-7,acc*1e-9))return false;
+  previous=price;
+ }
+ return true;
+}
+
 
 async function json<T>(path:string):Promise<T>{
   const r=await fetch(path,{cache:'no-store'});
@@ -93,6 +111,9 @@ export default function UnifiedTerminal(){
  const [trades,setTrades]=useState<Trade[]>([]);
  const [candles,setCandles]=useState<BarRecord[]>([]);
  const [asofIndex,setAsofIndex]=useState<number|null>(null);
+ const [depthRow,setDepthRow]=useState<L2Row|null>(null);
+ const [recovery,setRecovery]=useState<RecoveryResponse|null>(null);
+ const [depthError,setDepthError]=useState<string|null>(null);
  const [playing,setPlaying]=useState(false);
  const [mode,setMode]=useState<'chart'|'microstructure'|'evidence'>('chart');
  const [error,setError]=useState<string|null>(null);
@@ -146,6 +167,41 @@ export default function UnifiedTerminal(){
  const visibleCandleCount=asof===null?0:shownCandles.filter(c=>c.available_at<=asof).length;
  const activeTrades=useMemo(()=>shownTrades.filter(t=>asof!==null&&t.received_at_ms<=asof).slice(-21).reverse(),[shownTrades,asof]);
  const historicalFeed=useMemo(()=>catalog&&loadedProduct===product&&asof!==null?feed(catalog,product,asof):null,[catalog,product,loadedProduct,asof]);
+ // The new full L2 projection is loaded for the SAME historical receiver-asof
+ // decision as all existing panels. Late responses are ignored on product/time change.
+ useEffect(()=>{
+   setDepthRow(null);setRecovery(null);setDepthError(null);
+   if(!catalog||loadedProduct!==product||cutoff===null)return;
+   let active=true;
+   const params=new URLSearchParams({product,asof:String(cutoff)});
+   Promise.all([
+     json<L2Response>(`/api/v34/depth?${params}`),
+     json<RecoveryResponse>(`/api/v34/recovery?${params}`)
+   ]).then(([d,r])=>{
+     if(!active)return;
+     if(d.product!==product||r.product!==product||d.row.product!==product||d.asof_receiver_ms!==cutoff||r.asof_receiver_ms!==cutoff||d.row.decision_receiver_ms!==cutoff
+        ||d.source_sha256!==catalog.source_sha256||r.source_sha256!==catalog.source_sha256
+        ||d.base_projection_sha256!==catalog.projection_sha256||r.base_projection_sha256!==catalog.projection_sha256
+        ||d.l2_projection_sha256!==r.l2_projection_sha256||!(/^[a-f0-9]{64}$/.test(d.l2_projection_sha256))
+        ||d.live_feed!==false||r.live_feed!==false||d.trading_enabled!==false||r.trading_enabled!==false
+        ||d.oos_approved!==false||r.oos_approved!==false||d.historical_only!==true||r.historical_only!==true
+        ||d.levels_each_side!==10||r.eligibility!=='POST_HOC_DESCRIPTIVE_ONLY_NO_ALPHA'
+        ||r.events.some(e=>e.product!==product||e.available_at_ms>cutoff||e.available_at_ms<e.shock_receiver_ms+30000))
+       throw new Error('L2/recovery source and causal contract mismatch');
+     const levels=d.row.depth;
+     if(levels&&(!admissibleLevels(levels.bids,true)||!admissibleLevels(levels.asks,false)||Number(levels.bids[0].price)>=Number(levels.asks[0].price)))
+       throw new Error('Reconstructed depth levels invalid');
+     if(levels&&selectedFeature?.status==='DIAGNOSTIC_CAUSAL_L1'
+        &&(levels.bids[0].price!==selectedFeature.best_bid||levels.asks[0].price!==selectedFeature.best_ask||levels.bids[0].quantity!==selectedFeature.best_bid_qty||levels.asks[0].quantity!==selectedFeature.best_ask_qty))
+       throw new Error('L2/L1 reference divergence');
+     setDepthRow(d.row);setRecovery(r);
+   }).catch(e=>{if(active)setDepthError(String(e))});
+   return()=>{active=false};
+ },[catalog,product,loadedProduct,cutoff,selectedFeature]);
+ const validDepth=depthRow?.decision_receiver_ms===cutoff&&depthRow?.product===product&&depthRow?.status==='HISTORICAL_L2_TEN_LEVEL'?depthRow.depth:null;
+ const validRecovery=recovery?.asof_receiver_ms===cutoff&&recovery?.product===product?recovery:null;
+ const recovering=validRecovery?.events.filter(e=>e.recovery_within_30s)||[];
+ const recoveryRate=validRecovery&&validRecovery.events.length>0?100*recovering.length/validRecovery.events.length:null;
  const current=selectedFeature?.status==='DIAGNOSTIC_CAUSAL_L1'&&selectedFeature.source_age_ms!==null&&selectedFeature.source_age_ms<=5000?selectedFeature:null;
  const bid=numeric(current?.best_bid),ask=numeric(current?.best_ask),bidQty=numeric(current?.best_bid_qty),askQty=numeric(current?.best_ask_qty);
  const mid=bid!==null&&ask!==null?(bid+ask)/2:null;
@@ -214,18 +270,20 @@ export default function UnifiedTerminal(){
          </div>
        </div>
        <div className="pro-main-middle">
-         <article className="pro-panel pro-book-panel"><PanelTitle eyebrow="04  /  LIQUIDITY" title="Order book · L1" tag="ONE LEVEL ONLY"/>
-           <div className="pro-book-legend"><span>PRICE (USD)</span><span>SIZE (BASE)</span></div>
-           <div className="pro-l1-book"><div className="pro-book-row ask"><span>{compact(ask,2)}</span><span>{compact(askQty,6)}</span><div className="pro-book-depth" style={{width:`${askWidth??0}%`}}/></div>
-             <div className="pro-book-spread">SPREAD <b>{compact(spread,2)} USD</b> <span> · NO ADDITIONAL L2 LEVELS IN PROJECTION</span></div>
-             <div className="pro-book-row bid"><span>{compact(bid,2)}</span><span>{compact(bidQty,6)}</span><div className="pro-book-depth" style={{width:`${bidWidth??0}%`}}/></div>
-           </div>
-           <div className="pro-book-meters"><div className="pro-book-meter-title"><span>TOP-OF-BOOK QUEUE DISTRIBUTION</span><b>{imbalance===null?'N/A':compact(imbalance,3)}</b></div><div className="pro-queue"><span className="pro-bid-volume" style={{width:`${bidWidth??0}%`}}/><span className="pro-ask-volume" style={{width:`${askWidth??0}%`}}/></div><div className="pro-queue-label"><span>BID QTY {compact(bidQty,5)}</span><span>ASK QTY {compact(askQty,5)}</span></div></div>
-           <div className="pro-limit-message">Top-of-book observation only. A 10-level ladder and cumulative market depth require a separately replayed full L2 projection; missing levels are not imputed.</div>
+         <article className="pro-panel pro-book-panel"><PanelTitle eyebrow="04 / ORDER-BOOK DEPTH" title="Coinbase L2 · top 10" tag="AUDITED HISTORICAL"/>
+           <div className="pro-book-legend"><span>PRICE (USD)</span><span>SIZE (BASE) / CUMULATIVE</span></div>
+           {validDepth?<div className="pro-l2-ladder" aria-label="Historical ten-level L2 order book">
+             <div className="pro-l2-side">{[...validDepth.asks].reverse().map((l,i)=><div className="pro-l2-level ask" key={l.price}><span>{compact(numeric(l.price),2)}</span><span>{compact(numeric(l.quantity),5)}</span><span>{compact(numeric(l.cumulative_base),4)}</span><div className="pro-l2-fill" style={{width:`${Math.min(100,100*Number(l.cumulative_base)/Math.max(0.0000001,Number(validDepth.ask_total_base_10)))}%`}}/></div>)}</div>
+             <div className="pro-book-spread">L1 SPREAD <b>{compact(spread,2)} USD</b> · RECEIVER-ASOF</div>
+             <div className="pro-l2-side">{validDepth.bids.map(l=><div className="pro-l2-level bid" key={l.price}><span>{compact(numeric(l.price),2)}</span><span>{compact(numeric(l.quantity),5)}</span><span>{compact(numeric(l.cumulative_base),4)}</span><div className="pro-l2-fill" style={{width:`${Math.min(100,100*Number(l.cumulative_base)/Math.max(0.0000001,Number(validDepth.bid_total_base_10)))}%`}}/></div>)}</div>
+             <div className="pro-l2-totals"><span>BID 10L <strong>{statValue(validDepth.bid_total_base_10,5)}</strong></span><span>ASK 10L <strong>{statValue(validDepth.ask_total_base_10,5)}</strong></span></div>
+           </div>:<div className="pro-no-data" role="status">{depthError?`L2 FAIL-CLOSED: ${depthError}`:depthRow?'No admissible 10-level quote at selected decision':'Loading hash-pinned 10-level historical L2 quote…'}</div>}
+           <div className="pro-limit-message">Replayed full L2 deltas and snapshots. Displayed quantities are not guaranteed executable depth or queue priority. No exchange-clock calibration.</div>
          </article>
-         <article className="pro-panel pro-recovery-panel"><PanelTitle eyebrow="05  /  EVENT-TIME" title="Liquidity recovery" tag="RESEARCH GATED"/>
-           <div className="pro-recovery-state"><span className="pro-recovery-icon">↻</span><div><strong>Not yet measurable</strong><small>5m L1 diagnostic grid cannot resolve event-time replenishment.</small></div></div>
-           <div className="pro-recovery-steps"><div><i>01</i><span>Detect a depth shock</span><b>REQUIRES L2 EVENTS</b></div><div><i>02</i><span>Measure depth return</span><b>NO CAUSAL CURVE</b></div><div><i>03</i><span>Cost-aware event OOS</span><b>NOT APPROVED</b></div></div>
+         <article className="pro-panel pro-recovery-panel"><PanelTitle eyebrow="05 / RECEIVER-EVENT RESEARCH" title="Liquidity replenishment" tag="POST-HOC ONLY"/>
+           <div className="pro-recovery-state"><span className="pro-recovery-icon">↻</span><div><strong>{validRecovery?`${validRecovery.visible_events_count} qualified historical shocks`:'Evaluating archived recovery evidence'}</strong><small>Past 30s median · 50% drop · 80% within 30s · receiver-second sampling</small></div></div>
+           {validRecovery&&validRecovery.events.length?<><div className="pro-l2-recovery-stat"><strong>{compact(recoveryRate,1)}%</strong><span>recovered in 30 seconds among last {validRecovery.events.length} displayed shock events</span></div><div className="pro-recovery-events">{validRecovery.events.slice(-5).reverse().map(e=><div key={e.shock_receiver_ms}><span>{timeOf(e.shock_receiver_ms)}</span><strong className={e.recovery_within_30s?'pro-positive':'pro-negative'}>{e.first_recovery_delay_ms===null?'CENSORED':(e.first_recovery_delay_ms/1000).toFixed(0)+'s'}</strong><small>{compact(numeric(e.shock_depth_base),3)} / {compact(numeric(e.baseline_30s_median_depth_base),3)} BASE</small></div>)}</div></>:<div className="pro-no-data">{depthError?'Recovery evidence blocked with L2 source':validRecovery?'No qualified shock completed by this observation.':'Awaiting independently pinned post-hoc evidence…'}</div>}
+           <div className="pro-limit-message">Future recovery outcomes are withheld until the full 30s window completes. Descriptive cohort only. Not a forecast, execution signal, independent OOS or alpha.</div>
          </article>
        </div>
        <div className="pro-main-right">
