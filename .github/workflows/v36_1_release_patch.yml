@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/v36_1_release_patch.yml'
       - 'btc_eth_terminal/backend/v33_frontend_integrity.py'
+      - 'btc_eth_terminal/backend/bridge.py'
       - 'btc_eth_terminal/backend/v36_live_engine.py'
       - 'btc_eth_terminal/backend/v36_live_gateway.py'
       - 'btc_eth_terminal/backend/v36_frontend_integrity.py'
