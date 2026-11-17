@@ -17,6 +17,17 @@ function serve(quarantined){return http.createServer((req,res)=>{
  if(u.pathname==='/api/v30/series')return send(res,200,{product:u.searchParams.get('product'),kind:u.searchParams.get('kind'),rows:[],next_offset:null,source_sha256:projection,projection_sha256:pin,oos_approved:false,live_feed:false});
  if(u.pathname==='/api/v35/health')return send(res,200,{mode:'ARCHIVE_REPLAY',source_admission:quarantined?'QUARANTINED_ARCHIVE_ENVELOPE':'VERIFIED_ARCHIVE_ENVELOPE',source_manifest_sha256:pin,messages:2,live_feed:false,trading_enabled:false});
  if(u.pathname==='/api/v35/history')return send(res,200,{mode:'ARCHIVE_REPLAY',product:u.searchParams.get('product'),source_manifest_sha256:pin,live_feed:false,trading_enabled:false,rows:[row(u.searchParams.get('product'),1),row(u.searchParams.get('product'),2)],next_after:2,has_more:false});
+ if(u.pathname==='/api/v35/candles'){
+  const product=u.searchParams.get('product'),base=product==='BTC-USD'?100:200;
+  return send(res,200,{schema:'v35_1_archived_trade_candles_v1',product,mode:'ARCHIVE_REPLAY',
+   live_feed:false,trading_enabled:false,source_manifest_sha256:pin,timeframe_ms:60000,
+   source_definition:'RECEIVER_TIME_COMPLETED_BUCKETS_OBSERVED_TRADE_UPDATES_ONLY',
+   rows:[{schema:'v35_1_receiver_trade_bar_v1',product,mode:'ARCHIVE_REPLAY',
+    live_feed:false,trading_enabled:false,source_manifest_sha256:pin,
+    time:1794641220000,available_at:1794641280000,
+    open:String(base),high:String(base+3),low:String(base),close:String(base+1),volume:'5',
+    observed_trade_count:2,source_definition:'RECEIVER_TIME_COMPLETED_BUCKET_OBSERVED_TRADE_UPDATES_ONLY'}]});
+ }
  if(u.pathname==='/api/v35/stream'){
   const lines=['event: source\ndata: {"mode":"ARCHIVE_REPLAY","live_feed":false}\n\n'];
   for(let n=1;n<=2;n++)lines.push('id: '+n+'\nevent: state\ndata: '+JSON.stringify(row(u.searchParams.get('product'),n))+'\n\n');
@@ -43,6 +54,7 @@ function serve(quarantined){return http.createServer((req,res)=>{
     await panel.waitFor();
     if(!quarantine){
      await panel.getByRole('table',{name:'Verified replay order book'}).waitFor();
+     await panel.getByText(/1 candles available at selected replay time/).waitFor();
      await panel.getByRole('button',{name:'Step',exact:true}).click();
      await panel.getByText('Observation 2/2').waitFor();
      await panel.getByRole('button',{name:'Check SSE stream'}).click();
