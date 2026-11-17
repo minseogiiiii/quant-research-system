@@ -182,9 +182,9 @@ class RealHTTPContract(unittest.TestCase):
         self.assertEqual(stream.count('event: state\n'),3)
         self.assertIn('event: replay_end\n',stream)
         first=self.dataset.rows['BTC-USD'][2]['state_version']
-        status,_,reconnected=self.get('/api/v35/stream?product=BTC-USD&limit=2',headers={'Last-Event-ID':str(first)})
+        status,_,reconnected=self.get('/api/v35/stream?product=BTC-USD&limit=2',headers={'Last-Event-ID':self.dataset.certificate['manifest_sha256']+':BTC-USD:'+str(first)})
         self.assertEqual(status,200)
-        self.assertIn('id: '+str(self.dataset.rows['BTC-USD'][3]['state_version'])+'\n',reconnected.decode())
+        self.assertIn('id: '+self.dataset.certificate['manifest_sha256']+':BTC-USD:'+str(self.dataset.rows['BTC-USD'][3]['state_version'])+'\n',reconnected.decode())
 
     def test_gaps_queries_and_mutating_methods_rejected(self):
         for url,status in [('/api/v35/snapshot?product=SOL-USD',400),
