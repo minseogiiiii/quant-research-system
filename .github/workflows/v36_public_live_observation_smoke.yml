@@ -1,0 +1,110 @@
+name: v36 read-only public Coinbase live-source smoke
+on:
+  push:
+    branches:
+      - integration/btc-eth-unified-terminal
+    paths:
+      - '.github/workflows/v36_public_live_observation_smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-spot-network-observation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate public-only collector and no order surface
+        run: |
+          node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
+          python - <<'PY'
+          from pathlib import Path
+          src=(Path('btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs')).read_text()
+          assert 'wss://advanced-trade-ws.coinbase.com' in src
+          assert "['level2','market_trades','heartbeats']" in src
+          for forbidden in ('create_order(', 'submit_order(', 'place_order(', 'send_order('):
+              assert forbidden not in src
+          print('PASS public-only read-only collector: limited static surface check')
+          PY
+      - name: Attempt live public WebSocket with exact source admission, no raw artifact upload
+        timeout-minutes: 3
+        run: |
+          set +e
+          WORKDIR="/tmp/v36_public_spot_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          python -u btc_eth_terminal/scripts/v36_observe_existing_collector.py \
+            --execute-public-capture --workdir "$WORKDIR" --duration 30 --port 8766 \
+            --raw-budget-bytes 1000000000 --archive-budget-bytes 2000000000 \
+            --disk-reserve-bytes 4294967296 > /tmp/v36_observer_summary.jsonl 2> /tmp/v36_observer_stderr.log &
+          CAPTURE_PID=$!
+          python - <<'PY'
+          import json,time
+          from urllib.request import urlopen
+          from urllib.error import HTTPError,URLError
+          base='http://127.0.0.1:8766'
+          statuses={}
+          admitted=[]
+          for i in range(175):
+              try:
+                  with urlopen(base+'/api/v36/health',timeout=.7) as r:
+                      health=json.load(r)
+                  status=health.get('status','UNKNOWN')
+                  statuses[status]=statuses.get(status,0)+1
+                  if (health.get('mode')=='LIVE_SOURCE' and
+                      health.get('live_feed') is True and status=='HEALTHY'
+                      and health.get('messages',0)>0 and health.get('heartbeats',0)>0):
+                      snap={}
+                      for product in ('BTC-USD','ETH-USD'):
+                          with urlopen(base+'/api/v36/snapshot?product='+product,timeout=1) as r:
+                              data=json.load(r)
+                          state=data.get('state')
+                          assert state is not None and state.get('mode')=='LIVE_SOURCE'
+                          assert state.get('product')==product and not state.get('trading_enabled')
+                          snap[product]={'version':state['state_version'],
+                              'receiver_time_ms':state['receiver_time_ms'],
+                              'source_raw_sha256':state['source_raw_sha256'],
+                              'best_bid':state['best_bid'],'best_ask':state['best_ask']}
+                      admitted.append({'status':'HOST_OBSERVED_LIVE_READ_ONLY',
+                         'session_id':health['session_id'],'messages':health['messages'],
+                         'last_sequence':health['last_sequence'],
+                         'snapshot':snap,'trading_enabled':False})
+                      break
+              except (HTTPError,URLError,TimeoutError,OSError,ValueError,KeyError,AssertionError):
+                  pass
+              time.sleep(.25)
+          print('SOURCE_HEALTH_STATES',json.dumps(statuses,sort_keys=True))
+          print('ACTUAL_LIVE_SOURCE_ADMISSION',json.dumps(admitted,sort_keys=True))
+          if not admitted:
+              raise SystemExit('BLOCKED_UNVERIFIED_LIVE_SOURCE_NO_VALID_BTC_ETH_SNAPSHOTS')
+          PY
+          EVIDENCE_RC=$?
+          wait "$CAPTURE_PID"
+          COLLECTOR_RC=$?
+          if test -f "$WORKDIR/V36_OBSERVER_EVIDENCE.json"; then
+            python - "$WORKDIR/V36_OBSERVER_EVIDENCE.json" <<'PY'
+          import json,sys
+          x=json.load(open(sys.argv[1]))
+          h=x['final_observer_health']
+          print('FINAL_INCOMPLETE_OR_VERIFIED_COLLECTOR_SUMMARY',
+            json.dumps({'collector_exit_code':x['collector_exit_code'],
+              'manifest_sha256':x['captured_manifest_sha256'],
+              'messages':h['messages'],'heartbeats':h['heartbeats'],
+              'status':h['status'],'trading_enabled':False},sort_keys=True))
+          PY
+          fi
+          echo "CAPTURE_EXIT:$COLLECTOR_RC ADMISSION_EXIT:$EVIDENCE_RC"
+          # Do not upload or commit any original raw JSONL or source archive.
+          if [ "$COLLECTOR_RC" -ne 0 ] || [ "$EVIDENCE_RC" -ne 0 ]; then
+            echo 'BLOCKED: actual Coinbase LIVE admission and full capture were not independently validated'
+            exit 1
+          fi
+          echo 'PASS HOST_OBSERVED_READ_ONLY_LIVE_SOURCE'
