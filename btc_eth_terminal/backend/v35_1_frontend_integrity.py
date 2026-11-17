@@ -9,8 +9,8 @@ from v34_frontend_integrity import get_asset, verify_build, FrontendIntegrityErr
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / 'frontend' / 'dist_v35_1'
 MANIFEST = ROOT / 'frontend' / 'v35_1_dist_integrity.json'
-PINNED_MANIFEST_SHA256 = '51216df2dd58abcf34732e46765ec0d196df1140a7fca9976ec80eb6a9f47888'
-CANDIDATE_JS = '/assets/index-a80XelIM.js'
+PINNED_MANIFEST_SHA256 = 'c3226751a5d7e882a9e113f9b674d7cbabb2144a5d781e9006000b447c4b80d2'
+CANDIDATE_JS = '/assets/index-Dmz4-5Al.js'
 CANDIDATE_CSS = '/assets/index-DgWkONqN.css'
 
 
