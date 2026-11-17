@@ -1,20 +1,20 @@
 {
-  "ci_run": "https://github.com/minseogiiiii/quant-research-system/actions/runs/43991795187",
+  "ci_run": "https://github.com/minseogiiiii/quant-research-system/actions/runs/43993998279",
   "files": {
     "assets/index-DgWkONqN.css": {
       "bytes": 28896,
       "sha256": "543e6edd06ef8b462ad0cc7cac4442635b9ae91a071f9daabff1a93c8822ecfd"
     },
-    "assets/index-a80XelIM.js": {
-      "bytes": 521523,
-      "sha256": "efd4a54784c7f4cab7e86b2ba3e473227d7f6e69cd48caea960285a9807276a3"
+    "assets/index-Dmz4-5Al.js": {
+      "bytes": 524524,
+      "sha256": "b59cc7f773a8dc72f50824b71e6c4ea882e0a118fb03d59f51d6a4f1960c3f5e"
     },
     "index.html": {
       "bytes": 368,
-      "sha256": "0e994e230296d5a3bde8c551795777b83ff09c4af97420042c64c62ac6830232"
+      "sha256": "13ad5d30404c577bb212ca976bc647217c46ade944b8e36ddd78038c600edeb0"
     }
   },
-  "git_commit": "71fd9c157311f124c723993bb87dda025907a840",
+  "git_commit": "bc68988843842892cb619c13a80cac8ef9ce7666",
   "live_trading_enabled": false,
   "receiver_time_only": true,
   "schema": "v34_funnest_build_integrity_v1"
