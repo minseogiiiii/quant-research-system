@@ -6,6 +6,7 @@ on:
       - integration/btc-eth-unified-terminal
     paths:
       - 'btc_eth_terminal/frontend/**'
+      - 'btc_eth_terminal/scripts/v36_build_frontend.py'
       - '.github/workflows/unified_terminal_frontend.yml'
   workflow_dispatch:
 
@@ -41,10 +42,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: v35-1-unpinned-candidate-dist
-          path: btc_eth_terminal/frontend/dist/
+          path: btc_eth_terminal/frontend/dist_v36/
           retention-days: 7
-      - name: Verify source-pinned browser assets match v35 candidate manifest
-        run: node --test tests/buildManifest.test.mjs
+      - name: Verify v36 source-pinned browser assets, preserve legacy dist
+        run: python ../scripts/v36_build_frontend.py --verify-existing
       - name: Check generated browser bundle files
         run: |
           test -f dist/index.html
@@ -54,6 +55,6 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: btc-eth-unified-v31-funnest-dist
+          name: btc-eth-v36-source-pinned-funnest-dist
           path: btc_eth_terminal/frontend/dist/
           retention-days: 7
