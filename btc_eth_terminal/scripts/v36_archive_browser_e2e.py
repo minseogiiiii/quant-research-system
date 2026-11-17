@@ -112,8 +112,9 @@ def run(capture:Path,pin:str,browser_executable:str|None=None)->dict:
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--capture',type=Path,default=DEFAULT)
-    ap.add_argument('--manifest-sha256',default=sha256((DEFAULT/'manifest.json').read_bytes()).hexdigest())
+    ap.add_argument('--capture',required=True,type=Path)
+    ap.add_argument('--manifest-sha256',required=True,
+                    help='Independently pinned digest of the supplied, private source manifest')
     ap.add_argument('--browser-executable')
     ap.add_argument('--report',type=Path,required=True)
     args=ap.parse_args()
