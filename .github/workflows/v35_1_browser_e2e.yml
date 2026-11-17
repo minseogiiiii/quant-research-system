@@ -28,7 +28,7 @@ jobs:
       - name: Build exact frontend and check SHA-pinned candidate
         run: |
           npm run build
-          node --test tests/buildManifest.test.mjs
+          python ../scripts/v36_build_frontend.py --verify-existing
       - name: Install browser driver without changing committed lockfile
         run: npm install --no-save --ignore-scripts --no-audit --no-fund playwright-core@1.55.0
       - name: Verify installed Chrome binary
