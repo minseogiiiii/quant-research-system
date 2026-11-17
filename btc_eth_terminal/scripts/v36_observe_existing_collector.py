@@ -61,6 +61,23 @@ def read_tap(connection:socket.socket,engine:LiveMarketEngine,done:list):
         except OSError:pass
 
 
+
+def capture_ready_for_research(collector_rc: int, manifest: object) -> bool:
+    """Fail-closed on an empty or incomplete capture even if child exits 0.
+
+    This does not grant LIVE admission. It is a strict post-capture archive
+    readiness check, not exchange attestation or independent external pinning.
+    """
+    return (collector_rc == 0 and isinstance(manifest, dict)
+            and manifest.get('format') == 'btc_eth_raw_soak_v10'
+            and manifest.get('status') == 'CAPTURE_COMPLETED_NO_GAPS_UNVERIFIED_MARKET_TRUTH'
+            and manifest.get('ready_for_research') is True
+            and type(manifest.get('messages')) is int and manifest['messages'] > 0
+            and manifest.get('faults') == []
+            and manifest.get('complete_sequence_per_connection') is True
+            and manifest.get('all_connections_have_snapshots') is True)
+
+
 def main(argv=None)->int:
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--workdir',required=True,type=Path)
@@ -141,12 +158,22 @@ def main(argv=None)->int:
         candidates=list((work/'soak_evidence').glob('coinbase_btc_eth_soak_*'))
         source=candidates[0] if len(candidates)==1 else None
         manifest=source/'manifest.json' if source else None
-        source_hash=sha256(manifest.read_bytes()).hexdigest() if manifest and manifest.is_file() else None
+        manifest_bytes=manifest.read_bytes() if manifest and manifest.is_file() else None
+        source_hash=sha256(manifest_bytes).hexdigest() if manifest_bytes is not None else None
+        try:
+            capture_meta=json.loads(manifest_bytes) if manifest_bytes is not None else None
+        except (ValueError, UnicodeError):
+            capture_meta=None
+        capture_ready=capture_ready_for_research(proc.returncode,capture_meta)
         evidence={'schema':'v36_observer_evidence_v1','mode':'LIVE_SOURCE',
                   'source_attestation':'HOST_PID_AND_CLOCK_ONLY_NOT_SIGNED_EXCHANGE',
                   'producer_script_sha256':script_hash,'collector_exit_code':proc.returncode,
                   'elapsed_seconds':round(time.monotonic()-start,3),
                   'captured_manifest_sha256':source_hash,
+                  'capture_ready_for_research':capture_ready,
+                  'capture_status':capture_meta.get('status') if isinstance(capture_meta,dict) else None,
+                  'capture_message_count':capture_meta.get('messages') if isinstance(capture_meta,dict) else None,
+                  'capture_fault_count':len(capture_meta.get('faults',[])) if isinstance(capture_meta,dict) and isinstance(capture_meta.get('faults'),list) else None,
                   'captured_dir':str(source) if source else None,
                   'final_observer_health':engine.health(),
                   'execution_authorized':False,'trading_enabled':False}
@@ -155,7 +182,7 @@ def main(argv=None)->int:
             json.dump(evidence,stream,indent=2,sort_keys=True);stream.write('\n')
             stream.flush();os.fsync(stream.fileno())
         print(json.dumps(evidence,sort_keys=True))
-        return 0 if proc.returncode==0 and source_hash else 2
+        return 0 if capture_ready and source_hash else 2
     finally:
         done[0]=True
         if proc is not None and proc.poll() is None:
