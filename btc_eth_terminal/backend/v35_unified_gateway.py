@@ -174,6 +174,10 @@ class UnifiedHandler(HistoricalHandler):
                 return
             if limit > MAX_SSE_EVENTS:
                 raise StateRejected('STREAM_LIMIT_EXCEEDED')
+            # Numeric URL 'after' positions contain no archive/product identity.
+            # Resume SSE only using the source-qualified Last-Event-ID contract.
+            if after > 0:
+                raise StateRejected('RESYNC_REQUIRED')
             last_id = self.headers.get('Last-Event-ID')
             if last_id:
                 if 'after' in args:
