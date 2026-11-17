@@ -1,0 +1,136 @@
+name: v36.1 real LIVE Chromium and independent completed OHLCV
+
+on:
+  push:
+    branches:
+      - integration/btc-eth-unified-terminal
+    paths:
+      - '.github/workflows/v36_1_real_live_browser_ohlcv.yml'
+      - 'btc_eth_terminal/scripts/v36_1_live_browser_e2e.py'
+      - 'btc_eth_terminal/scripts/v36_1_verify_independent_ohlcv.py'
+      - 'btc_eth_terminal/frontend/src/LiveTerminal.tsx'
+      - 'btc_eth_terminal/frontend/src/v36_1_completed_candle_feed.ts'
+      - 'btc_eth_terminal/frontend/v36_dist_integrity.json'
+      - 'btc_eth_terminal/backend/v36_live_engine.py'
+      - 'btc_eth_terminal/backend/v36_live_gateway.py'
+      - 'btc_eth_terminal/backend/v36_frontend_integrity.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-live-and-independent-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify no execution and source-qualified market state
+        run: |
+          node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
+          python -m compileall -q btc_eth_terminal/backend
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_1_version_pinned_state.py' -v
+      - name: Install Chrome automation and exact pinned Funnest libraries
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir playwright==1.55.0
+          cd btc_eth_terminal/frontend
+          npm ci --ignore-scripts --no-audit --no-fund
+          node --experimental-strip-types --test tests/v36_1_completed_candle_feed.test.mjs
+          npm run build
+          python ../scripts/v36_build_frontend.py --verify-existing
+          command -v google-chrome
+          cd ../..
+      - name: Real 240 second Coinbase capture with LIVE browser and independent candles
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set +e
+          PRIVATE="$RUNNER_TEMP/v36_1_private_$GITHUB_RUN_ID"
+          python -u btc_eth_terminal/scripts/v36_observe_existing_collector.py \
+            --execute-public-capture --duration 240 --port 8766 --workdir "$PRIVATE" \
+            --raw-budget-bytes 1000000000 --archive-budget-bytes 2000000000 \
+            --disk-reserve-bytes 4294967296 \
+            > "$RUNNER_TEMP/v36_1_public_observer_summary.jsonl" \
+            2> "$RUNNER_TEMP/v36_1_public_observer_stderr.log" &
+          CAPTURE_PID=$!
+          python - <<'PY'
+          import json,time
+          from urllib.request import urlopen
+          ok=False
+          for _ in range(90):
+              try:
+                  with urlopen('http://127.0.0.1:8766/api/v36/health',timeout=1) as resp:
+                      h=json.load(resp)
+                  if (h.get('mode')=='LIVE_SOURCE' and h.get('status')=='HEALTHY'
+                      and h.get('live_feed') is True and h.get('trading_enabled') is False
+                      and set(h.get('snapshots',[]))=={'BTC-USD','ETH-USD'}
+                      and h.get('heartbeats',0)>0):
+                      ok=True;break
+              except (OSError,ValueError,KeyError):
+                  pass
+              time.sleep(.4)
+          print('GENUINE_PUBLIC_LIVE_ADMISSION_BEFORE_BROWSER',ok,flush=True)
+          if not ok:raise SystemExit(2)
+          PY
+          ADMISSION_RC=$?
+          BROWSER_RC=2
+          if [ "$ADMISSION_RC" -eq 0 ]; then
+            python -u btc_eth_terminal/scripts/v36_1_live_browser_e2e.py \
+              --port 8766 --browser-executable /usr/bin/google-chrome \
+              --seconds 170 --min-versions-per-product 10 --min-bars-per-product 1 \
+              --report "$PRIVATE/v36_1_private_live_browser_report.json"
+            BROWSER_RC=$?
+          fi
+          wait "$CAPTURE_PID"
+          COLLECTOR_RC=$?
+          VERIFY_RC=2
+          OHLCV_RC=2
+          if [ -f "$PRIVATE/V36_OBSERVER_EVIDENCE.json" ]; then
+            python -u btc_eth_terminal/scripts/v36_verify_live_capture.py \
+              --evidence "$PRIVATE/V36_OBSERVER_EVIDENCE.json"
+            VERIFY_RC=$?
+            python - "$PRIVATE/V36_OBSERVER_EVIDENCE.json" <<'PY'
+          import json,subprocess,sys
+          from pathlib import Path
+          evidence=json.loads(Path(sys.argv[1]).read_bytes())
+          if evidence.get('observer_source_complete') is not True:
+              raise SystemExit('BLOCKED_INCOMPLETE_CAPTURE')
+          cmd=[sys.executable,'btc_eth_terminal/scripts/v36_1_verify_independent_ohlcv.py',
+               '--capture',evidence['captured_dir'],
+               '--manifest-sha256',evidence['captured_manifest_sha256'],
+               '--min-completed-per-product','1']
+          raise SystemExit(subprocess.call(cmd))
+          PY
+            OHLCV_RC=$?
+          fi
+          echo "LIVE_GATE:$ADMISSION_RC BROWSER:$BROWSER_RC COLLECTOR:$COLLECTOR_RC AUDIT:$VERIFY_RC OHLCV:$OHLCV_RC"
+          if [ -f "$PRIVATE/v36_1_private_live_browser_report.json" ]; then
+            python - "$PRIVATE/v36_1_private_live_browser_report.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1]))
+          print('LIVE_BROWSER_RESULT',json.dumps({
+              'status':data.get('status'),
+              'reason':data.get('reason'),
+              'elapsed_seconds':data.get('elapsed_seconds'),
+              'canvas_pixel_numeric_equality':'NOT_VERIFIED',
+              'products':{p:{k:v for k,v in x.items() if k!='versions'}
+                          for p,x in data.get('products',{}).items()},
+              'trading_enabled':False},sort_keys=True))
+          PY
+          fi
+          # Raw source records and complete private reports are NOT uploaded.
+          if [ "$ADMISSION_RC" -ne 0 ] || [ "$BROWSER_RC" -ne 0 ] || \
+             [ "$COLLECTOR_RC" -ne 0 ] || [ "$VERIFY_RC" -ne 0 ] || \
+             [ "$OHLCV_RC" -ne 0 ]; then
+            echo "FAIL_V36_1_REAL_LIVE_BROWSER_OR_INDEPENDENT_OHLCV"
+            exit 2
+          fi
+          echo "PASS_V36_1_GENUINE_LIVE_BROWSER_AND_INDEPENDENT_SOURCE_OHLCV"
