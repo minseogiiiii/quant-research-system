@@ -169,6 +169,22 @@ class IngressContract(unittest.TestCase):
         with self.assertRaisesRegex(ArchiveRejected, 'UNSAFE_CHUNK_NAME'):
             verify_capture(self.root, pin)
 
+    def test_repinned_noninteger_connection_id_fails_closed(self):
+        meta = json.loads((self.root / 'manifest.json').read_bytes())
+        meta['chunks'][0]['connection_id'] = '0'
+        (self.root / 'manifest.json').write_bytes(_json_bytes(meta))
+        pin = hashlib.sha256((self.root / 'manifest.json').read_bytes()).hexdigest()
+        with self.assertRaisesRegex(ArchiveRejected, 'CONNECTION_BOUNDARY_OUT_OF_ORDER'):
+            verify_capture(self.root, pin)
+
+    def test_repinned_malformed_product_inventory_fails_closed(self):
+        meta = json.loads((self.root / 'manifest.json').read_bytes())
+        meta['products'] = [{'product_id': 'BTC-USD'}, 'ETH-USD']
+        (self.root / 'manifest.json').write_bytes(_json_bytes(meta))
+        pin = hashlib.sha256((self.root / 'manifest.json').read_bytes()).hexdigest()
+        with self.assertRaisesRegex(ArchiveRejected, 'MALFORMED_PRODUCT_INVENTORY'):
+            verify_capture(self.root, pin)
+
     def test_symlinked_archive_chunk_rejected(self):
         file = next((self.root / 'chunks').glob('*.jsonl'))
         real = file.with_suffix('.backup')
