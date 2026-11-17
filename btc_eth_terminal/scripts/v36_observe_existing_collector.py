@@ -132,10 +132,15 @@ def main(argv=None)->int:
     ap.add_argument('--execute-public-capture',action='store_true')
     ap.add_argument('--duration',type=int,default=120)
     ap.add_argument('--port',type=int,default=8766)
+    ap.add_argument('--fault-test-only',action='store_true',help='Never promote deliberately faulted source')
+    ap.add_argument('--inject-disconnect-after-messages',type=int,default=0)
     ap.add_argument('--raw-budget-bytes',type=int,default=15_000_000_000)
     ap.add_argument('--archive-budget-bytes',type=int,default=20_000_000_000)
     ap.add_argument('--disk-reserve-bytes',type=int,default=4*1024**3)
     args=ap.parse_args(argv)
+    if args.inject_disconnect_after_messages and (not args.fault_test_only or
+         not 100<=args.inject_disconnect_after_messages<=10000):
+        ap.error('Fault injection requires --fault-test-only and 100..10000 messages')
     if not args.execute_public_capture:
         print('BLOCKED: explicit --execute-public-capture required',file=sys.stderr)
         return 2
@@ -172,7 +177,7 @@ def main(argv=None)->int:
          'SOAK_ARCHIVE_BUDGET_BYTES':str(args.archive_budget_bytes),
          'SOAK_DISK_RESERVE_BYTES':str(args.disk_reserve_bytes),
          'SOAK_CHUNK_LIMIT_BYTES':'8000000',
-         'SOAK_TEST_FIXTURE':'0','SOAK_TEST_DISCONNECT_AFTER_MESSAGES':'0',
+         'SOAK_TEST_FIXTURE':'0','SOAK_TEST_DISCONNECT_AFTER_MESSAGES':str(args.inject_disconnect_after_messages),
          'V36_LIVE_TAP_SOCKET':str(tap_path)}
     done=[False];proc=None;worker=None;observer_finished=False;observer_health=None
     start=time.monotonic()
@@ -228,6 +233,8 @@ def main(argv=None)->int:
                   'elapsed_seconds':round(time.monotonic()-start,3),
                   'captured_manifest_sha256':source_hash,
                   'capture_ready_for_research':capture_ready,
+                  'fault_test_only':args.fault_test_only,
+                  'injected_disconnect_after_messages':args.inject_disconnect_after_messages,
                   'observer_reader_finished':observer_finished,
                   'observer_source_complete':observer_complete,
                   'observer_health_before_stop':observer_health,
@@ -242,7 +249,7 @@ def main(argv=None)->int:
             json.dump(evidence,stream,indent=2,sort_keys=True);stream.write('\n')
             stream.flush();os.fsync(stream.fileno())
         print(json.dumps(evidence,sort_keys=True))
-        return 0 if capture_ready and observer_complete and source_hash else 2
+        return 0 if not args.fault_test_only and capture_ready and observer_complete and source_hash else 2
     finally:
         done[0]=True
         if proc is not None and proc.poll() is None:
