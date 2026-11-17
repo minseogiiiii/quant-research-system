@@ -8,6 +8,7 @@ on:
       - 'btc_eth_terminal/tests/test_v35_2_transport_contract.py'
       - 'btc_eth_terminal/tests/test_v35_3_scoped_sse_cursor.py'
       - 'btc_eth_terminal/tests/test_v36_ci_synthetic_admission.py'
+      - 'btc_eth_terminal/tests/test_v36_capture_readiness.py'
       - 'btc_eth_terminal/tests/test_v36_collector_tap.py'
       - 'btc_eth_terminal/tests/v36_mock_coinbase_websocket.mjs'
       - 'btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs'
@@ -80,6 +81,10 @@ jobs:
         env:
           PYTHONPATH: btc_eth_terminal/backend
         run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_ci_synthetic_admission.py' -v
+      - name: Verify that zero-message or quarantined capture can never pass
+        env:
+          PYTHONPATH: btc_eth_terminal/backend
+        run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_capture_readiness.py' -v
       - name: Validate bounded HTTP clients and telemetry without private archives
         env:
           PYTHONPATH: btc_eth_terminal/backend
