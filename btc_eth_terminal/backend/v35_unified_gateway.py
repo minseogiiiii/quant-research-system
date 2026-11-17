@@ -9,13 +9,14 @@ from http.server import ThreadingHTTPServer
 import json
 from pathlib import Path
 import re
-from threading import BoundedSemaphore
+from threading import BoundedSemaphore, Lock
 from urllib.parse import parse_qs, urlsplit
 
 from bridge import Handler as HistoricalHandler
 from v35_replay_service import replay_capture, ReplayDataset, StateRejected, PRODUCTS
 
 MAX_SSE_EVENTS = 60
+CLIENT_SOCKET_TIMEOUT_SECONDS = 3.0
 
 class BoundedServer(ThreadingHTTPServer):
     daemon_threads = True
@@ -24,15 +25,50 @@ class BoundedServer(ThreadingHTTPServer):
 
     def __init__(self, address, handler):
         self.slots = BoundedSemaphore(self.max_clients)
+        self._stats_lock = Lock()
+        self._stats = {'accepted_requests': 0, 'rejected_client_slots': 0,
+                       'active_connections': 0, 'peak_connections': 0,
+                       'sse_started': 0, 'sse_completed': 0,
+                       'sse_aborted': 0, 'resync_required': 0}
         super().__init__(address, handler)
+
+    def get_request(self):
+        # Slow peers may never finish HTTP headers or read an SSE response.
+        # Time out both read and write operations.
+        sock, address = super().get_request()
+        sock.settimeout(CLIENT_SOCKET_TIMEOUT_SECONDS)
+        return sock, address
+
+    def count(self, name: str, delta: int = 1) -> None:
+        with self._stats_lock:
+            self._stats[name] += delta
+            if name == 'active_connections':
+                self._stats['peak_connections'] = max(self._stats['peak_connections'],
+                                                       self._stats['active_connections'])
+
+    def metrics(self) -> dict:
+        with self._stats_lock:
+            values = dict(self._stats)
+        return {'schema': 'v35_1_finite_gateway_metrics_v1',
+                'mode': 'ARCHIVE_REPLAY', 'live_feed': False,
+                'trading_enabled': False,
+                'max_clients': self.max_clients,
+                'socket_timeout_seconds': CLIENT_SOCKET_TIMEOUT_SECONDS,
+                'max_sse_events_per_response': MAX_SSE_EVENTS,
+                'sse_queue_depth': 0,  # Finite precomputed SSE, no persistent queue.
+                **values}
 
     def process_request(self, request, client_address):
         if not self.slots.acquire(blocking=False):
+            self.count('rejected_client_slots')
             self.shutdown_request(request)
             return
+        self.count('accepted_requests')
+        self.count('active_connections')
         try:
             super().process_request(request, client_address)
         except BaseException:
+            self.count('active_connections', -1)
             self.slots.release()
             raise
 
@@ -40,6 +76,7 @@ class BoundedServer(ThreadingHTTPServer):
         try:
             super().process_request_thread(request, client_address)
         finally:
+            self.count('active_connections', -1)
             self.slots.release()
 
 
@@ -73,6 +110,7 @@ class UnifiedHandler(HistoricalHandler):
             return
         if not parsed.path.startswith('/api/v35/'):
             return super().do_GET()
+        sse_response_started = False
         try:
             if self.dataset is None:
                 self.send_obj(503, {'error': 'NO_VERIFIED_ARCHIVE', 'live_feed': False})
@@ -80,6 +118,7 @@ class UnifiedHandler(HistoricalHandler):
             route = parsed.path
             permitted = {
                 '/api/v35/health': set(),
+                '/api/v35/metrics': set(),
                 '/api/v35/snapshot': {'product', 'version'},
                 '/api/v35/history': {'product', 'after', 'limit'},
                 '/api/v35/candles': {'product', 'limit'},
@@ -101,6 +140,9 @@ class UnifiedHandler(HistoricalHandler):
                 if raw is None or re.fullmatch(r'(0|[1-9]\d{0,12})', raw) is None:
                     raise StateRejected(f'INVALID_{k.upper()}')
                 return int(raw)
+            if route == '/api/v35/metrics':
+                self.send_obj(200, self.server.metrics())
+                return
             if route == '/api/v35/health':
                 self.send_obj(200, {'schema': 'v35_1_health_v1',
                                     'mode': 'ARCHIVE_REPLAY', 'status': 'VERIFIED_ARCHIVE_ONLY',
@@ -153,6 +195,8 @@ class UnifiedHandler(HistoricalHandler):
             body = ''.join(frames).encode('utf8')
             if len(body) > 2_000_000:
                 raise StateRejected('SSE_FRAME_BUDGET_EXCEEDED')
+            self.server.count('sse_started')
+            sse_response_started = True
             self.send_response(200)
             for key,value in [
                 ('Content-Type', 'text/event-stream; charset=utf-8'),
@@ -162,12 +206,17 @@ class UnifiedHandler(HistoricalHandler):
                 self.send_header(key,value)
             self.end_headers()
             self.wfile.write(body)
+            self.server.count('sse_completed')
         except (StateRejected, ValueError, KeyError) as exc:
+            if str(exc) in ('RESYNC_REQUIRED', 'STATE_VERSION_NOT_RETAINED'):
+                self.server.count('resync_required')
             code = 409 if str(exc) in ('RESYNC_REQUIRED', 'STATE_VERSION_NOT_RETAINED') else 400
             self.send_obj(code, {'error': str(exc), 'mode': 'ARCHIVE_REPLAY',
                                  'live_feed': False, 'trading_enabled': False})
-        except (ConnectionError, BrokenPipeError):
-            # Disconnecting clients cannot modify the source or state.
+        except (ConnectionError, TimeoutError, OSError):
+            # Includes peer disconnects and timed-out slow readers.
+            if sse_response_started:
+                self.server.count('sse_aborted')
             return
 
 
