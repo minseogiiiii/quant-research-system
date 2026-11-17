@@ -94,10 +94,13 @@ def verify_capture(root: Path, expected_manifest_sha256: str) -> dict:
         manifest = json.loads(manifest_path.read_bytes())
     except (UnicodeError, ValueError):
         _reject('MALFORMED_MANIFEST')
+    products = manifest.get('products') if isinstance(manifest, dict) else None
+    if (not isinstance(products, list) or not all(isinstance(p, str) for p in products)):
+        _reject('MALFORMED_PRODUCT_INVENTORY')
     if (not isinstance(manifest, dict) or manifest.get('format') != 'btc_eth_raw_soak_v10'
         or manifest.get('source') != 'wss://advanced-trade-ws.coinbase.com'
         or manifest.get('source_authentication') != 'PUBLIC_WEBSOCKET_NO_SIGNED_EXCHANGE_ATTESTATION'
-        or set(manifest.get('products', [])) != PRODUCTS
+        or set(products) != PRODUCTS
         or manifest.get('sequence_scope') != 'PER_WEBSOCKET_CONNECTION'
         or manifest.get('orders_enabled') is not False
         or manifest.get('strategy_execution_enabled') is not False
@@ -123,14 +126,14 @@ def verify_capture(root: Path, expected_manifest_sha256: str) -> dict:
     for idx, entry in enumerate(chunks):
         name = entry.get('file')
         path = _chunk_path(root, name)
-        if path.name != f'chunk_{idx:05d}_conn_{entry.get("connection_id", -1):03}.jsonl':
-            _reject('CHUNK_INDEX_OUT_OF_ORDER')
         if name in seen_files:
             _reject('DUPLICATE_SOURCE_CHUNK')
         seen_files.add(name)
         cid = entry.get('connection_id')
         if type(cid) is not int or cid not in states or cid < last_conn or cid > last_conn + 1:
             _reject('CONNECTION_BOUNDARY_OUT_OF_ORDER')
+        if path.name != f'chunk_{idx:05d}_conn_{cid:03}.jsonl':
+            _reject('CHUNK_INDEX_OUT_OF_ORDER')
         if not re.fullmatch(r'chunk_\d{5}_conn_' + f'{cid:03}' + r'\.jsonl', path.name):
             _reject('CHUNK_CONNECTION_MISMATCH')
         last_conn = cid
