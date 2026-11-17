@@ -1,0 +1,41 @@
+[Unit]
+Description=BTC/ETH read-only Coinbase public-source collector and terminal
+Wants=network-online.target time-sync.target
+After=network-online.target time-sync.target
+StartLimitIntervalSec=1800
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=btceth
+Group=btceth
+WorkingDirectory=/opt/btc-eth-terminal
+Environment=V36_TERMINAL_ROOT=/opt/btc-eth-terminal
+Environment=V36_CAPTURE_ROOT=/var/lib/btceth-live/captures
+StateDirectory=btceth-live
+StateDirectoryMode=0700
+ExecStartPre=/usr/bin/mkdir -p /var/lib/btceth-live/captures
+ExecStart=/opt/btc-eth-terminal/scripts/v36_2_durable_launch.sh
+Restart=always
+RestartSec=30s
+TimeoutStartSec=90
+TimeoutStopSec=30
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/btceth-live
+LimitNOFILE=4096
+TasksMax=80
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target
