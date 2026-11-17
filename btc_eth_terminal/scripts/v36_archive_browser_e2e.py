@@ -88,6 +88,11 @@ def run(capture:Path,pin:str,browser_executable:str|None=None)->dict:
                         page.get_by_role('button',name=product).click()
                         expected=e.snapshot(product)['state']
                         if expected is None:raise AssertionError('ARCHIVED_SOURCE_NOT_ADMITTED')
+                        # Product changes are asynchronous. Wait for the exact
+                        # matching source-backed state, never read prior-product
+                        # market values as evidence of the new instrument.
+                        page.get_by_role('status').filter(
+                            has_text=f"state version {expected['state_version']}").wait_for(timeout=12000)
                         page.get_by_text('ARCHIVE SIMULATION · NOT LIVE').wait_for(timeout=12000)
                         panel=page.get_by_role('region',name='Validated top of book')
                         for key in ('best_bid','best_ask','spread','microprice','ofi_since_connection_base'):
