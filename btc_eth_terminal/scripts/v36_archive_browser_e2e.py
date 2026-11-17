@@ -13,6 +13,7 @@ from pathlib import Path
 import sys
 from threading import Thread
 from urllib.request import urlopen
+from urllib.error import HTTPError
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'backend'))
@@ -41,18 +42,32 @@ def run(capture:Path,pin:str,browser_executable:str|None=None)->dict:
     worker=Thread(target=svr.serve_forever,daemon=True);worker.start()
     origin=f'http://127.0.0.1:{svr.server_address[1]}'
     try:
-        for route in ['/research/v36','/research','/terminal','/research/v35.1',
-                      '/api/v36/health','/api/v36/snapshot?product=BTC-USD',
-                      '/api/v36/snapshot?product=ETH-USD','/api/v36/candles?product=BTC-USD',
-                      '/api/v36/candles?product=ETH-USD']:
-            with urlopen(origin+route,timeout=8) as res:
-                assert res.status==200,route
-                payload=res.read()
-                if route.startswith('/api/v36/'):
-                    obj=json.loads(payload)
-                    assert obj['mode']=='ARCHIVE_SIMULATION',route
-            result.setdefault('http_routes_verified',[]).append(route)
-        result['http_status']='PASS_GENUINE_ARCHIVE'
+        critical=['/research/v36','/api/v36/health',
+                  '/api/v36/snapshot?product=BTC-USD',
+                  '/api/v36/snapshot?product=ETH-USD',
+                  '/api/v36/candles?product=BTC-USD',
+                  '/api/v36/candles?product=ETH-USD']
+        legacy=['/research','/terminal','/research/v35.1']
+        for route in critical+legacy:
+            try:
+                with urlopen(origin+route,timeout=8) as res:
+                    assert res.status==200,route
+                    payload=res.read()
+                    if route.startswith('/api/v36/'):
+                        obj=json.loads(payload)
+                        assert obj['mode']=='ARCHIVE_SIMULATION',route
+                result.setdefault('http_routes_verified',[]).append(route)
+            except HTTPError as exc:
+                # Code-only public CI does not contain frozen legacy dist.
+                # Separate its missing historical assets from actual v36 E2E.
+                if route in legacy and exc.code==503:
+                    result.setdefault('legacy_asset_routes_not_verified',[]).append(route)
+                    continue
+                raise
+        result['http_status']='PASS_GENUINE_ARCHIVE_V36_CORE'
+        result['legacy_routes_status']=('UNVERIFIED_MISSING_FROZEN_ASSETS_IN_CODE_ONLY_CI'
+                                        if result.get('legacy_asset_routes_not_verified') else
+                                        'PASS_LEGACY_ASSET_ROUTES')
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
