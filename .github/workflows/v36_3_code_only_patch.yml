@@ -1,0 +1,87 @@
+name: v36.3 code-only SHA-pinned patch from frozen R4 source
+
+on:
+  push:
+    branches:
+      - integration/btc-eth-unified-terminal
+    paths:
+      - '.github/workflows/v36_3_code_only_patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verified-source-patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify GitHub source and construct reproducible bounded R4-to-R5 patch
+        run: |
+          python - <<'PY'
+          import hashlib,json,os,pathlib,subprocess,zipfile
+          BASE='48ce9d638698db953b568dcf7d6a01744ff35480'
+          HEAD=os.environ['GITHUB_SHA']
+          def git(*parts):
+              return subprocess.check_output(['git',*parts]).decode().strip()
+          git('cat-file','-e',BASE+'^{commit}')
+          differences=git('diff','--name-status','--no-renames',BASE,HEAD,'--','btc_eth_terminal/').splitlines()
+          files=[]
+          for line in differences:
+              status,raw=line.split('\t',1)
+              if status not in ('A','M'):
+                  raise SystemExit('UNSUPPORTED_RELEASE_FILE_DELETION:'+raw)
+              if not raw.startswith('btc_eth_terminal/'):
+                  raise SystemExit('RELEASE_PATH_OUTSIDE_TERMINAL:'+raw)
+              dest=raw.removeprefix('btc_eth_terminal/')
+              if (dest.startswith('backend/data/') or '/data/' in dest
+                  or '/soak_evidence/' in dest or '__pycache__' in dest):
+                  raise SystemExit('RAW_SOURCE_OR_RUNTIME_FILE_FORBIDDEN:'+raw)
+              p=pathlib.Path(raw)
+              if not p.is_file() or p.is_symlink() or p.stat().st_size>3_000_000:
+                  raise SystemExit('UNSAFE_OR_TOO_LARGE_CODE_FILE:'+raw)
+              files.append((dest,p.read_bytes(),git('hash-object',raw),status))
+          if len(files)<5 or len(files)>100:
+              raise SystemExit('UNEXPECTED_PATCH_FILE_COUNT:'+str(len(files)))
+          info={'schema':'v36_3_r5_code_only_patch_manifest_v1',
+                'base_git_commit':BASE,'head_git_commit':HEAD,
+                'parent_full_r4_sha256':'59c2d987a238028adca1970ca1adc529003e02300f6378dac3a74402d5f0ae2a',
+                'raw_market_data_included':False,'execution_authorized':False,
+                'files':{}}
+          target=pathlib.Path('/tmp/V36_3_R5_CODE_ONLY_SOURCE_PATCH.zip')
+          with zipfile.ZipFile(target,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=6) as z:
+              for dest,body,gitblob,status in sorted(files):
+                  info['files'][dest]={'sha256':hashlib.sha256(body).hexdigest(),
+                      'bytes':len(body),'git_blob_sha1':gitblob,'change':status}
+                  member=zipfile.ZipInfo('btc_eth_unified_terminal_v36_candidate/'+dest,
+                       date_time=(2026,1,1,0,0,0))
+                  member.compress_type=zipfile.ZIP_DEFLATED
+                  z.writestr(member,body)
+              item=zipfile.ZipInfo('V36_3_R5_CODE_PATCH_MANIFEST.json',
+                                  date_time=(2026,1,1,0,0,0))
+              item.compress_type=zipfile.ZIP_DEFLATED
+              z.writestr(item,json.dumps(info,indent=2,sort_keys=True)+'\n')
+          # Self-check archive members after finalization.
+          with zipfile.ZipFile(target) as z:
+              assert z.testzip() is None
+              assert len(z.namelist())==len(files)+1
+              for dest,body,_,_ in files:
+                  name='btc_eth_unified_terminal_v36_candidate/'+dest
+                  assert z.read(name)==body
+          print('PASS_V36_3_R5_CODE_PATCH_'+json.dumps({
+            'git_head':HEAD,'changed_source_files':len(files),
+            'patch_sha256':hashlib.sha256(target.read_bytes()).hexdigest(),
+            'patch_bytes':target.stat().st_size,'raw_market_data_included':False,
+            'trading_enabled':False},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v36-3-r5-code-only-source-patch
+          path: /tmp/V36_3_R5_CODE_ONLY_SOURCE_PATCH.zip
+          retention-days: 7
