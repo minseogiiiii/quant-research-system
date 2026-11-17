@@ -78,6 +78,8 @@ class LiveMarketEngine:
         self._cv=Condition(RLock())
         self.connection_id=None
         self.session_id=None
+        # Forensic, bounded session identities; never used for blind resume.
+        self.session_history=deque(maxlen=16)
         self.status='CONNECTING'
         self.reason='AWAITING_COLLECTOR_SOURCE'
         self.seq=-1
@@ -122,6 +124,7 @@ class LiveMarketEngine:
     def _new_connection(self, conn: int) -> None:
         self.connection_id=conn
         self.session_id=secrets.token_hex(16)  # Never reused across source gap or server restart.
+        self.session_history.append({'connection_id':conn,'session_id':self.session_id})
         self.status='WAITING_FOR_SNAPSHOT'
         self.reason='WAITING_FOR_DUAL_SNAPSHOT_AND_ACKS'
         self.seq=-1
@@ -357,6 +360,7 @@ class LiveMarketEngine:
                 'execution_authorized':False, 'exchange_signed_attestation':False,
                 'run_id':self.run_id,'session_id':self.session_id,
                 'connection_id':self.connection_id,'status':self.status,'reason':self.reason,
+                'source_session_history':list(self.session_history),
                 'last_sequence':self.seq,'last_receiver_time_ms':self.last_ms,
                 'products':list(PRODUCTS),'snapshots':sorted(self.snapshots),
                 'subscriptions':sorted(self.acks),'heartbeats':self.heartbeats,
