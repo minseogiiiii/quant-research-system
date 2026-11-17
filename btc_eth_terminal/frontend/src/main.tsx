@@ -8,6 +8,7 @@ import {
 } from './datafeed';
 import './style.css';
 import UnifiedTerminal from './unified';
+import LiveTerminal from './LiveTerminal';
 
 function formatMs(t: number) { return new Date(t).toISOString().replace('.000Z', 'Z'); }
 function errString(e: unknown): string { return e instanceof Error ? e.message : String(e); }
@@ -191,4 +192,4 @@ function App() {
     <footer>BTC and ETH only. Coinbase BTC-USD / ETH-USD spot are NOT Binance BTCUSDT / ETHUSDT. Market charting does not prove a strategy is profitable. No live orders, account credentials or future labels are connected.</footer>
   </main>;
 }
-createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
+createRoot(document.getElementById('root')!).render(<React.StrictMode>{window.location.pathname==='/research/v36' ? <LiveTerminal/> : <App/>}</React.StrictMode>);
