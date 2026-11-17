@@ -5,6 +5,7 @@ on:
       - integration/btc-eth-unified-terminal
     paths:
       - 'btc_eth_terminal/backend/**'
+      - 'btc_eth_terminal/tests/test_v35_2_transport_contract.py'
       - '.github/workflows/v35_1_backend_import.yml'
   workflow_dispatch:
 
@@ -44,6 +45,10 @@ jobs:
               raise AssertionError('Non-loopback bind unexpectedly permitted')
           print('PASS: v35.1 modules import without private archives; loopback policy enforced')
           PY
+      - name: Validate bounded HTTP clients and telemetry without private archives
+        env:
+          PYTHONPATH: btc_eth_terminal/backend
+        run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v35_2_transport_contract.py' -v
       - name: Confirm no v35 real exchange order transport or broker write adapter was introduced
         run: |
           python - <<'PY'
