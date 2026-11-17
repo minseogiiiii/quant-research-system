@@ -10,8 +10,8 @@ from v34_frontend_integrity import get_asset, FrontendIntegrityError
 ROOT=Path(__file__).resolve().parents[1]
 DIST=ROOT/'frontend/dist_v36'
 MANIFEST=ROOT/'frontend/v36_dist_integrity.json'
-PINNED_MANIFEST_SHA256='f845bf42b9b3c6eee7b154cc095168ab83c3b6766ad2805fbb83efd60700e238'
-LIVE_JS='/assets/index-Dqfy5zqK.js'
+PINNED_MANIFEST_SHA256='1d8ccafcfb2604a13317528a28ecaf5149a3667e92c537826fd5ef642883a0bb'
+LIVE_JS='/assets/index-C_ljvDPR.js'
 LIVE_CSS='/assets/index-Ckn1nBC7.css'
 
 
