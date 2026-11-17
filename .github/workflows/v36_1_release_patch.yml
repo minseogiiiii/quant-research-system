@@ -1,0 +1,86 @@
+name: v36.1 auditable code-only release candidate patch
+
+on:
+  push:
+    branches:
+      - integration/btc-eth-unified-terminal
+    paths:
+      - '.github/workflows/v36_1_release_patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-code-only-patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify source-state and Funnest Datafeed tests
+        run: |
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_1_version_pinned_state.py' -v
+          node --experimental-strip-types --test btc_eth_terminal/frontend/tests/v36_1_completed_candle_feed.test.mjs
+      - name: Rebuild exact pinned Funnest frontend
+        run: |
+          cd btc_eth_terminal/frontend
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          python ../scripts/v36_build_frontend.py --verify-existing
+      - name: Bundle code only, freeze SHA-256 per file
+        run: |
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          from zipfile import ZipFile,ZipInfo,ZIP_DEFLATED
+          root=Path('btc_eth_terminal')
+          include=[]
+          for sub,patterns in [
+              ('backend',('*.py',)),
+              ('scripts',('*.py','*.mjs')),
+              ('tests',('*.py','*.mjs','*.json')),
+              ('frontend/src',('*.ts','*.tsx','*.css')),
+              ('frontend/tests',('*.mjs','*.cjs')),
+              ('frontend/dist_v36',('*.html','*.css','*.js')),
+          ]:
+              folder=root/sub
+              for pattern in patterns:
+                  if folder.is_dir():include.extend(p for p in folder.rglob(pattern) if p.is_file())
+          include.extend(root/'frontend'/p for p in ('package.json','package-lock.json','v36_dist_integrity.json','index.html','tsconfig.json','vite.config.ts') if (root/'frontend'/p).is_file())
+          include.extend(p for p in Path('docs').glob('V36*') if p.is_file())
+          include=sorted(set(include))
+          manifest={'schema':'v36_1_code_only_patch_manifest_v1',
+              'git_head':os.environ['GITHUB_SHA'],
+              'frozen_parent_full_zip_sha256':'d8d7100926ff71cc439a0df09c593b353bed83c428c439b8c7f8bc7790f19f1b',
+              'raw_market_data_included':False,'trading_enabled':False,'files':{}}
+          out=Path('/tmp/v36_1_auditable_code_patch.zip')
+          base='btc_eth_unified_terminal_v36_candidate/'
+          with ZipFile(out,'w',ZIP_DEFLATED,compresslevel=6) as z:
+              for p in include:
+                  target=(p.relative_to(root) if p.is_relative_to(root) else p)
+                  name=base+target.as_posix();data=p.read_bytes()
+                  manifest['files'][target.as_posix()]={'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}
+                  entry=ZipInfo(name,date_time=(2026,1,1,0,0,0));entry.compress_type=ZIP_DEFLATED
+                  z.writestr(entry,data)
+              body=(json.dumps(manifest,indent=2,sort_keys=True)+'\n').encode()
+              entry=ZipInfo(base+'V36_1_PATCH_MANIFEST.json',date_time=(2026,1,1,0,0,0))
+              entry.compress_type=ZIP_DEFLATED;z.writestr(entry,body)
+          print('CODE_ONLY_PATCH',json.dumps({'files':len(include),
+              'archive_sha256':hashlib.sha256(out.read_bytes()).hexdigest(),
+              'bytes':out.stat().st_size,'git_head':os.environ['GITHUB_SHA'],
+              'raw_market_data_included':False},sort_keys=True))
+          PY
+      - name: Preserve code-only release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: v36-1-auditable-code-only-patch
+          path: /tmp/v36_1_auditable_code_patch.zip
+          retention-days: 7
