@@ -97,6 +97,8 @@ class LiveMarketEngine:
         self.books={p:Book() for p in PRODUCTS}
         self.ofi={p:Decimal(0) for p in PRODUCTS}
         self.last_l2={p:None for p in PRODUCTS}
+        # Receiver-monotonic freshness is immune to wall-clock rollback.
+        self.last_l2_ingest_mono={p:None for p in PRODUCTS}
         self.last_pub={p:None for p in PRODUCTS}
         self.recent_trades={p:deque(maxlen=24) for p in PRODUCTS}
         self.candle_open={p:None for p in PRODUCTS}
@@ -134,6 +136,8 @@ class LiveMarketEngine:
         self.books={p:Book() for p in PRODUCTS}
         self.ofi={p:Decimal(0) for p in PRODUCTS}
         self.last_l2={p:None for p in PRODUCTS}
+        # Receiver-monotonic freshness is immune to wall-clock rollback.
+        self.last_l2_ingest_mono={p:None for p in PRODUCTS}
         self.last_pub={p:None for p in PRODUCTS}
         self.recent_trades={p:deque(maxlen=24) for p in PRODUCTS}
         self.candle_open={p:None for p in PRODUCTS}
@@ -148,9 +152,18 @@ class LiveMarketEngine:
             self._invalid('NO_COLLECTOR_MESSAGES_WITHIN_STALENESS_BUDGET','STALE');return
         if self.last_heartbeat_local_mono is not None and (now-self.last_heartbeat_local_mono)//1_000_000>STALE_MS:
             self._invalid('HEARTBEAT_STALE','STALE');return
+        # Both clocks are safety guards: wall time detects abrupt forward
+        # jumps (existing contract); receiver monotonic measures true silence
+        # even if the wall clock moves backwards. Clock anomalies fail closed.
         now_ms=self._clock()
-        if any(self.last_l2[p] is None or now_ms-self.last_l2[p][0]>STALE_MS for p in PRODUCTS):
-            self._invalid('PRODUCT_L2_STALE','STALE')
+        if any(self.last_l2_ingest_mono[p] is None
+               or self.last_l2[p] is None
+               or now<self.last_l2_ingest_mono[p]
+               or (now-self.last_l2_ingest_mono[p])//1_000_000>STALE_MS
+               or now_ms-self.last_l2[p][0]>STALE_MS
+               or self.last_l2[p][0]-now_ms>MAX_RECEIVER_FUTURE_MS
+               for p in PRODUCTS):
+            self._invalid('PRODUCT_L2_STALE_OR_CLOCK_ANOMALY','STALE')
 
     def _publish(self, product: str, receiver_ms: int, seq: int) -> None:
         if self.status != 'HEALTHY' or self.last_l2[product] is None:
@@ -327,6 +340,7 @@ class LiveMarketEngine:
                 if after is None:raise StateRejected('L2_INCOMPLETE_AFTER_EVENT')
                 if ev['type']=='update':self.ofi[p]+=ofi_delta(before,after)
                 self.last_l2[p]=(recv,seq,envelope['sha256'],mono)
+                self.last_l2_ingest_mono[p]=self._mono()
                 if self.status=='HEALTHY':self._publish(p,recv,seq)
         if (self.status=='WAITING_FOR_SNAPSHOT' and self.snapshots==set(PRODUCTS) and
             self.heartbeats>0 and self.acks==set(REQUIRED_ACKS)):
@@ -360,6 +374,23 @@ class LiveMarketEngine:
                     'state':self.rows[product][-1] if valid else None,
                     'trading_enabled':False,'execution_authorized':False,
                     'resync_required':not valid}
+
+    def stream_initial(self, product: str) -> dict:
+        """Atomically capture the initial quote and source-session identity.
+
+        Separate health/snapshot calls can straddle a source reconnect and
+        produce an inconsistent SSE source handshake and initial cursor.
+        """
+        if product not in PRODUCTS:raise StateRejected('UNKNOWN_PRODUCT')
+        with self._cv:
+            self._stale_if_necessary()
+            if self.status!='HEALTHY' or not self.rows[product]:
+                raise StateRejected('RESYNC_REQUIRED')
+            row=self.rows[product][-1]
+            if row['session_id']!=self.session_id or row['product']!=product:
+                raise StateRejected('RESYNC_REQUIRED')
+            return {'session_id':self.session_id,'product':product,
+                    'state':dict(row),'trading_enabled':False}
 
     def state_at_version(self, product: str, session: str, version: int) -> dict:
         """Bounded exact-state lookup for live browser and forensic parity.
