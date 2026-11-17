@@ -11,6 +11,7 @@ on:
       - 'btc_eth_terminal/tests/test_v36_large_frame_tap.py'
       - 'btc_eth_terminal/scripts/v36_verify_live_capture.py'
       - 'btc_eth_terminal/scripts/v36_verify_live_sse.py'
+      - 'btc_eth_terminal/scripts/v36_archive_browser_e2e.py'
       - 'btc_eth_terminal/tests/test_v36_observer_full_capture.py'
   workflow_dispatch:
 
@@ -202,6 +203,7 @@ jobs:
                             'product_versions':{x['product']:x['state_version']
                                                 for x in result['verified_products']},
                             'source_manifest_sha256':source_pin,
+                            'legacy_routes_status':result.get('legacy_routes_status'),
                             'chart_canvas_OHLCV_numeric_parity':'NOT_VERIFIED',
                             'market_data_mocked':False,'trading_enabled':False},sort_keys=True))
           PY
