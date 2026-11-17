@@ -1,10 +1,14 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import {FnChart} from '@funnest/charts-react';
+import type {Datafeed, Bar, BarsResult, SymbolInfo, Resolution} from '@funnest/charts';
 import {validateDepth10} from './marketStateIntegrity';
 
 type Product = 'BTC-USD'|'ETH-USD';
 type SourceHealth = {mode:string;live_feed:boolean;trading_enabled:boolean;source_admission:string;source_manifest_sha256:string;final_state_sha256:string;messages:number};
 type MarketRow = {product:string;mode:string;live_feed:boolean;trading_enabled:boolean;receiver_time_ms:number;source_last_l2_receiver_ms:number;source_age_ms:number;state_version:number;source_sequence:number;connection_id:number;status:string;freshness:string;source_manifest_sha256:string;best_bid?:string;best_ask?:string;spread?:string;microprice?:string;best_imbalance?:string;ofi_since_connection_base?:string;depth?:unknown;recent_trades?:Array<{price:string;size:string;side:string;received_at_ms:number}>};
 type Page={mode:string;product:string;live_feed:boolean;trading_enabled:boolean;source_manifest_sha256:string;rows:MarketRow[];has_more:boolean;next_after:number};
+type ArchiveBar={schema:string;product:string;mode:string;live_feed:boolean;trading_enabled:boolean;source_manifest_sha256:string;time:number;available_at:number;open:string;high:string;low:string;close:string;volume:string;observed_trade_count:number;source_definition:string};
+type CandlesPage={schema:string;product:string;mode:string;live_feed:boolean;trading_enabled:boolean;source_manifest_sha256:string;timeframe_ms:number;source_definition:string;rows:ArchiveBar[]};
 
 function verifiedRow(row:MarketRow,product:Product,pin:string):boolean {
  return !!row && row.product===product && row.mode==='ARCHIVE_REPLAY' && row.live_feed===false &&
@@ -15,6 +19,20 @@ function verifiedRow(row:MarketRow,product:Product,pin:string):boolean {
  row.source_last_l2_receiver_ms<=row.receiver_time_ms &&
  (row.status==='VALID_ARCHIVED_QUOTE'?validateDepth10(row.depth):row.status==='NO_ADMISSIBLE_QUOTE' && !row.depth);
 }
+function validArchiveBar(b:ArchiveBar,product:Product,pin:string):boolean {
+ if(!b||b.schema!=='v35_1_receiver_trade_bar_v1'||b.product!==product||
+    b.mode!=='ARCHIVE_REPLAY'||b.live_feed!==false||b.trading_enabled!==false||
+    b.source_manifest_sha256!==pin||!Number.isSafeInteger(b.time)||b.time<=0||
+    b.time%60000!==0||b.available_at!==b.time+60000||
+    b.source_definition!=='RECEIVER_TIME_COMPLETED_BUCKET_OBSERVED_TRADE_UPDATES_ONLY'||
+    !Number.isSafeInteger(b.observed_trade_count)||b.observed_trade_count<1)return false;
+ const nums=[b.open,b.high,b.low,b.close,b.volume].map(x=>
+   typeof x==='string'&&/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(x)?Number(x):NaN);
+ if(nums.some(x=>!Number.isFinite(x)||x<=0))return false;
+ const [o,h,l,c]=nums;
+ return h>=o&&h>=c&&l<=o&&l<=c&&l<=h;
+}
+
 async function checkedJSON<T>(url:string,signal?:AbortSignal):Promise<T> {
  const response=await fetch(url,{signal,cache:'no-store'});
  if(!response.ok)throw new Error('Archive service returned HTTP '+response.status);
@@ -25,6 +43,7 @@ const fmt=(n:number)=>new Date(n).toISOString().replace('T',' ').replace('.000Z'
 export default function ArchiveReplayPanel({product}:{product:Product}){
  const [health,setHealth]=useState<SourceHealth|null>(null);
  const [rows,setRows]=useState<MarketRow[]>([]);
+ const [candles,setCandles]=useState<ArchiveBar[]>([]);
  const [cursor,setCursor]=useState(0);
  const [hasMore,setHasMore]=useState(false);
  const [playing,setPlaying]=useState(false);
@@ -34,7 +53,7 @@ export default function ArchiveReplayPanel({product}:{product:Product}){
  const stream=useRef<EventSource|null>(null);
  useEffect(()=>{
    const ctrl=new AbortController();let mounted=true;
-   setRows([]);setCursor(0);setHasMore(false);setPlaying(false);setError(null);
+   setRows([]);setCandles([]);setCursor(0);setHasMore(false);setPlaying(false);setError(null);
    setHealth(null);setLoading(true);setStreamResult('NOT STARTED');
    stream.current?.close();stream.current=null;
    (async()=>{
@@ -43,7 +62,17 @@ export default function ArchiveReplayPanel({product}:{product:Product}){
         h.source_admission!=='VERIFIED_ARCHIVE_ENVELOPE'||!/^[0-9a-f]{64}$/.test(h.source_manifest_sha256)){
        throw new Error('Source admission contract invalid');
      }
-     const p=await checkedJSON<Page>('/api/v35/history?product='+product+'&limit=250',ctrl.signal);
+     const [p,c]=await Promise.all([
+       checkedJSON<Page>('/api/v35/history?product='+product+'&limit=250',ctrl.signal),
+       checkedJSON<CandlesPage>('/api/v35/candles?product='+product+'&limit=400',ctrl.signal)
+     ]);
+     if(c.schema!=='v35_1_archived_trade_candles_v1'||c.product!==product||
+        c.mode!=='ARCHIVE_REPLAY'||c.live_feed!==false||c.trading_enabled!==false||
+        c.source_manifest_sha256!==h.source_manifest_sha256||c.timeframe_ms!==60000||
+        c.source_definition!=='RECEIVER_TIME_COMPLETED_BUCKETS_OBSERVED_TRADE_UPDATES_ONLY'||
+        !Array.isArray(c.rows)||!c.rows.every(b=>validArchiveBar(b,product,h.source_manifest_sha256))||
+        c.rows.some((b,i)=>i>0&&b.time<=c.rows[i-1].time))
+       throw new Error('Archive trade candle source or availability violated');
      if(p.mode!=='ARCHIVE_REPLAY'||p.live_feed!==false||p.trading_enabled!==false||
         p.product!==product||p.source_manifest_sha256!==h.source_manifest_sha256||
         !Array.isArray(p.rows)||!p.rows.every(r=>verifiedRow(r,product,h.source_manifest_sha256))||
@@ -51,7 +80,7 @@ export default function ArchiveReplayPanel({product}:{product:Product}){
           (r.state_version<=p.rows[i-1].state_version||r.receiver_time_ms<p.rows[i-1].receiver_time_ms))){
        throw new Error('Market state or source mismatch');
      }
-     if(mounted){setHealth(h);setRows(p.rows);setHasMore(p.has_more);setCursor(0);}
+     if(mounted){setHealth(h);setCandles(c.rows);setRows(p.rows);setHasMore(p.has_more);setCursor(0);}
    })().catch(e=>{if(mounted&&e?.name!=='AbortError')setError(String(e));})
      .finally(()=>{if(mounted)setLoading(false);});
    return()=>{mounted=false;ctrl.abort();stream.current?.close();stream.current=null;};
@@ -64,6 +93,25 @@ export default function ArchiveReplayPanel({product}:{product:Product}){
    return()=>window.clearInterval(timer);
  },[playing,rows.length]);
  const row=rows[cursor]??null;
+ const asof=row?.receiver_time_ms??null;
+ const visibleCandles=useMemo(()=>candles.filter(b=>asof!==null&&b.available_at<=asof),[candles,asof]);
+ const archivedFeed=useMemo(():Datafeed|null=>{
+   if(!health||!visibleCandles.length)return null;
+   const symbol:SymbolInfo={symbol:product,name:product+' · archived observed trade updates',
+     exchange:'Coinbase Advanced public spot · receiver clock',session:'24x7',timezone:'UTC',
+     type:'crypto',tickSize:0.01,pricePrecision:2,supportedResolutions:['1']};
+   return {
+     async resolveSymbol(name:string){if(name!==product)throw new Error('Unknown admitted replay product');return symbol;},
+     async searchSymbols(q:string){return product.toLowerCase().includes(q.toLowerCase())?[symbol]:[];},
+     async getBars(info:SymbolInfo,resolution:Resolution,request):Promise<BarsResult>{
+       if(info.symbol!==product||resolution!=='1')throw new Error('Invalid archive candle resolution');
+       const bars:Bar[]=visibleCandles.filter(b=>b.time>=request.from&&b.time<request.to)
+        .map(b=>({time:b.time,open:Number(b.open),high:Number(b.high),low:Number(b.low),close:Number(b.close),volume:Number(b.volume)}));
+       return {bars,noMoreData:true};
+     },
+     subscribeBars(){return()=>{};}
+   };
+ },[health,visibleCandles,product]);
  async function loadMore(){
    if(!health||!hasMore||!rows.length)return;
    setPlaying(false);
@@ -124,6 +172,14 @@ export default function ArchiveReplayPanel({product}:{product:Product}){
      <button type="button" onClick={testSSE}>Check SSE stream</button>
      <span aria-live="polite" style={{fontSize:12}}>{streamResult}</span>
    </div>
+   <div aria-label="Admitted archive trade candle chart" style={{marginTop:12,marginBottom:10}}>
+    <p style={{fontSize:11,color:'#8aa9bf'}}>OBSERVED TRADE UPDATES · 1-MIN RECEIVER-TIME COMPLETED OHLCV · {visibleCandles.length} candles available at selected replay time</p>
+    {archivedFeed?<div style={{height:340,minHeight:340}}>
+      <FnChart key={product+'-'+String(asof)} datafeed={archivedFeed} symbol={product} resolution="1"
+        colorScheme="dark" locale="en" storageKey={null} drawingToolbar={false} onReady={()=>{}}
+        style={{height:'100%'}}/>
+     </div>:<p role="status">No completed, admitted trade-update candle at this receiver-time cutoff.</p>}
+   </div>
    {row?<div>
      <p style={{fontSize:12,color:'#a6c3d8'}}>Observation {cursor+1}/{rows.length} · {fmt(row.receiver_time_ms)} · seq {row.source_sequence} · conn {row.connection_id} · v{row.state_version} · {row.freshness}</p>
      {row.status==='VALID_ARCHIVED_QUOTE'&&row.depth&&validateDepth10(row.depth)?
@@ -143,7 +199,7 @@ export default function ArchiveReplayPanel({product}:{product:Product}){
        </div>:
        <p role="alert" style={{color:'#ffae83'}}>STALE OR UNAVAILABLE ARCHIVE QUOTE. Prices withheld.</p>}
     </div>:<p>No approved archive state available.</p>}
-    <p style={{fontSize:11,color:'#a4bac9'}}>Historical receiver clock only. Periodic quotes are sampled, not every L2 event. OFI is connection-cumulative and descriptive, not a return predictor. Existing Funnest chart above remains on its separately pinned historical cohort. NO CONFIRMED EXECUTABLE ALPHA. No order path.</p>
+    <p style={{fontSize:11,color:'#a4bac9'}}>Historical receiver clock only. Periodic quotes are sampled, not every L2 event. OFI is connection-cumulative and descriptive, not a return predictor. New Funnest archive chart uses this admitted source and completed receiver-time trade updates only. The original historical chart above remains on its separately pinned cohort. NO CONFIRMED EXECUTABLE ALPHA. No order path.</p>
   </>:null}
  </section>;
 }
