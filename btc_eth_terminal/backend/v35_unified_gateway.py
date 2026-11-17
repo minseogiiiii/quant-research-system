@@ -82,6 +82,7 @@ class UnifiedHandler(HistoricalHandler):
                 '/api/v35/health': set(),
                 '/api/v35/snapshot': {'product', 'version'},
                 '/api/v35/history': {'product', 'after', 'limit'},
+                '/api/v35/candles': {'product', 'limit'},
                 '/api/v35/stream': {'product', 'after', 'limit'},
             }
             if route not in permitted:
@@ -118,6 +119,9 @@ class UnifiedHandler(HistoricalHandler):
             if route == '/api/v35/snapshot':
                 at_version = numeric('version') if 'version' in args else None
                 self.send_obj(200, self.dataset.snapshot(product, at_version))
+                return
+            if route == '/api/v35/candles':
+                self.send_obj(200, self.dataset.candles_page(product, numeric('limit', 400)))
                 return
             after = numeric('after', 0)
             limit = numeric('limit', 50)
