@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from threading import BoundedSemaphore
 from urllib.parse import parse_qs, urlsplit
 
 from v35_unified_gateway import BoundedServer, UnifiedHandler
@@ -80,6 +81,9 @@ class LiveHandler(UnifiedHandler):
                     'source_session_id':health['session_id'],
                     'trading_enabled':False,'execution_authorized':False,
                     'max_clients':counters['max_clients'],
+                    'max_sse_clients':counters['max_sse_clients'],
+                    'active_sse_connections':counters['active_sse_connections'],
+                    'sse_rejected_slots':counters['sse_rejected_slots'],
                     'max_events_per_burst':MAX_EVENTS_PER_BURST,
                     'max_stream_seconds':MAX_STREAM_SECONDS,
                     'state_retention_per_product':MAX_RETAINED,
@@ -114,6 +118,20 @@ class LiveHandler(UnifiedHandler):
             return
 
     def _stream(self,source:LiveMarketEngine,product:str):
+        # Persistent SSE must not exhaust the monitoring connection slots.
+        if not self.server.sse_slots.acquire(blocking=False):
+            self.server.count('sse_rejected_slots')
+            self._reply(503,{'error':'LIVE_SSE_SUBSCRIPTION_LIMIT',
+                             'trading_enabled':False,'resync_required':True})
+            return
+        self.server.count('active_sse_connections')
+        try:
+            return self._stream_inner(source,product)
+        finally:
+            self.server.count('active_sse_connections',-1)
+            self.server.sse_slots.release()
+
+    def _stream_inner(self,source:LiveMarketEngine,product:str):
         # Atomic source/initial-book binding. Old separate health() and
         # snapshot() calls could cross a live collector session rotation.
         snap=source.stream_initial(product)
@@ -180,6 +198,26 @@ class LiveHandler(UnifiedHandler):
             self.server.count('sse_aborted')
 
 
+class LiveBoundedServer(BoundedServer):
+    """Eight persistent SSE subscriptions plus two short monitoring slots.
+
+    The historical v35 BoundedServer is unchanged at eight total slots.
+    """
+    max_clients=10
+    max_sse_clients=8
+
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.sse_slots=BoundedSemaphore(self.max_sse_clients)
+        self._stats.update({'active_sse_connections':0,
+                            'sse_rejected_slots':0})
+
+    def metrics(self):
+        m=super().metrics()
+        m['max_sse_clients']=self.max_sse_clients
+        return m
+
+
 def server_for_live(engine:LiveMarketEngine,host='127.0.0.1',port=0,
                     historical_dataset:ReplayDataset|None=None)->BoundedServer:
     if host not in ('127.0.0.1','::1'):
@@ -188,4 +226,4 @@ def server_for_live(engine:LiveMarketEngine,host='127.0.0.1',port=0,
         pass
     BoundHandler.live_engine=engine
     BoundHandler.dataset=historical_dataset
-    return BoundedServer((host,port),BoundHandler)
+    return LiveBoundedServer((host,port),BoundHandler)
