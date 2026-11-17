@@ -49,6 +49,21 @@ def read_tap(connection:socket.socket,engine:LiveMarketEngine,done:list):
                 idx=buffer.find(b'\n')
                 if idx<0:break
                 line=bytes(buffer[:idx+1]);del buffer[:idx+1]
+                if line.startswith(b'V36_TAP_CONTROL '):
+                    try:
+                        payload=json.loads(line[len(b'V36_TAP_CONTROL '):])
+                        if (len(line)>512 or payload.get('schema')!='v36_tap_transport_control_v1'
+                            or payload.get('status')!='SOURCE_GAP'
+                            or type(payload.get('connection_id')) is not int
+                            or payload['connection_id']!=engine.connection_id):
+                            raise ValueError('INVALID_TRANSPORT_CONTROL')
+                    except (ValueError,TypeError,AttributeError):
+                        engine.transport_lost('INVALID_OBSERVER_TRANSPORT_CONTROL')
+                        return
+                    engine.transport_lost('COLLECTOR_REPORTED_WEBSOCKET_SOURCE_GAP')
+                    # The next source must provide a fresh conn_id, sequence
+                    # zero, both snapshots, acks, heartbeat and valid L2.
+                    continue
                 try:engine.consume(line)
                 except StateRejected:
                     # The only safe continuity action is a new full source
