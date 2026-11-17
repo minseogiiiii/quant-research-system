@@ -25,12 +25,17 @@ const syntheticFixture=process.env.SOAK_TEST_FIXTURE==='1';
 // capture certification remain unchanged. A full/broken tap is permanently
 // dropped; never delay or compromise raw disk persistence for the terminal.
 const liveTapPath=process.env.V36_LIVE_TAP_SOCKET;
+// First authentic Coinbase BTC L2 snapshot can exceed 4 MiB. Node's default
+// highWaterMark is far too small, and write(false) is NOT a rejected write.
+// Bound pending observation bytes without blocking archival writes.
+const MAX_TAP_PENDING_BYTES=16*1024*1024;
 let liveTap=null, tapUsable=false;
 if(liveTapPath!==undefined){
  if(!path.isAbsolute(liveTapPath)||Buffer.byteLength(liveTapPath)>100||
     (syntheticFixture&&process.env.V36_TAP_FIXTURE_MODE!=='1'))
   throw Error('V36_LIVE_TAP_SOCKET_REQUIRES_ABSOLUTE_PATH_AND_REAL_SOURCE');
- liveTap=net.createConnection(liveTapPath);
+ liveTap=new net.Socket({writableHighWaterMark:MAX_TAP_PENDING_BYTES});
+ liveTap.connect(liveTapPath);
  liveTap.on('connect',()=>{tapUsable=true;});
  liveTap.on('error',()=>{tapUsable=false;liveTap?.destroy();});
  liveTap.on('close',()=>{tapUsable=false;});
@@ -38,13 +43,15 @@ if(liveTapPath!==undefined){
 function observeCommittedEnvelope(bytes){
  if(!tapUsable)return;
  // Bounded by one archive record. No unbounded Socket writable queue.
- if(liveTap.writableLength>1_000_000 || bytes.length>9_000_000){
+ if(bytes.length>9_000_000 ||
+    liveTap.writableLength+bytes.length>=MAX_TAP_PENDING_BYTES){
+  // A tap loss invalidates observer continuity, never the raw archive.
   tapUsable=false;liveTap.destroy();return;
  }
- if(!liveTap.write(bytes)){
-  // A blocked observer must not stall the collector or silently miss updates.
-  tapUsable=false;liveTap.destroy();
- }
+ // Node write(false) means the entire record WAS accepted into the socket
+ // buffer. Never discard it merely due to its size. The preflight bound
+ // above ensures only a finite amount of pending observation data exists.
+ liveTap.write(bytes);
 }
 
 if(process.env.SOAK_TEST_FIXTURE!==undefined && !['0','1'].includes(process.env.SOAK_TEST_FIXTURE))throw Error('Bad synthetic fixture flag');
@@ -125,7 +132,11 @@ function append(raw,seq,received,monotonic){
  meta.messages++;c.messages++;
  // Only a successful archive append may be offered to the separate observer.
  observeCommittedEnvelope(bytes);}
-function finish(reason){if(stopped)return;stopped=true;tapUsable=false;try{liveTap?.end();liveTap?.destroy();}catch{};clearInterval(timer);clearTimeout(backoff);
+function finish(reason){if(stopped)return;stopped=true;tapUsable=false;
+ // Gracefully flush accepted observation records at finite shutdown.
+ // Destroying immediately after end() truncates queued large snapshots.
+ try{if(liveTap&&!liveTap.destroyed){liveTap.setTimeout(3000,()=>liveTap.destroy());liveTap.end();}}catch{};
+ clearInterval(timer);clearTimeout(backoff);
  try{ws?.close();}catch{};try{if(c&&!c.ended_utc)c.ended_utc=utc();if(c&&c.state==='CONNECTED')c.state='DISCONNECTED';closeChunk();
  meta.finished_at_utc=utc();meta.finish_reason=reason;meta.total_reconnects=reconnects;
  telemetry.peak_rss_bytes=Math.max(telemetry.peak_rss_bytes,process.memoryUsage().rss);
