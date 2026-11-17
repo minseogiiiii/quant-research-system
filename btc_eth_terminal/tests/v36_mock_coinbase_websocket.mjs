@@ -13,7 +13,10 @@ const messages=[
  {channel:'l2_data',events:[{type:'update',product_id:'BTC-USD',updates:[{side:'bid',price_level:'100',new_quantity:'7'}]}]},
  {channel:'l2_data',events:[{type:'update',product_id:'ETH-USD',updates:[{side:'offer',price_level:'201',new_quantity:'3'}]}]},
  {channel:'heartbeats',events:[{heartbeat_counter:2}]},
-];
+]; 
+// Strictly synthetic 4.7 MiB first Coinbase-style L2 frame. The padding is
+// untrusted fixture content, never presented as exchange market observations.
+if(process.env.V36_TAP_LARGE_SNAPSHOT_TEST==='1') messages[0].synthetic_padding='x'.repeat(4_700_000);
 class MockCoinbaseWebSocket {
  constructor(endpoint){
   if(endpoint!=='wss://advanced-trade-ws.coinbase.com')throw Error('Unexpected endpoint');
