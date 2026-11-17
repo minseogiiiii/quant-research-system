@@ -438,7 +438,15 @@ class LiveMarketEngine:
                 raise StateRejected('RESYNC_REQUIRED')
             if after>self.version:raise StateRejected('RESYNC_REQUIRED')
             if not any(row['state_version']>after for row in self.rows[product]):
-                self._cv.wait(timeout)
+                # Trade and heartbeat updates wake this Condition even when
+                # the requested product has no new market state. Do not
+                # return early or spin an SSE heartbeat on every source event.
+                def relevant():
+                    return (self.status!='HEALTHY' or self.session_id!=session
+                            or any(row['state_version']>after for row in self.rows[product])
+                            or (after>0 and after<self.version and not any(
+                                row['state_version']==after for row in self.rows[product])))
+                self._cv.wait_for(relevant,timeout=timeout)
             self._stale_if_necessary()
             if self.status!='HEALTHY' or self.session_id!=session:
                 raise StateRejected('RESYNC_REQUIRED')
