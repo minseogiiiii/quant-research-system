@@ -36,6 +36,8 @@ jobs:
               assert forbidden not in src
           print('PASS public-only read-only collector: limited static surface check')
           PY
+      - name: Diagnose public Coinbase WebSocket handshake without subscribing
+        run: node btc_eth_terminal/scripts/v36_public_ws_probe.mjs
       - name: Attempt live public WebSocket with exact source admission, no raw artifact upload
         timeout-minutes: 3
         run: |
@@ -99,6 +101,32 @@ jobs:
               'manifest_sha256':x['captured_manifest_sha256'],
               'messages':h['messages'],'heartbeats':h['heartbeats'],
               'status':h['status'],'trading_enabled':False},sort_keys=True))
+          captured=x.get('captured_dir')
+          if captured:
+              from pathlib import Path
+              try:
+                  meta=json.loads((Path(captured)/'manifest.json').read_text())
+              except (OSError, ValueError):
+                  meta={}
+              faults=meta.get('faults', []) if isinstance(meta.get('faults', []), list) else []
+              def classify(event):
+                  reason=event.get('reason','') if isinstance(event,dict) else ''
+                  if reason.startswith('ERROR:Received network error or non-101 status code'): return 'WSS_NETWORK_OR_NON_101'
+                  if reason.startswith('CLOSE:'): return 'WSS_CLOSE'
+                  if reason.startswith('ERROR:'): return 'WSS_ERROR'
+                  if reason.startswith('CONNECT:'): return 'WSS_CONNECT'
+                  if reason.startswith('SOURCE:'): return 'SOURCE_VALIDATION'
+                  return 'OTHER'
+              print('SANITIZED_CAPTURE_FAILURE',json.dumps({
+                  'capture_status':meta.get('status'),
+                  'finish_reason':meta.get('finish_reason'),
+                  'capture_messages':meta.get('messages'),
+                  'connections':len(meta.get('connections', [])),
+                  'fault_classes':[classify(f) for f in faults][:8],
+                  'fault_count':len(faults),
+                  'observer_capture_ready':x.get('capture_ready_for_research'),
+                  'trading_enabled':False,
+              },sort_keys=True))
           PY
           fi
           echo "CAPTURE_EXIT:$COLLECTOR_RC ADMISSION_EXIT:$EVIDENCE_RC"
