@@ -63,46 +63,55 @@ def audit_browser(origin:str,browser_executable:str,seconds:int,min_versions:int
                 for product in PRODUCTS:
                     if time.monotonic()>=until:break
                     page.get_by_role('button',name=product).click()
-                    quote=page.get_by_role('status')
-                    try:quote.wait_for(timeout=4500)
-                    except Exception:continue
-                    line=quote.inner_text()
-                    match=VERSION.search(line)
+                    # One browser JS event-loop turn captures the same React
+                    # committed DOM. Sequential Playwright selectors can cross
+                    # a 1-second book update and create a false depth mismatch.
+                    dom=page.evaluate("""() => {
+                      const root=document.querySelector('main.v36-live-terminal');
+                      const top=root?.querySelector('[aria-label="Validated top of book"]');
+                      const depth=root?.querySelector('[aria-label="Live order book 10 levels"]');
+                      const cards={};
+                      for(const c of (top?.querySelectorAll('div')||[])){
+                        const label=c.querySelector(':scope > small')?.textContent?.trim()||'';
+                        const value=c.querySelector(':scope > strong')?.textContent?.trim();
+                        if(label&&value!==undefined)cards[label]=value;
+                      }
+                      return {
+                        status:root?.querySelector('[role="status"]')?.textContent||'',
+                        sourceHealth:root?.querySelector('[aria-label="Source health"]')?.textContent||'',
+                        selected:root?.querySelector('button[aria-pressed="true"]')?.textContent||'',
+                        liveLabel:root?.querySelector('header + p > strong')?.textContent||'',
+                        cards,
+                        depth:Array.from(depth?.querySelectorAll('tbody tr')||[],
+                          tr=>Array.from(tr.querySelectorAll('td'),td=>td.textContent?.trim()||'')),
+                        datafeedProduct:root?.querySelector('[data-testid="funnest-actual-getbars"]')?.getAttribute('data-product'),
+                        datafeedSession:root?.querySelector('[data-testid="funnest-actual-getbars"]')?.getAttribute('data-session'),
+                        datafeedBars:root?.querySelector('[data-testid="funnest-actual-getbars"]')?.getAttribute('data-bars')
+                      };
+                    }""")
+                    if dom['selected'].strip()!=product:continue
+                    if 'OBSERVED LIVE SOURCE' not in dom['liveLabel']:continue
+                    if session not in dom['sourceHealth']:continue
+                    match=VERSION.search(dom['status'])
                     if not match:continue
                     v=int(match.group(1))
                     params=urlencode({'product':product,'session':session,'version':v})
                     try:back=read(origin,'/api/v36/state?'+params)['state']
                     except HTTPError as exc:
-                        if exc.code==409:continue  # retention expired or source became stale
+                        if exc.code==409:continue  # old version evicted or source no longer healthy
                         raise
-                    if back['session_id']!=session or back['product']!=product:fail('BAD_BACKEND_PRODUCT_SESSION')
-                    panel=page.get_by_role('region',name='Validated top of book')
-                    observed={}
+                    if back['session_id']!=session or back['product']!=product:
+                        fail('BAD_BACKEND_PRODUCT_SESSION')
                     for metric in METRICS:
-                        label=metric.upper().replace('_',' ')
-                        node=panel.locator('div').filter(has_text=label).first.locator('strong')
-                        observed[metric]=node.inner_text().strip()
-                    # If state moved while reading, retry instead of comparing
-                    # a legitimate older display with a newer backend state.
-                    if VERSION.search(quote.inner_text() or '') is None or \
-                       int(VERSION.search(quote.inner_text()).group(1))!=v:continue
-                    for metric in METRICS:
-                        if Decimal(observed[metric])!=Decimal(str(back[metric])):
+                        observed=dom['cards'].get(metric.upper().replace('_',' '))
+                        if observed is None or Decimal(observed)!=Decimal(str(back[metric])):
                             fail('EXACT_VERSION_DOM_'+metric+'_MISMATCH_'+product)
-                    depth=page.get_by_role('region',name='Live order book 10 levels')
-                    cols=depth.locator('tbody tr').all_inner_texts()
-                    if len(cols)!=10:fail('DOM_DEPTH_LENGTH_NOT_TEN_'+product)
-                    expected=[]
-                    for k in range(10):
-                        expected.append([back['depth']['bids'][k]['price'],
-                                         back['depth']['bids'][k]['quantity'],
-                                         back['depth']['asks'][k]['price'],
-                                         back['depth']['asks'][k]['quantity']])
-                    actual=[depth.locator('tbody tr').nth(k).locator('td').all_inner_texts()
-                            for k in range(10)]
-                    if actual!=expected:fail('EXACT_VERSION_DEPTH_MISMATCH_'+product)
-                    if VERSION.search(quote.inner_text() or '') is None or \
-                       int(VERSION.search(quote.inner_text()).group(1))!=v:continue
+                    expected=[[back['depth']['bids'][k]['price'],
+                               back['depth']['bids'][k]['quantity'],
+                               back['depth']['asks'][k]['price'],
+                               back['depth']['asks'][k]['quantity']] for k in range(10)]
+                    if len(dom['depth'])!=10 or dom['depth']!=expected:
+                        fail('EXACT_VERSION_ATOMIC_DEPTH_MISMATCH_'+product)
                     versions=results['products'][product]['versions']
                     if v not in versions:versions.append(v)
                     candles=read(origin,'/api/v36/candles?product='+product)
@@ -110,11 +119,10 @@ def audit_browser(origin:str,browser_executable:str,seconds:int,min_versions:int
                     eligible={b['time']:b for b in candles['rows']}
                     results['products'][product]['backend_completed_candles']=max(
                         results['products'][product]['backend_completed_candles'],len(eligible))
-                    marker=page.get_by_test_id('funnest-actual-getbars')
-                    if marker.count():
-                        if marker.get_attribute('data-product')!=product or \
-                           marker.get_attribute('data-session')!=session:continue
-                        bars=json.loads(marker.get_attribute('data-bars') or '[]')
+                    if dom.get('datafeedBars') is not None:
+                        if dom.get('datafeedProduct')!=product or dom.get('datafeedSession')!=session:
+                            continue
+                        bars=json.loads(dom.get('datafeedBars') or '[]')
                         for b in bars:
                             ref=eligible.get(b['time'])
                             if ref is None:fail('FUNNEST_GETBARS_UNBACKED_TIME_'+product)
