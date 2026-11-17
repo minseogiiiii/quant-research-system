@@ -13,6 +13,10 @@ on:
       - 'btc_eth_terminal/tests/test_v36_1_version_pinned_state.py'
       - 'btc_eth_terminal/tests/test_v36_2_operational_race.py'
       - 'btc_eth_terminal/tests/test_v36_2_live_metrics.py'
+      - 'btc_eth_terminal/tests/test_v36_2_transport_gap.py'
+      - 'btc_eth_terminal/tests/test_v36_2_storage_faults.py'
+      - 'btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs'
+      - 'btc_eth_terminal/scripts/v36_observe_existing_collector.py'
       - 'btc_eth_terminal/scripts/v36_1_verify_independent_ohlcv.py'
       - 'btc_eth_terminal/scripts/v36_verify_live_capture.py'
       - 'btc_eth_terminal/tests/test_v36_collector_tap.py'
@@ -104,6 +108,14 @@ jobs:
         env:
           PYTHONPATH: btc_eth_terminal/backend
         run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_1_version_pinned_state.py' -v
+      - name: Verify synthetic full Node collector disconnect, new snapshots, source-bound SSE 409
+        env:
+          PYTHONPATH: btc_eth_terminal/backend
+        run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_transport_gap.py' -v
+      - name: Verify collector storage budgets and SIGKILL incomplete-source quarantine
+        env:
+          PYTHONPATH: btc_eth_terminal/backend
+        run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_storage_faults.py' -v
       - name: Verify mode-correct, bounded, read-only v36 operational metrics
         env:
           PYTHONPATH: btc_eth_terminal/backend
