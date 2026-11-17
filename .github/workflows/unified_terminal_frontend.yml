@@ -41,8 +41,8 @@ jobs:
       - name: Retain unpromoted candidate build for independent audit
         uses: actions/upload-artifact@v4
         with:
-          name: v35-1-unpinned-candidate-dist
-          path: btc_eth_terminal/frontend/dist_v36/
+          name: v36-unpinned-build-before-sha-gate
+          path: btc_eth_terminal/frontend/dist/
           retention-days: 7
       - name: Verify v36 source-pinned browser assets, preserve legacy dist
         run: python ../scripts/v36_build_frontend.py --verify-existing
@@ -56,5 +56,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: btc-eth-v36-source-pinned-funnest-dist
-          path: btc_eth_terminal/frontend/dist/
+          path: btc_eth_terminal/frontend/dist_v36/
           retention-days: 7
