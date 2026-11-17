@@ -112,3 +112,9 @@ main.terminal-root .legacy-workspace-toggle{margin:18px 0 0;padding:14px 18px;bo
 .pro-recovery-events span{color:#9bb2c7;font-family:ui-monospace,SFMono-Regular,monospace}
 .pro-recovery-events strong{text-align:center}
 .pro-recovery-events small{text-align:right;color:#7895ad;font-size:9px}
+
+/* v36 isolated read-only market-state workspace; old research styles remain unchanged. */
+.v36-live-terminal button { cursor: pointer; border: 1px solid #476780; }
+.v36-live-terminal button:focus-visible { outline: 3px solid #8fcbee; outline-offset: 3px; }
+.v36-live-terminal a { color: #75cbf1; }
+.v36-live-terminal table td { padding: 3px 5px; border-bottom: 1px solid #244258; }
