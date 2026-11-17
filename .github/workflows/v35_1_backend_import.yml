@@ -17,6 +17,8 @@ on:
       - 'btc_eth_terminal/tests/test_v36_2_storage_faults.py'
       - 'btc_eth_terminal/tests/test_v36_2_durable_policy.py'
       - 'btc_eth_terminal/tests/test_v36_2_sse_backpressure.py'
+      - 'btc_eth_terminal/scripts/v36_3_durable_archive_gate.py'
+      - 'btc_eth_terminal/tests/test_v36_3_durable_archive_gate.py'
       - 'btc_eth_terminal/scripts/v36_2_durable_launch.sh'
       - 'btc_eth_terminal/deployment/v36_2_btceth_live.service'
       - 'btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs'
@@ -120,6 +122,12 @@ jobs:
         env:
           PYTHONPATH: btc_eth_terminal/backend
         run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_sse_backpressure.py' -v
+      - name: Verify 520-chunk durable archive, intentional tampering, SIGKILL and fail-closed restart
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          python -m py_compile btc_eth_terminal/scripts/v36_3_durable_archive_gate.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_durable_archive_gate.py' -v
       - name: Verify strict durable source budgets and shell startup policy
         env:
           PYTHONPATH: btc_eth_terminal/backend
