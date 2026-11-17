@@ -15,7 +15,7 @@ Environment=V36_CAPTURE_ROOT=/var/lib/btceth-live/captures
 StateDirectory=btceth-live
 StateDirectoryMode=0700
 ExecStartPre=/usr/bin/mkdir -p /var/lib/btceth-live/captures
-ExecStart=/opt/btc-eth-terminal/scripts/v36_2_durable_launch.sh
+ExecStart=/bin/sh /opt/btc-eth-terminal/scripts/v36_2_durable_launch.sh
 Restart=always
 RestartSec=30s
 TimeoutStartSec=90
