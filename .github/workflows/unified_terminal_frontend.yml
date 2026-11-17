@@ -28,6 +28,13 @@ jobs:
         run: node --experimental-strip-types --test tests/marketStateIntegrity.test.mjs
       - name: Install pinned chart and React dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Preserve exact pinned dependencies for offline candidate verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: v36-frontend-pinned-node-modules
+          path: btc_eth_terminal/frontend/node_modules/
+          retention-days: 1
+          include-hidden-files: true
       - name: Validate actual TypeScript and Vite production build
         run: npm run build
       - name: Retain unpromoted candidate build for independent audit
