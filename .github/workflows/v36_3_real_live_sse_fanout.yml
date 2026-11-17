@@ -1,0 +1,82 @@
+name: v36.3 actual Coinbase LIVE SSE eight-client and archive integrity
+
+on:
+  push:
+    branches:
+      - integration/btc-eth-unified-terminal
+    paths:
+      - '.github/workflows/v36_3_real_live_sse_fanout.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-public-multiclient:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm source and probe compile without secrets or private data
+        run: |
+          node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
+          python -m py_compile btc_eth_terminal/scripts/v36_3_real_live_fanout.py
+          python -m py_compile btc_eth_terminal/scripts/v36_3_durable_archive_gate.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_heartbeat_coalescing.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_live_health_reservation.py' -v
+      - name: Observe 170s actual public Coinbase and 100s eight simultaneous persistent SSE streams
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          set +e
+          PRIVATE="$RUNNER_TEMP/v36_3_live_fanout_$GITHUB_RUN_ID"
+          python -u btc_eth_terminal/scripts/v36_observe_existing_collector.py \
+            --execute-public-capture --duration 170 --port 8766 \
+            --workdir "$PRIVATE" \
+            --raw-budget-bytes 1000000000 \
+            --archive-budget-bytes 2000000000 \
+            --disk-reserve-bytes 4294967296 \
+            > "$RUNNER_TEMP/v36_3_observer_summary.jsonl" \
+            2> "$RUNNER_TEMP/v36_3_observer_stderr.log" &
+          OBSERVER_PID=$!
+          python -u btc_eth_terminal/scripts/v36_3_real_live_fanout.py \
+            --seconds 100 --port 8766 --observer-pid "$OBSERVER_PID"
+          FANOUT_RC=$?
+          wait "$OBSERVER_PID"
+          CAPTURE_RC=$?
+          INDEPENDENT_RC=2
+          DURABLE_RC=2
+          if [ -f "$PRIVATE/V36_OBSERVER_EVIDENCE.json" ]; then
+            python -u btc_eth_terminal/scripts/v36_verify_live_capture.py \
+              --evidence "$PRIVATE/V36_OBSERVER_EVIDENCE.json"
+            INDEPENDENT_RC=$?
+            python - "$PRIVATE/V36_OBSERVER_EVIDENCE.json" <<'PY'
+          import json,subprocess,sys
+          from pathlib import Path
+          e=json.loads(Path(sys.argv[1]).read_bytes())
+          if e.get('observer_source_complete') is not True:
+              raise SystemExit('BLOCKED_INCOMPLETE_OBSERVER')
+          cmd=[sys.executable,'btc_eth_terminal/scripts/v36_3_durable_archive_gate.py',
+               '--capture',e['captured_dir'],
+               '--manifest-sha256',e['captured_manifest_sha256']]
+          raise SystemExit(subprocess.call(cmd))
+          PY
+            DURABLE_RC=$?
+          fi
+          echo "REAL_LIVE_EIGHT_SSE_RC:$FANOUT_RC COLLECTOR_RC:$CAPTURE_RC INDEPENDENT_REPLAY_RC:$INDEPENDENT_RC DURABLE_ARCHIVE_RC:$DURABLE_RC"
+          if [ "$FANOUT_RC" -ne 0 ] || [ "$CAPTURE_RC" -ne 0 ] || \
+             [ "$INDEPENDENT_RC" -ne 0 ] || [ "$DURABLE_RC" -ne 0 ]; then
+            echo FAIL_REAL_PUBLIC_LIVE_SSE_FANOUT_OR_ARCHIVE_GATE
+            exit 2
+          fi
+          # The raw WebSocket archive and manifest remain only in private
+          # ephemeral runner storage and are never uploaded.
+          echo PASS_REAL_PUBLIC_LIVE_EIGHT_CLIENTS_AND_INDEPENDENT_ARCHIVE
