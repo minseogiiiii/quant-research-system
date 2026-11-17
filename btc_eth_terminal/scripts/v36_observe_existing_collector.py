@@ -126,6 +126,22 @@ def observer_source_complete(manifest: object, health: object, reader_finished: 
     )
 
 
+DURABLE_MIN_RAW_BYTES=40_000_000_000
+DURABLE_MIN_ARCHIVE_BYTES=55_000_000_000
+DURABLE_MIN_DISK_RESERVE_BYTES=10*1024**3
+
+def durable_policy_valid(duration: int, raw: int, archive: int, reserve: int) -> bool:
+    """Hard budget contract for opt-in persistent Linux source capture.
+
+    Passing this function does NOT certify host capacity, source continuity
+    or 24-hour operational success.
+    """
+    return (type(duration) is int and 3600<=duration<=86400
+            and type(raw) is int and raw>=DURABLE_MIN_RAW_BYTES
+            and type(archive) is int and archive>=max(DURABLE_MIN_ARCHIVE_BYTES,raw)
+            and type(reserve) is int and reserve>=DURABLE_MIN_DISK_RESERVE_BYTES)
+
+
 def main(argv=None)->int:
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--workdir',required=True,type=Path)
@@ -133,11 +149,17 @@ def main(argv=None)->int:
     ap.add_argument('--duration',type=int,default=120)
     ap.add_argument('--port',type=int,default=8766)
     ap.add_argument('--fault-test-only',action='store_true',help='Never promote deliberately faulted source')
+    ap.add_argument('--durable-operator-mode',action='store_true',help='Strict 40GB/55GB/10GiB Linux limits')
     ap.add_argument('--inject-disconnect-after-messages',type=int,default=0)
     ap.add_argument('--raw-budget-bytes',type=int,default=15_000_000_000)
     ap.add_argument('--archive-budget-bytes',type=int,default=20_000_000_000)
     ap.add_argument('--disk-reserve-bytes',type=int,default=4*1024**3)
     args=ap.parse_args(argv)
+    if args.durable_operator_mode and (args.fault_test_only or args.inject_disconnect_after_messages):
+        ap.error('Durable source recording cannot use fault injection')
+    if args.durable_operator_mode and not durable_policy_valid(
+            args.duration,args.raw_budget_bytes,args.archive_budget_bytes,args.disk_reserve_bytes):
+        ap.error('Durable mode requires 1..24h, >=40GB raw, >=55GB archive, >=10GiB reserve')
     if args.inject_disconnect_after_messages and (not args.fault_test_only or
          not 100<=args.inject_disconnect_after_messages<=10000):
         ap.error('Fault injection requires --fault-test-only and 100..10000 messages')
@@ -147,8 +169,8 @@ def main(argv=None)->int:
     if not sys.platform.startswith('linux') or not hasattr(socket,'SO_PEERCRED'):
         print('BLOCKED: Linux SO_PEERCRED unavailable',file=sys.stderr)
         return 2
-    if not 15<=args.duration<=3600 or not 1024<=args.port<=65535:
-        ap.error('duration 15..3600, port 1024..65535')
+    if not 15<=args.duration<=(86400 if args.durable_operator_mode else 3600) or not 1024<=args.port<=65535:
+        ap.error('duration out of mode range or invalid port')
     if (args.raw_budget_bytes<1024 or args.archive_budget_bytes<args.raw_budget_bytes or
         args.disk_reserve_bytes<4*1024**3):
         ap.error('Storage budgets must preserve raw<=archive and >=4GiB disk reserve')
@@ -234,6 +256,7 @@ def main(argv=None)->int:
                   'captured_manifest_sha256':source_hash,
                   'capture_ready_for_research':capture_ready,
                   'fault_test_only':args.fault_test_only,
+                  'durable_operator_mode':args.durable_operator_mode,
                   'injected_disconnect_after_messages':args.inject_disconnect_after_messages,
                   'observer_reader_finished':observer_finished,
                   'observer_source_complete':observer_complete,
