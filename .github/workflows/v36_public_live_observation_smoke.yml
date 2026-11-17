@@ -12,6 +12,9 @@ on:
       - 'btc_eth_terminal/scripts/v36_verify_live_capture.py'
       - 'btc_eth_terminal/scripts/v36_verify_live_sse.py'
       - 'btc_eth_terminal/scripts/v36_archive_browser_e2e.py'
+      - 'btc_eth_terminal/frontend/src/LiveTerminal.tsx'
+      - 'btc_eth_terminal/frontend/v36_dist_integrity.json'
+      - 'btc_eth_terminal/backend/v36_frontend_integrity.py'
       - 'btc_eth_terminal/tests/test_v36_observer_full_capture.py'
   workflow_dispatch:
 
