@@ -1,0 +1,32 @@
+name: v35 Archive Ingress Integrity
+
+on:
+  push:
+    branches:
+      - integration/btc-eth-unified-terminal
+    paths:
+      - 'btc_eth_terminal/backend/v35_archive_ingress.py'
+      - 'btc_eth_terminal/tests/test_v35_archive_ingress.py'
+      - '.github/workflows/v35_archive_ingress.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ingress-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax-check unchanged Python module and tests
+        run: python -m compileall -q btc_eth_terminal/backend/v35_archive_ingress.py btc_eth_terminal/tests/test_v35_archive_ingress.py
+      - name: Run synthetic ingress corruption/fail-closed regressions
+        run: python -m unittest discover -s btc_eth_terminal/tests -p test_v35_archive_ingress.py -v
+      - name: Confirm no original market archives were shipped to CI
+        run: |
+          test ! -d btc_eth_terminal/backend/data
+          echo "Real Coinbase source tests SKIP here: no pinned raw archive shipped to GitHub."
