@@ -11,7 +11,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from v35_unified_gateway import BoundedServer, UnifiedHandler
 from v35_replay_service import StateRejected, ReplayDataset
-from v36_live_engine import LiveMarketEngine, PRODUCTS
+from v36_live_engine import LiveMarketEngine, PRODUCTS, MAX_RETAINED
 
 LIVE_CURSOR = re.compile(r'v36:([0-9a-f]{32}):(BTC-USD|ETH-USD):([1-9][0-9]{0,12})\Z')
 MAX_STREAM_SECONDS = 300
@@ -53,6 +53,7 @@ class LiveHandler(UnifiedHandler):
             return
         permitted={
             '/api/v36/health':set(),
+            '/api/v36/metrics':set(),
             '/api/v36/snapshot':{'product'},
             '/api/v36/state':{'product','session','version'},
             '/api/v36/candles':{'product'},
@@ -66,6 +67,28 @@ class LiveHandler(UnifiedHandler):
                 raise StateRejected('INVALID_QUERY')
             if parsed.path=='/api/v36/health':
                 self._reply(200,source.health());return
+            if parsed.path=='/api/v36/metrics':
+                health=source.health()
+                counters=self.server.metrics()
+                # The v35 metrics contract remains archived-only.
+                # This separate route carries actual live source semantics.
+                self._reply(200,{
+                    'schema':'v36_live_transport_metrics_v1',
+                    'mode':health['mode'], 'live_feed':health['live_feed'],
+                    'source_status':health['status'],
+                    'source_healthy':health['status']=='HEALTHY',
+                    'source_session_id':health['session_id'],
+                    'trading_enabled':False,'execution_authorized':False,
+                    'max_clients':counters['max_clients'],
+                    'max_events_per_burst':MAX_EVENTS_PER_BURST,
+                    'max_stream_seconds':MAX_STREAM_SECONDS,
+                    'state_retention_per_product':MAX_RETAINED,
+                    **{k:counters[k] for k in (
+                        'accepted_requests','rejected_client_slots',
+                        'active_connections','peak_connections',
+                        'sse_started','sse_completed','sse_aborted',
+                        'resync_required')},
+                });return
             product=args.get('product',[None])[0]
             if product not in PRODUCTS:raise StateRejected('UNKNOWN_PRODUCT')
             if parsed.path=='/api/v36/snapshot':
