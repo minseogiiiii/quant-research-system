@@ -1,7 +1,9 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import type {CSSProperties} from 'react';
 import {FnChart} from '@funnest/charts-react';
-import type {Datafeed, Bar, BarsResult, Resolution, SymbolInfo} from '@funnest/charts';
+import type {Bar} from '@funnest/charts';
+import {createCompletedCandleFeed, validateCompletedCandles} from './v36_1_completed_candle_feed';
+import type {CompletedCandle} from './v36_1_completed_candle_feed';
 import {validateDepth10} from './marketStateIntegrity';
 
 type Product='BTC-USD'|'ETH-USD';
@@ -14,7 +16,7 @@ type Row={schema:string;mode:string;live_feed:boolean;trading_enabled:boolean;se
   source_last_l2_receiver_ms:number;connection_id:number;best_bid:string;best_ask:string;spread:string;
   microprice:string;best_imbalance:string;ofi_since_connection_base:string;depth:unknown;
   recent_trades:Array<{price:string;size:string;maker_side:string;received_at_ms:number;trade_id?:string}>};
-type Candle={time:number;available_at:number;open:string;high:string;low:string;close:string;volume:string;observed_trade_count:number};
+type Candle=CompletedCandle;
 const mono=/^(?:0|[1-9]\d*)(?:\.\d+)?$/;
 const healthy=(h:Health|null)=>h?.status==='HEALTHY' && h.trading_enabled===false &&
   (h.mode==='LIVE_SOURCE' ? h.live_feed===true : h.mode==='ARCHIVE_SIMULATION' && h.live_feed===false);
@@ -50,19 +52,42 @@ export default function LiveTerminal(){
  const [error,setError]=useState<string|null>(null);
  const subscription=useRef<EventSource|null>(null);
  const last=useRef(0);
+ const lastFingerprint=useRef<string|null>(null);
+ const lastSourceSequence=useRef(-1);
+ const [servedBars,setServedBars]=useState<Bar[]>([]);
+ const candleFeed=useMemo(()=>createCompletedCandleFeed(product,bars=>setServedBars(bars.map(b=>({...b})))),[product,health?.session_id]);
+ useEffect(()=>{setServedBars([]);return ()=>candleFeed.dispose();},[candleFeed]);
  useEffect(()=>{
-  let active=true;const abort=new AbortController();let pollId:number|null=null;
+  if(!state||!healthy(health)||state.product!==product||
+     state.session_id!==health?.session_id||!candles.length)return;
+  try{candleFeed.publish(candles,health.last_receiver_time_ms??state.receiver_time_ms);}
+  catch(e){setState(null);setCandles([]);setConnection('RESYNC_REQUIRED');setError('FUNNEST_CANDLE_INTEGRITY:'+String(e));
+   subscription.current?.close();subscription.current=null;}
+ },[candleFeed,candles,product,state?.state_version,health?.status,health?.last_receiver_time_ms]);
+ useEffect(()=>{
+  let active=true;let busy=false;let admittedSession:string|null=null;
+  const abort=new AbortController();let pollId:number|null=null;
   subscription.current?.close();subscription.current=null;last.current=0;
+  lastFingerprint.current=null;lastSourceSequence.current=-1;
   setHealth(null);setState(null);setCandles([]);setError(null);setConnection('CONNECTING');
   const block=(reason:string)=>{
    if(!active)return;
-   setState(null);setConnection('RESYNC_REQUIRED');setError(reason);
+   setState(null);setCandles([]);setConnection('RESYNC_REQUIRED');setError(reason);
    subscription.current?.close();subscription.current=null;
   };
   const refresh=async()=>{
+   if(!active||busy)return;
+   busy=true;
    try{
     const h=await api<Health>('/api/v36/health',abort.signal);
     if(!active)return;
+    if(healthy(h)&&admittedSession!==null&&admittedSession!==h.session_id){
+     // A new authenticated source session is not a continuation.
+     subscription.current?.close();subscription.current=null;
+     setState(null);setCandles([]);setConnection('RESYNC_REQUIRED');
+     last.current=0;lastFingerprint.current=null;lastSourceSequence.current=-1;
+    }
+    if(healthy(h))admittedSession=h.session_id;
     setHealth(h);
     if(!healthy(h)){
      subscription.current?.close();subscription.current=null;
@@ -74,27 +99,40 @@ export default function LiveTerminal(){
      if(!active)return;
      if(!snapshot.state||!validRow(snapshot.state,product,h))throw new Error('UNTRUSTED_LIVE_SNAPSHOT');
      const current=snapshot.state;
-     last.current=current.state_version;setState(current);
+     if(current.state_version>=last.current){
+      last.current=current.state_version;
+      lastFingerprint.current=JSON.stringify(current);
+      lastSourceSequence.current=current.source_sequence;
+      setState(current);
+     }
      const stream=new EventSource('/api/v36/stream?product='+product);
      subscription.current=stream;setConnection('SSE_CONNECTED');setError(null);
      const next=(event:MessageEvent)=>{
+      if(!active||subscription.current!==stream)return;
       try{
        const r=JSON.parse(event.data) as Row;
        if(!validRow(r,product,h))throw new Error('SSE_SOURCE_OR_DEPTH_INVALID');
        if(r.state_version<last.current)throw new Error('SSE_STATE_VERSION_REGRESSION');
-       if(r.state_version===last.current)return; // benign first snapshot duplicate
-       last.current=r.state_version;setState(r);
+       const fingerprint=JSON.stringify(r);
+       if(r.state_version===last.current){
+        if(lastFingerprint.current!==fingerprint)throw new Error('SSE_DUPLICATE_VERSION_CONFLICT');
+        return;
+       }
+       if(r.source_sequence<lastSourceSequence.current)throw new Error('SOURCE_SEQUENCE_REGRESSION');
+       last.current=r.state_version;lastFingerprint.current=fingerprint;
+       lastSourceSequence.current=r.source_sequence;setState(r);
       }catch(e){block(String(e));}
      };
      stream.addEventListener('snapshot',next);
      stream.addEventListener('state',next);
      stream.addEventListener('resync_required',(event:MessageEvent)=>block('SOURCE_GAP:'+event.data));
-     stream.addEventListener('stream_rotation',()=>{stream.close();if(subscription.current===stream)subscription.current=null;});
-     stream.onerror=()=>block('SOURCE_SSE_DISCONNECTED_OR_INVALID');
+     stream.addEventListener('stream_rotation',()=>{if(!active||subscription.current!==stream)return;
+      stream.close();subscription.current=null;setConnection('ROTATING_STREAM');});
+     stream.onerror=()=>{if(active&&subscription.current===stream)block('SOURCE_SSE_DISCONNECTED_OR_INVALID');};
     }
     const c=await api<{mode:string;session_id:string;rows:Candle[];incomplete_candle_never_published:boolean}>(
       '/api/v36/candles?product='+product,abort.signal);
-    if(!active)return;
+    if(!active||admittedSession!==h.session_id)return;
     if(c.mode!==h.mode||c.session_id!==h.session_id||c.incomplete_candle_never_published!==true||
        !Array.isArray(c.rows)||!c.rows.every(b=>Number.isSafeInteger(b.time)&&b.time>0&&
        b.time%60000===0&&Number.isSafeInteger(b.available_at)&&b.available_at>=b.time+60000&&
@@ -102,30 +140,16 @@ export default function LiveTerminal(){
        Number.isSafeInteger(b.observed_trade_count)&&b.observed_trade_count>0)){
       throw new Error('LIVE_CANDLE_PROVENANCE_INVALID');
     }
+    if(!validateCompletedCandles(c.rows,h.last_receiver_time_ms??0))
+      throw new Error('INCOMPLETE_OR_UNAVAILABLE_CANDLE');
     setCandles(c.rows);
    }catch(e){if(active&&(e as Error).name!=='AbortError')block(String(e));}
+   finally{busy=false;}
   };
   void refresh();pollId=window.setInterval(()=>{void refresh();},3500);
   return()=>{active=false;abort.abort();if(pollId!==null)window.clearInterval(pollId);subscription.current?.close();subscription.current=null;};
  },[product]);
- const chartDatafeed=useMemo(():Datafeed|null=>{
-  if(!candles.length||!state||state.product!==product||state.session_id!==health?.session_id)return null;
-  const symbol:SymbolInfo={symbol:product,name:`${product} · observed public spot trade updates`,
-    exchange:'Coinbase Advanced · receiver clock',session:'24x7',timezone:'UTC',type:'crypto',
-    tickSize:0.01,pricePrecision:2,supportedResolutions:['1']};
-  const visible=candles.filter(c=>c.available_at<=state.receiver_time_ms);
-  return {
-   async resolveSymbol(name:string){if(name!==product)throw Error('UNKNOWN_SYMBOL');return symbol;},
-   async searchSymbols(q:string){return product.toLowerCase().includes(q.toLowerCase())?[symbol]:[];},
-   async getBars(info:SymbolInfo,resolution:Resolution,request):Promise<BarsResult>{
-    if(info.symbol!==product||resolution!=='1')throw Error('UNSUPPORTED_LIVE_RESOLUTION');
-    const bars:Bar[]=visible.filter(b=>b.time>=request.from&&b.time<request.to)
-      .map(b=>({time:b.time,open:Number(b.open),high:Number(b.high),low:Number(b.low),
-                close:Number(b.close),volume:Number(b.volume)}));
-    return {bars,noMoreData:true};
-   },subscribeBars(){return()=>{};}
-  };
- },[candles,state,product,health?.session_id]);
+
  return <main className="v36-live-terminal" style={{background:'#081523',minHeight:'100vh',color:'#dbeaf2',padding:'20px clamp(10px,3vw,35px)',fontFamily:'system-ui,Arial'}}>
   <header style={{display:'flex',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:12}}>
    <div><small style={{color:'#8cb4ce'}}>v36 · COINBASE PUBLIC SPOT · READ-ONLY</small>
@@ -136,7 +160,7 @@ export default function LiveTerminal(){
    </div>
   </header>
   <p><strong style={{color:healthy(health)?'#5be0b4':'#ffb77a'}}>
-   {health?.mode==='LIVE_SOURCE' && healthy(health)?'OBSERVED LIVE SOURCE':
+   {health?.mode==='LIVE_SOURCE' && healthy(health)&&state?.session_id===health.session_id && connection!=='RESYNC_REQUIRED'?'OBSERVED LIVE SOURCE':
     health?.mode==='ARCHIVE_SIMULATION'?'ARCHIVE SIMULATION · NOT LIVE':'NOT ADMITTED · NO LIVE MARKET DATA'}
   </strong> · {connection} · {health?.status??'CONNECTING'} · orders disabled</p>
   <p style={{color:'#96b3c9',fontSize:12}} aria-label="Source health">Session {health?.session_id??'none'} · messages {health?.messages??0}
@@ -154,8 +178,9 @@ export default function LiveTerminal(){
    <section aria-label="Live source-backed Funnest chart" style={{marginTop:16,...cell}}>
     <h2 style={{fontSize:16}}>Funnest Charts · completed receiver-time trade candles</h2>
     <p style={{fontSize:12,color:'#9db6c5'}}>No incomplete candle is labelled final. Visual chart numbers use JavaScript display precision; backend financial arithmetic remains Decimal.</p>
-    {chartDatafeed?<div style={{height:340}}><FnChart key={product+'-'+String(candles.at(-1)?.time)}
-        datafeed={chartDatafeed} symbol={product} resolution="1" colorScheme="dark"
+    <output data-testid="funnest-actual-getbars" data-product={product} data-session={health?.session_id??''} data-bars={JSON.stringify(servedBars)} hidden />
+    {candles.length>0&&state?.session_id===health?.session_id?<div style={{height:340}}><FnChart key={product+'-'+String(health?.session_id)}
+        datafeed={candleFeed.datafeed} symbol={product} resolution="1" colorScheme="dark"
         locale="en" storageKey={null} drawingToolbar={false} onReady={()=>{}} style={{height:'100%'}} /></div>:
      <p>No completed trade-derived minute is available yet.</p>}
    </section>
