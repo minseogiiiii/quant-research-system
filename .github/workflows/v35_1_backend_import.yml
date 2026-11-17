@@ -1,4 +1,4 @@
-name: v35.1 read-only backend import and safety
+name: v35.1 and v36 read-only backend source contracts
 on:
   push:
     branches:
@@ -7,6 +7,11 @@ on:
       - 'btc_eth_terminal/backend/**'
       - 'btc_eth_terminal/tests/test_v35_2_transport_contract.py'
       - 'btc_eth_terminal/tests/test_v35_3_scoped_sse_cursor.py'
+      - 'btc_eth_terminal/tests/test_v36_ci_synthetic_admission.py'
+      - 'btc_eth_terminal/tests/test_v36_collector_tap.py'
+      - 'btc_eth_terminal/tests/v36_mock_coinbase_websocket.mjs'
+      - 'btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs'
+      - 'btc_eth_terminal/scripts/v36_observe_existing_collector.py'
       - '.github/workflows/v35_1_backend_import.yml'
   workflow_dispatch:
 
@@ -46,6 +51,35 @@ jobs:
               raise AssertionError('Non-loopback bind unexpectedly permitted')
           print('PASS: v35.1 modules import without private archives; loopback policy enforced')
           PY
+      - name: Import v36 live engine, persistent SSE and immutable frontend modules
+        env:
+          PYTHONPATH: btc_eth_terminal/backend
+        run: |
+          python - <<'PY'
+          import v36_live_engine, v36_live_gateway, v36_frontend_integrity
+          from v36_live_gateway import server_for_live
+          from v36_live_engine import LiveMarketEngine
+          try:
+              server_for_live(LiveMarketEngine(),host='0.0.0.0')
+          except Exception as exc:
+              assert 'LOOPBACK_ONLY' in str(exc)
+          else:
+              raise AssertionError('Network-facing bind allowed')
+          print('PASS v36 source not admitted by default; loopback-only gateway')
+          PY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify existing node collector syntax and controlled synthetic tap archival parity
+        env:
+          PYTHONPATH: btc_eth_terminal/backend
+        run: |
+          node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_collector_tap.py' -v
+      - name: Validate v36 synthetic-only gap, snapshot and live-admission safety
+        env:
+          PYTHONPATH: btc_eth_terminal/backend
+        run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_ci_synthetic_admission.py' -v
       - name: Validate bounded HTTP clients and telemetry without private archives
         env:
           PYTHONPATH: btc_eth_terminal/backend
@@ -58,7 +92,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          modules=['v35_archive_ingress.py','v35_replay_service.py','v35_unified_gateway.py','v35_1_frontend_integrity.py']
+          modules=['v35_archive_ingress.py','v35_replay_service.py','v35_unified_gateway.py','v35_1_frontend_integrity.py','v36_live_engine.py','v36_live_gateway.py','v36_frontend_integrity.py']
           for name in modules:
               data=(Path('btc_eth_terminal/backend')/name).read_text()
               for marker in ('create_order(', 'submit_order(', 'place_order(', 'send_order('):
