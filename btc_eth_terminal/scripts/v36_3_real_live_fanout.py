@@ -112,6 +112,8 @@ def run(origin,duration,pid):
         for job in jobs:job.result(timeout=20)
     problems=[]
     if len(metrics)<80:problems.append('TOO_FEW_HEALTH_SAMPLES')
+    if max((x['connections'] for x in metrics),default=0)<8:
+        problems.append('EIGHT_SIMULTANEOUS_SSE_NOT_OBSERVED')
     for s in stat:
         if s['errors']:problems.append('SSE_CLIENT_ERROR:'+str(s['client']))
         if s['snapshots']!=1:problems.append('SSE_INITIAL_SNAPSHOT_MISSING:'+str(s['client']))
