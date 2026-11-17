@@ -32,3 +32,19 @@
 - The v34.1 and frozen raw archives are immutable, independent original cohort identity retained. `main` unchanged.
 
 **Verdict: `NO CONFIRMED EXECUTABLE ALPHA`.**
+
+
+## 2026-11-16 v35.1r1 bounded gateway resilience increment
+
+Engineering increment, NOT a production release and NOT a live exchange-feed certification.
+
+- Preserved the original v35.1 ZIP SHA-256 `5d6e437eb59e8e0e967b98d9d47a3d1e2e833e5ac4aa236a1f9868648fcd8969` and v34.1 parent `8304562514657d3a6405255d595a8ce7e1f223eef2f0f15f157b8f18d6dacec8`. New standalone candidate is separately delivered, never overwrites these originals.
+- Read-only `backend/v35_unified_gateway.py` now assigns a three-second socket read/write timeout to accepted peers, retains the 8-client BoundedSemaphore and adds locked, per-server counters via `/api/v35/metrics`: accepted/rejected connections, current/peak active connections, finite SSE started/completed/aborted and RESYNC_REQUIRED.
+- The SSE endpoint remains finite, pre-composed, receiver-clock `ARCHIVE_REPLAY` only. No live SSE subscription engine or exchange write path has been added; `sse_queue_depth=0` means no persistent stream queue exists, not that a continuous live feed was load-certified.
+- Added `tests/test_v35_2_transport_contract.py` and executed its **4 synthetic transport-only cases** through [GitHub backend CI run 44000049087](https://github.com/minseogiiiii/quant-research-system/actions/runs/44000049087), success on `a9aebc0493ca7356da7b6444efe4dc5e2ee6d800`. CI additionally passed Python compilation, import safety and limited order-write marker scans.
+- Separate full-source local tests used actual SHA-pinned Coinbase 120-second original archive: 7 new gateway/concurrency/fault cases passed; existing 22 v35.1 integration cases passed. Frozen final source tree plus new transport cases: **154 passed**, exit code 0, including v30-v34.1 related regressions. Independently extracted full candidate: the same 154 passed. **The historical full 831-case Python suite was NOT rerun** in this increment.
+- Real archived-source browser E2E harness checked 8 same-host HTTP/API paths and source identities with **5,177 original messages**. Local Chromium returned `ERR_BLOCKED_BY_ADMINISTRATOR`; actual archive-to-DOM chart values remain **BLOCKED**, not PASS. Existing synthetic browser CI cannot fill this evidence gap. Reproducible harness and machine-readable BLOCKED report are included in the standalone candidate.
+- One-host sample benchmark: 120-second archive replay 1.1261 seconds; 100 snapshot HTTP requests at concurrency 4: p50 3.115 ms, p95 5.131 ms, max 18.736 ms; max process RSS 138.11 MiB. Not a production latency SLA or 24-hour reliability test.
+- All **210 historical `backend/data`** files remain SHA-identical to v34.1. Main branch unmodified. Research verdict: `NO CONFIRMED EXECUTABLE ALPHA`.
+
+**Remaining high-priority gates:** actual market-archive browser E2E in an authorized Chromium environment, sustained multi-client/slow-reader soak under a durable host, complete final 831-suite regression if required for promotion, actual fresh Coinbase admission, source stall monitoring, operational risk review and independent OOS.
