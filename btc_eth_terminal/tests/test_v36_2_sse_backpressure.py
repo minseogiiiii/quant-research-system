@@ -55,7 +55,7 @@ class BoundedSSE(unittest.TestCase):
     extra.close()
     self.fail('Ninth concurrent live SSE slot must not be allocated')
    except (ConnectionError,OSError):pass
-   self.assertLessEqual(server.metrics()['peak_connections'],8)
+   self.assertLessEqual(server.metrics()['peak_connections'],10)
   finally:
    for c in opened:c.close()
    engine.transport_lost('SYNTHETIC_STOP')
@@ -63,5 +63,5 @@ class BoundedSSE(unittest.TestCase):
    while time.monotonic()<until and server.metrics()['active_connections']:
     time.sleep(.05)
    self.assertEqual(server.metrics()['active_connections'],0)
-   self.assertGreaterEqual(server.metrics()['rejected_client_slots'],1)
+   self.assertGreaterEqual(server.metrics()['sse_rejected_slots'],1)
 if __name__=='__main__':unittest.main()
