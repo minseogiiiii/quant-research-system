@@ -54,6 +54,7 @@ class LiveHandler(UnifiedHandler):
         permitted={
             '/api/v36/health':set(),
             '/api/v36/snapshot':{'product'},
+            '/api/v36/state':{'product','session','version'},
             '/api/v36/candles':{'product'},
             '/api/v36/stream':{'product'},
         }
@@ -70,6 +71,14 @@ class LiveHandler(UnifiedHandler):
             if parsed.path=='/api/v36/snapshot':
                 snap=source.snapshot(product)
                 self._reply(200 if snap['state'] is not None else 503,snap)
+                return
+            if parsed.path=='/api/v36/state':
+                if 'session' not in args or 'version' not in args:
+                    raise StateRejected('INVALID_VERSIONED_SOURCE_REQUEST')
+                version_text=args['version'][0]
+                if not re.fullmatch(r'[1-9][0-9]{0,12}',version_text):
+                    raise StateRejected('INVALID_VERSIONED_SOURCE_REQUEST')
+                self._reply(200,source.state_at_version(product,args['session'][0],int(version_text)))
                 return
             if parsed.path=='/api/v36/candles':
                 self._reply(200,source.candles_page(product));return
