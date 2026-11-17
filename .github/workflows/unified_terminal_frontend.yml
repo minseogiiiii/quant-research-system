@@ -30,6 +30,12 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Validate actual TypeScript and Vite production build
         run: npm run build
+      - name: Retain unpromoted candidate build for independent audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: v35-1-unpinned-candidate-dist
+          path: btc_eth_terminal/frontend/dist/
+          retention-days: 7
       - name: Verify source-pinned browser assets match v35 candidate manifest
         run: node --test tests/buildManifest.test.mjs
       - name: Check generated browser bundle files
