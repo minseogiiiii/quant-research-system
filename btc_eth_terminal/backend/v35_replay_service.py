@@ -248,8 +248,8 @@ def replay_capture(root: Path, expected_manifest_sha256: str) -> ReplayDataset:
                                     'received_at_ms': recv_ms,
                                 })
                                 del recent_trades[product][:-MAX_TRADES]
-                                # The startup trade snapshot is historical context, not a
-                                # newly observed trade flow event. Exclude it from OHLCV.
+                                # Startup trade snapshot is historical context, not a newly
+                                # observed trade flow event. Never include it in OHLCV.
                                 if event['type'] != 'update':
                                     continue
                                 try:
@@ -343,6 +343,8 @@ def replay_capture(root: Path, expected_manifest_sha256: str) -> ReplayDataset:
                 raise StateRejected('INCOMPLETE_DUAL_PRODUCT_REPLAY')
             rows = {p: tuple(output[p]) for p in PRODUCTS}
             candles: dict[str, tuple[dict, ...]] = {}
+            # Only full receiver-time minutes between first and last observed
+            # archived messages are eligible. No zero-volume invented minutes.
             if first_message_recv_ms is None or last_message_recv_ms is None:
                 raise StateRejected('EMPTY_SOURCE_CLOCK_RANGE')
             earliest_complete = ((first_message_recv_ms + CANDLE_MS - 1) // CANDLE_MS) * CANDLE_MS
