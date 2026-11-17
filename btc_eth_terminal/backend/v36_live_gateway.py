@@ -173,19 +173,23 @@ class LiveHandler(UnifiedHandler):
             if not last:
                 emit('snapshot',snap['state'],f'v36:{session}:{product}:{after}')
             started=time.monotonic()
+            last_output=started
             while time.monotonic()-started<MAX_STREAM_SECONDS:
                 updates=source.poll(product,session,after,timeout=1.0)
                 if len(updates)>MAX_EVENTS_PER_BURST:
                     raise StateRejected('RESYNC_REQUIRED')
                 if not updates:
-                    emit('heartbeat',{'mode':source.mode,'session_id':session,
-                                      'last_state_version':after,'trading_enabled':False})
+                    if time.monotonic()-last_output>=10.0:
+                        emit('heartbeat',{'mode':source.mode,'session_id':session,
+                                          'last_state_version':after,'trading_enabled':False})
+                        last_output=time.monotonic()
                     continue
                 for row in updates:
                     if row['state_version']<=after or row['session_id']!=session:
                         raise StateRejected('RESYNC_REQUIRED')
                     cursor=f'v36:{session}:{product}:{row["state_version"]}'
                     emit('state',row,cursor)
+                    last_output=time.monotonic()
                     after=row['state_version']
             emit('stream_rotation',{'reason':'BOUNDED_CONNECTION_LIFETIME','after':after,
                                     'session_id':session})
