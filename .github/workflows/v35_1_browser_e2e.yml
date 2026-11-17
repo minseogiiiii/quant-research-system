@@ -1,0 +1,41 @@
+name: v35.1 synthetic browser contract E2E
+on:
+  push:
+    branches:
+      - integration/btc-eth-unified-terminal
+    paths:
+      - 'btc_eth_terminal/frontend/**'
+      - '.github/workflows/v35_1_browser_e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chromium-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: btc_eth_terminal/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install frozen frontend dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build exact frontend and check SHA-pinned candidate
+        run: |
+          npm run build
+          node --test tests/buildManifest.test.mjs
+      - name: Install browser driver without changing committed lockfile
+        run: npm install --no-save --ignore-scripts --no-audit --no-fund playwright-core@1.55.0
+      - name: Verify installed Chrome binary
+        run: |
+          command -v google-chrome
+          google-chrome --version
+      - name: Exercise React DOM, replay controls, SSE and quarantine in Chromium
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node tests/v35_1_browser_e2e.cjs
