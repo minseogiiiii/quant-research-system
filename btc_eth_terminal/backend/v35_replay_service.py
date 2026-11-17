@@ -4,7 +4,7 @@ Never admits a live source, trades, brokerage instructions, or fabricated observ
 Commit-on-success: no partial state escapes from failed validation/replay.
 """
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from hashlib import sha256
 import heapq
@@ -26,6 +26,8 @@ MAX_ROWS_PER_PRODUCT = 10000
 MAX_LEVELS_PER_SIDE = 100_000
 MAX_TRADES = 24
 MAX_ENVELOPE_LINE = 16_000_000
+CANDLE_MS = 60_000
+MAX_COMPLETED_CANDLES = 2000
 
 class StateRejected(ValueError):
     pass
@@ -106,6 +108,23 @@ class ReplayDataset:
     rows: dict[str, tuple[dict, ...]]
     final_state_sha256: str
     message_count: int
+    candles: dict[str, tuple[dict, ...]] = field(default_factory=dict)
+
+    def candles_page(self, product: str, limit: int = 400) -> dict:
+        if product not in PRODUCTS:
+            raise StateRejected('UNKNOWN_PRODUCT')
+        if type(limit) is not int or not 1 <= limit <= 400:
+            raise StateRejected('INVALID_CANDLE_LIMIT')
+        records = self.candles.get(product, ())
+        if len(records) > limit:
+            raise StateRejected('CANDLE_PAGE_LIMIT_EXCEEDED')
+        return {'schema': 'v35_1_archived_trade_candles_v1',
+                'mode': 'ARCHIVE_REPLAY', 'product': product,
+                'source_manifest_sha256': self.certificate['manifest_sha256'],
+                'timeframe_ms': CANDLE_MS,
+                'source_definition': 'RECEIVER_TIME_COMPLETED_BUCKETS_OBSERVED_TRADE_UPDATES_ONLY',
+                'rows': list(records), 'live_feed': False,
+                'trading_enabled': False, 'oos_approved': False}
 
     def snapshot(self, product: str, at_version: int | None = None) -> dict:
         if product not in PRODUCTS:
@@ -175,6 +194,8 @@ def replay_capture(root: Path, expected_manifest_sha256: str) -> ReplayDataset:
             state_version = 0
             message_count = 0
             last_message_recv_ms = None
+            first_message_recv_ms = None
+            trade_candle_buckets = {product: {} for product in PRODUCTS}
             for index, entry in enumerate(manifest['chunks']):
                 conn = entry['connection_id']
                 if conn != last_conn:
@@ -209,9 +230,13 @@ def replay_capture(root: Path, expected_manifest_sha256: str) -> ReplayDataset:
                     message_count += 1
                     recv_ms = iso_ms(envelope['received_utc'])
                     last_message_recv_ms = recv_ms
+                    if first_message_recv_ms is None:
+                        first_message_recv_ms = recv_ms
                     channel = wire['channel']
                     if channel == 'market_trades':
                         for event in wire['events']:
+                            if event.get('type') not in ('snapshot', 'update'):
+                                raise StateRejected('UNSUPPORTED_TRADE_EVENT_KIND')
                             for trade in event.get('trades', []):
                                 product = trade.get('product_id')
                                 if product not in PRODUCTS:
@@ -223,6 +248,32 @@ def replay_capture(root: Path, expected_manifest_sha256: str) -> ReplayDataset:
                                     'received_at_ms': recv_ms,
                                 })
                                 del recent_trades[product][:-MAX_TRADES]
+                                # The startup trade snapshot is historical context, not a
+                                # newly observed trade flow event. Exclude it from OHLCV.
+                                if event['type'] != 'update':
+                                    continue
+                                try:
+                                    price = Decimal(trade['price'])
+                                    size = Decimal(trade['size'])
+                                except (ValueError, ArithmeticError, KeyError, TypeError) as exc:
+                                    raise StateRejected('INVALID_TRADE_DECIMAL') from exc
+                                if not price.is_finite() or not size.is_finite() or price <= 0 or size <= 0:
+                                    raise StateRejected('NONPOSITIVE_TRADE_DECIMAL')
+                                start = (recv_ms // CANDLE_MS) * CANDLE_MS
+                                bucket = trade_candle_buckets[product]
+                                bar = bucket.get(start)
+                                if bar is None:
+                                    if len(bucket) >= MAX_COMPLETED_CANDLES + 2:
+                                        raise StateRejected('MAX_TRADE_CANDLE_BUCKETS_EXCEEDED')
+                                    bucket[start] = {'open': price, 'high': price,
+                                                     'low': price, 'close': price,
+                                                     'volume': size, 'observed_trade_count': 1}
+                                else:
+                                    bar['high'] = max(bar['high'], price)
+                                    bar['low'] = min(bar['low'], price)
+                                    bar['close'] = price
+                                    bar['volume'] += size
+                                    bar['observed_trade_count'] += 1
                     if channel != 'l2_data':
                         continue
                     for event in wire['events']:
@@ -291,8 +342,31 @@ def replay_capture(root: Path, expected_manifest_sha256: str) -> ReplayDataset:
             if not all(output.values()):
                 raise StateRejected('INCOMPLETE_DUAL_PRODUCT_REPLAY')
             rows = {p: tuple(output[p]) for p in PRODUCTS}
-            raw = json.dumps(rows, sort_keys=True, separators=(',', ':')).encode()
-            return ReplayDataset(certificate, rows, sha256(raw).hexdigest(), message_count)
+            candles: dict[str, tuple[dict, ...]] = {}
+            if first_message_recv_ms is None or last_message_recv_ms is None:
+                raise StateRejected('EMPTY_SOURCE_CLOCK_RANGE')
+            earliest_complete = ((first_message_recv_ms + CANDLE_MS - 1) // CANDLE_MS) * CANDLE_MS
+            for product in PRODUCTS:
+                completed = []
+                for start, data in sorted(trade_candle_buckets[product].items()):
+                    if start < earliest_complete or start + CANDLE_MS > last_message_recv_ms:
+                        continue
+                    completed.append({
+                        'schema': 'v35_1_receiver_trade_bar_v1', 'product': product,
+                        'mode': 'ARCHIVE_REPLAY', 'live_feed': False, 'trading_enabled': False,
+                        'source_manifest_sha256': expected_manifest_sha256,
+                        'time': start, 'available_at': start + CANDLE_MS,
+                        'open': str(data['open']), 'high': str(data['high']),
+                        'low': str(data['low']), 'close': str(data['close']),
+                        'volume': str(data['volume']),
+                        'observed_trade_count': data['observed_trade_count'],
+                        'source_definition': 'RECEIVER_TIME_COMPLETED_BUCKET_OBSERVED_TRADE_UPDATES_ONLY'})
+                if len(completed) > MAX_COMPLETED_CANDLES:
+                    raise StateRejected('MAX_COMPLETED_CANDLES_EXCEEDED')
+                candles[product] = tuple(completed)
+            raw = json.dumps({'rows': rows, 'candles': candles}, sort_keys=True,
+                             separators=(',', ':')).encode()
+            return ReplayDataset(certificate, rows, sha256(raw).hexdigest(), message_count, candles)
         finally:
             os.close(chunkfd)
             os.close(rootfd)
