@@ -11,6 +11,7 @@ on:
       - 'btc_eth_terminal/tests/test_v36_capture_readiness.py'
       - 'btc_eth_terminal/tests/test_v36_observer_full_capture.py'
       - 'btc_eth_terminal/tests/test_v36_1_version_pinned_state.py'
+      - 'btc_eth_terminal/tests/test_v36_2_operational_race.py'
       - 'btc_eth_terminal/scripts/v36_1_verify_independent_ohlcv.py'
       - 'btc_eth_terminal/scripts/v36_verify_live_capture.py'
       - 'btc_eth_terminal/tests/test_v36_collector_tap.py'
@@ -102,6 +103,10 @@ jobs:
         env:
           PYTHONPATH: btc_eth_terminal/backend
         run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_1_version_pinned_state.py' -v
+      - name: Fail closed on wall-clock rollback and SSE source-session handshake races
+        env:
+          PYTHONPATH: btc_eth_terminal/backend
+        run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_operational_race.py' -v
       - name: Validate bounded HTTP clients and telemetry without private archives
         env:
           PYTHONPATH: btc_eth_terminal/backend
