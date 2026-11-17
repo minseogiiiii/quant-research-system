@@ -1,0 +1,99 @@
+name: v36.2 REAL Coinbase source-gap reconnect and quarantine smoke
+
+on:
+  push:
+    branches:
+      - integration/btc-eth-unified-terminal
+    paths:
+      - '.github/workflows/v36_2_real_source_gap.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-public-disconnect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify source-gap controls first with synthetic untrusted frames
+        run: |
+          node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_transport_gap.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_storage_faults.py' -v
+      - name: Force disconnect on genuine Coinbase public WebSocket and verify separated sessions
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          set +e
+          PRIVATE="$RUNNER_TEMP/v36_2_gap_$GITHUB_RUN_ID"
+          python -u btc_eth_terminal/scripts/v36_observe_existing_collector.py \
+            --execute-public-capture --fault-test-only \
+            --inject-disconnect-after-messages 150 \
+            --duration 45 --port 8766 \
+            --workdir "$PRIVATE" \
+            --raw-budget-bytes 1000000000 \
+            --archive-budget-bytes 2000000000 \
+            --disk-reserve-bytes 4294967296 \
+            > "$RUNNER_TEMP/v36_2_gap_collector_summary.log" \
+            2> "$RUNNER_TEMP/v36_2_gap_collector_stderr.log"
+          OBSERVER_RC=$?
+          python - "$PRIVATE" "$OBSERVER_RC" <<'PY'
+          import json,sys
+          from pathlib import Path
+          root=Path(sys.argv[1]);rc=int(sys.argv[2])
+          evidence=root/'V36_OBSERVER_EVIDENCE.json'
+          if not evidence.is_file():
+              print('FAIL_REAL_PUBLIC_INJECTED_GAP_NO_EVIDENCE')
+              raise SystemExit(2)
+          e=json.loads(evidence.read_bytes())
+          capture=Path(e['captured_dir'])
+          m=json.loads((capture/'manifest.json').read_bytes())
+          h=e.get('observer_health_before_stop') or {}
+          sessions=h.get('source_session_history') or []
+          distinct=len({item.get('session_id') for item in sessions})
+          inject=m.get('controlled_fault_injection') or {}
+          faults=m.get('faults') or []
+          expected=(
+              rc==2 and e.get('fault_test_only') is True
+              and e.get('injected_disconnect_after_messages')==150
+              and inject.get('after_messages')==150
+              and any('INJECTED_DISCONNECT_AFTER_COMMITTED_SOURCE' in x.get('reason','') for x in faults)
+              and len(m.get('connections',[]))>=2
+              and len(sessions)>=2 and distinct>=2
+              and h.get('connection_gaps',0)>=1
+              and h.get('connection_id',-1)>=1
+              and set(h.get('snapshots',[]))=={'BTC-USD','ETH-USD'}
+              and set(h.get('subscriptions',[]))=={'level2','market_trades','heartbeats'}
+              and h.get('heartbeats',0)>0
+              and m.get('ready_for_research') is False
+              and m.get('status')!='CAPTURE_COMPLETED_NO_GAPS_UNVERIFIED_MARKET_TRUTH'
+              and e.get('capture_ready_for_research') is False
+              and e.get('observer_source_complete') is False
+              and e.get('trading_enabled') is False
+          )
+          summary={'classification':'REAL_PUBLIC_SOURCE_WITH_INTENTIONAL_GAP',
+              'injected_fault_count':len(faults),
+              'source_connection_count':len(m.get('connections',[])),
+              'distinct_observer_sessions':distinct,
+              'source_gaps':h.get('connection_gaps'),
+              'new_session_dual_snapshots_and_heartbeat':bool(h.get('snapshots') and h.get('heartbeats')),
+              'original_messages':m.get('messages'),
+              'archive_research_eligible':m.get('ready_for_research'),
+              'trading_enabled':False}
+          print(('PASS' if expected else 'FAIL')+'_REAL_COINBASE_SOURCE_GAP_AND_RECONNECT',
+                json.dumps(summary,sort_keys=True))
+          if not expected:raise SystemExit(2)
+          PY
+          STATUS=$?
+          # No raw chunks, private manifest, or PID-bound records are uploaded.
+          exit "$STATUS"
