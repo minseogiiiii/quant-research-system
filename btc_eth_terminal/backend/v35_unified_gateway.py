@@ -16,6 +16,8 @@ from bridge import Handler as HistoricalHandler
 from v35_replay_service import replay_capture, ReplayDataset, StateRejected, PRODUCTS
 
 MAX_SSE_EVENTS = 60
+# EventSource resumes only when archive, product and state version all agree.
+CURSOR_RE = re.compile(r'([0-9a-f]{64}):(BTC-USD|ETH-USD):([1-9][0-9]{0,12})\Z')
 CLIENT_SOCKET_TIMEOUT_SECONDS = 3.0
 
 class BoundedServer(ThreadingHTTPServer):
@@ -174,21 +176,37 @@ class UnifiedHandler(HistoricalHandler):
                 raise StateRejected('STREAM_LIMIT_EXCEEDED')
             last_id = self.headers.get('Last-Event-ID')
             if last_id:
-                if 'after' in args or re.fullmatch(r'[1-9]\d{0,12}', last_id) is None:
+                if 'after' in args:
                     raise StateRejected('INVALID_SSE_RESUME_CURSOR')
-                after = int(last_id)
+                match = CURSOR_RE.fullmatch(last_id)
+                if match is None:
+                    # Numeric legacy IDs cannot establish source continuity.
+                    if re.fullmatch(r'[1-9]\d{0,12}', last_id):
+                        raise StateRejected('UNSCOPED_CURSOR_RESYNC_REQUIRED')
+                    raise StateRejected('INVALID_SSE_RESUME_CURSOR')
+                manifest_pin, cursor_product, version = match.groups()
+                if manifest_pin != self.dataset.certificate['manifest_sha256']:
+                    raise StateRejected('SOURCE_CHANGED_RESYNC_REQUIRED')
+                if cursor_product != product:
+                    raise StateRejected('PRODUCT_CHANGED_RESYNC_REQUIRED')
+                after = int(version)
             page = self.dataset.page(product, after, limit)
             frames: list[str] = []
-            def event(name: str, data: dict, cursor: int | None = None):
+            def event(name: str, data: dict, cursor: str | None = None):
                 if cursor is not None:
                     frames.append(f'id: {cursor}\n')
                 frames.append('event: '+name+'\n')
                 frames.append('data: '+json.dumps(data, separators=(',', ':'), allow_nan=False)+'\n\n')
             event('source', {'mode': 'ARCHIVE_REPLAY', 'product': product,
                              'source_manifest_sha256': self.dataset.certificate['manifest_sha256'],
-                             'live_feed': False, 'trading_enabled': False})
+                             'live_feed': False, 'trading_enabled': False,
+                             'cursor_contract': 'manifest_sha256:product:state_version'})
             for row in page['rows']:
-                event('state', row, row['state_version'])
+                # Native EventSource carries this id in Last-Event-ID on reconnect.
+                # A restart on a different archive cannot reuse numeric positions.
+                cursor = (self.dataset.certificate['manifest_sha256'] + ':' +
+                          product + ':' + str(row['state_version']))
+                event('state', row, cursor)
             event('replay_end', {'next_after': page['next_after'],
                                  'has_more': page['has_more'], 'mode': 'ARCHIVE_REPLAY',
                                  'live_feed': False})
@@ -208,9 +226,15 @@ class UnifiedHandler(HistoricalHandler):
             self.wfile.write(body)
             self.server.count('sse_completed')
         except (StateRejected, ValueError, KeyError) as exc:
-            if str(exc) in ('RESYNC_REQUIRED', 'STATE_VERSION_NOT_RETAINED'):
+            if str(exc) in ('RESYNC_REQUIRED', 'STATE_VERSION_NOT_RETAINED',
+                                'UNSCOPED_CURSOR_RESYNC_REQUIRED',
+                                'SOURCE_CHANGED_RESYNC_REQUIRED',
+                                'PRODUCT_CHANGED_RESYNC_REQUIRED'):
                 self.server.count('resync_required')
-            code = 409 if str(exc) in ('RESYNC_REQUIRED', 'STATE_VERSION_NOT_RETAINED') else 400
+            code = 409 if str(exc) in ('RESYNC_REQUIRED', 'STATE_VERSION_NOT_RETAINED',
+                                     'UNSCOPED_CURSOR_RESYNC_REQUIRED',
+                                     'SOURCE_CHANGED_RESYNC_REQUIRED',
+                                     'PRODUCT_CHANGED_RESYNC_REQUIRED') else 400
             self.send_obj(code, {'error': str(exc), 'mode': 'ARCHIVE_REPLAY',
                                  'live_feed': False, 'trading_enabled': False})
         except (ConnectionError, TimeoutError, OSError):
