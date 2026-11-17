@@ -21,7 +21,7 @@ async function allFiles(dir,prefix=''){
 }
 
 test('CI-built frontend files must exactly match read-only v35 candidate manifest',async()=>{
- const manifest=JSON.parse(await readFile(join(root,'v35_dist_integrity.json'),'utf8'));
+ const manifest=JSON.parse(await readFile(join(root,'v35_1_dist_integrity.json'),'utf8'));
  assert.equal(manifest.schema,'v34_funnest_build_integrity_v1');
  assert.equal(manifest.live_trading_enabled,false);
  assert.equal(manifest.receiver_time_only,true);
