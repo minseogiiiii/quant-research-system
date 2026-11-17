@@ -534,12 +534,34 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/v30/series": {"product","kind","from","to","limit","asof","offset"},
                 "/api/v30/book": {"product","asof"},
             })
+            # Historical v34 routes remain independently pinned to v30 L1,
+            # not replayed as a fresh v36 live source.
+            permitted.update({
+                "/api/v34/depth": {"product","asof"},
+                "/api/v34/recovery": {"product","asof","limit"},
+            })
             if parsed.path not in permitted:
                 self.send_obj(404, {"error": "Not found"})
                 return
             if any(key not in permitted[parsed.path] or len(values) != 1
                    for key, values in args.items()):
                 raise InputError("Unknown or repeated query parameter")
+            if parsed.path.startswith("/api/v34/"):
+                from v34_l2_api import depth as v34_depth, recovery as v34_recovery
+                def v34_required(name: str) -> str:
+                    value=args.get(name)
+                    if not value or len(value)!=1 or not value[0]:
+                        raise InputError("Expected exactly one "+name)
+                    return value[0]
+                product=v34_required("product")
+                asof=_strict_int(v34_required("asof"),"asof")
+                if parsed.path=="/api/v34/depth":
+                    self.send_obj(200,v34_depth(product,asof))
+                else:
+                    limit=_strict_int(args.get("limit",["10"])[0],"limit",30)
+                    if limit<1:raise InputError("Invalid v34 limit")
+                    self.send_obj(200,v34_recovery(product,asof,limit))
+                return
             if parsed.path.startswith("/api/v30/"):
                 from v30_unified_api import catalog as unified_catalog, series as unified_series, book as unified_book
                 def only(name: str) -> str:
