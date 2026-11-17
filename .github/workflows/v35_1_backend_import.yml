@@ -6,6 +6,7 @@ on:
     paths:
       - 'btc_eth_terminal/backend/**'
       - 'btc_eth_terminal/tests/test_v35_2_transport_contract.py'
+      - 'btc_eth_terminal/tests/test_v35_3_scoped_sse_cursor.py'
       - '.github/workflows/v35_1_backend_import.yml'
   workflow_dispatch:
 
@@ -49,6 +50,10 @@ jobs:
         env:
           PYTHONPATH: btc_eth_terminal/backend
         run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v35_2_transport_contract.py' -v
+      - name: Verify fail-closed SSE cursors across source and product switches
+        env:
+          PYTHONPATH: btc_eth_terminal/backend
+        run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v35_3_scoped_sse_cursor.py' -v
       - name: Confirm no v35 real exchange order transport or broker write adapter was introduced
         run: |
           python - <<'PY'
