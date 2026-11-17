@@ -9,6 +9,8 @@ on:
       - 'btc_eth_terminal/scripts/v36_observe_existing_collector.py'
       - 'btc_eth_terminal/scripts/v36_public_ws_probe.mjs'
       - 'btc_eth_terminal/tests/test_v36_large_frame_tap.py'
+      - 'btc_eth_terminal/scripts/v36_verify_live_capture.py'
+      - 'btc_eth_terminal/tests/test_v36_observer_full_capture.py'
   workflow_dispatch:
 
 permissions:
@@ -108,7 +110,9 @@ jobs:
             json.dumps({'collector_exit_code':x['collector_exit_code'],
               'manifest_sha256':x['captured_manifest_sha256'],
               'messages':h['messages'],'heartbeats':h['heartbeats'],
-              'status':h['status'],'trading_enabled':False},sort_keys=True))
+              'status':h['status'],'observer_source_complete':x.get('observer_source_complete'),
+              'observer_messages_before_stop':(x.get('observer_health_before_stop') or {}).get('messages'),
+              'trading_enabled':False},sort_keys=True))
           captured=x.get('captured_dir')
           if captured:
               from pathlib import Path
@@ -143,4 +147,6 @@ jobs:
             echo 'BLOCKED: actual Coinbase LIVE admission and full capture were not independently validated'
             exit 1
           fi
-          echo 'PASS HOST_OBSERVED_READ_ONLY_LIVE_SOURCE'
+          python -u btc_eth_terminal/scripts/v36_verify_live_capture.py \
+            --evidence "$WORKDIR/V36_OBSERVER_EVIDENCE.json"
+          echo 'PASS HOST_OBSERVED_READ_ONLY_LIVE_SOURCE_AND_INDEPENDENT_CAPTURE_REPLAY'
