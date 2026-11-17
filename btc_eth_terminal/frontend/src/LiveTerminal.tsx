@@ -109,7 +109,7 @@ export default function LiveTerminal(){
   return()=>{active=false;abort.abort();if(pollId!==null)window.clearInterval(pollId);subscription.current?.close();subscription.current=null;};
  },[product]);
  const chartDatafeed=useMemo(():Datafeed|null=>{
-  if(!candles.length||!state)return null;
+  if(!candles.length||!state||state.product!==product||state.session_id!==health?.session_id)return null;
   const symbol:SymbolInfo={symbol:product,name:`${product} · observed public spot trade updates`,
     exchange:'Coinbase Advanced · receiver clock',session:'24x7',timezone:'UTC',type:'crypto',
     tickSize:0.01,pricePrecision:2,supportedResolutions:['1']};
@@ -125,13 +125,13 @@ export default function LiveTerminal(){
     return {bars,noMoreData:true};
    },subscribeBars(){return()=>{};}
   };
- },[candles,state,product]);
+ },[candles,state,product,health?.session_id]);
  return <main className="v36-live-terminal" style={{background:'#081523',minHeight:'100vh',color:'#dbeaf2',padding:'20px clamp(10px,3vw,35px)',fontFamily:'system-ui,Arial'}}>
   <header style={{display:'flex',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:12}}>
    <div><small style={{color:'#8cb4ce'}}>v36 · COINBASE PUBLIC SPOT · READ-ONLY</small>
     <h1 style={{margin:'4px 0'}}>BTC/ETH Live Market Research</h1></div>
    <div style={{display:'flex',gap:8}} role="group" aria-label="Instrument">
-    {(['BTC-USD','ETH-USD'] as Product[]).map(p=><button key={p} type="button" onClick={()=>setProduct(p)}
+    {(['BTC-USD','ETH-USD'] as Product[]).map(p=><button key={p} type="button" onClick={()=>{if(p!==product){setState(null);setCandles([]);setConnection('CONNECTING');setProduct(p);}}}
       aria-pressed={product===p} style={{padding:10,borderRadius:8,color:'#fff',background:product===p?'#185b79':'#1c3448'}}>{p}</button>)}
    </div>
   </header>
@@ -143,7 +143,7 @@ export default function LiveTerminal(){
    · source seq {health?.last_sequence??'none'} · heartbeat count {health?.heartbeats??0}
    · gap count {health?.connection_gaps??0}</p>
   {error?<p role="alert" style={{color:'#ff9898'}}>MARKET DATA NOT TRUSTED: {error}</p>:null}
-  {state && healthy(health) && connection!=='RESYNC_REQUIRED'?<>
+  {state && state.product===product && state.session_id===health?.session_id && healthy(health) && connection!=='RESYNC_REQUIRED'?<>
    <p role="status" style={{fontSize:12,color:'#92b6c9'}}>Observed {formatTime(state.receiver_time_ms)} · conn {state.connection_id}
      · source sequence {state.source_sequence} · state version {state.state_version} · {state.mode}</p>
    <section aria-label="Validated top of book" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:8}}>
