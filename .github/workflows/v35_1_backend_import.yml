@@ -10,6 +10,7 @@ on:
       - 'btc_eth_terminal/tests/test_v36_ci_synthetic_admission.py'
       - 'btc_eth_terminal/tests/test_v36_capture_readiness.py'
       - 'btc_eth_terminal/tests/test_v36_collector_tap.py'
+      - 'btc_eth_terminal/tests/test_v36_large_frame_tap.py'
       - 'btc_eth_terminal/tests/v36_mock_coinbase_websocket.mjs'
       - 'btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs'
       - 'btc_eth_terminal/scripts/v36_observe_existing_collector.py'
@@ -77,6 +78,10 @@ jobs:
         run: |
           node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
           python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_collector_tap.py' -v
+      - name: Validate exact 4.7 MiB initial L2 snapshot transport without source bytes
+        env:
+          PYTHONPATH: btc_eth_terminal/backend
+        run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_large_frame_tap.py' -v
       - name: Validate v36 synthetic-only gap, snapshot and live-admission safety
         env:
           PYTHONPATH: btc_eth_terminal/backend
