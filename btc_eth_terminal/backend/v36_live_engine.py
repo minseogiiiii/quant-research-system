@@ -361,6 +361,27 @@ class LiveMarketEngine:
                     'trading_enabled':False,'execution_authorized':False,
                     'resync_required':not valid}
 
+    def state_at_version(self, product: str, session: str, version: int) -> dict:
+        """Bounded exact-state lookup for live browser and forensic parity.
+
+        This cannot return old prices after stale or source-session loss.
+        An unavailable version must produce RESYNC_REQUIRED, not latest state.
+        """
+        if (product not in PRODUCTS or not isinstance(session,str)
+                or not re.fullmatch(r'[0-9a-f]{32}',session)
+                or type(version) is not int or version<1):
+            raise StateRejected('INVALID_VERSIONED_SOURCE_REQUEST')
+        with self._cv:
+            self._stale_if_necessary()
+            if self.status!='HEALTHY' or session!=self.session_id:
+                raise StateRejected('RESYNC_REQUIRED')
+            for row in self.rows[product]:
+                if row['state_version']==version and row['session_id']==session:
+                    return {'schema':'v36_version_pinned_state_v1',
+                            'product':product,'session_id':session,'state':dict(row),
+                            'trading_enabled':False}
+            raise StateRejected('RESYNC_REQUIRED')
+
     def candles_page(self, product: str) -> dict:
         if product not in PRODUCTS:raise StateRejected('UNKNOWN_PRODUCT')
         with self._cv:
