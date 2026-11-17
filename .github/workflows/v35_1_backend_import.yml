@@ -15,6 +15,9 @@ on:
       - 'btc_eth_terminal/tests/test_v36_2_live_metrics.py'
       - 'btc_eth_terminal/tests/test_v36_2_transport_gap.py'
       - 'btc_eth_terminal/tests/test_v36_2_storage_faults.py'
+      - 'btc_eth_terminal/tests/test_v36_2_durable_policy.py'
+      - 'btc_eth_terminal/scripts/v36_2_durable_launch.sh'
+      - 'btc_eth_terminal/deployment/v36_2_btceth_live.service'
       - 'btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs'
       - 'btc_eth_terminal/scripts/v36_observe_existing_collector.py'
       - 'btc_eth_terminal/scripts/v36_1_verify_independent_ohlcv.py'
@@ -112,6 +115,12 @@ jobs:
         env:
           PYTHONPATH: btc_eth_terminal/backend
         run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_transport_gap.py' -v
+      - name: Verify strict durable source budgets and shell startup policy
+        env:
+          PYTHONPATH: btc_eth_terminal/backend
+        run: |
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_durable_policy.py' -v
+          bash -n btc_eth_terminal/scripts/v36_2_durable_launch.sh
       - name: Verify collector storage budgets and SIGKILL incomplete-source quarantine
         env:
           PYTHONPATH: btc_eth_terminal/backend
