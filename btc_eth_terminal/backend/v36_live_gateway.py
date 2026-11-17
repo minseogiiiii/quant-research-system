@@ -91,13 +91,10 @@ class LiveHandler(UnifiedHandler):
             return
 
     def _stream(self,source:LiveMarketEngine,product:str):
-        health=source.health()
-        if health['status']!='HEALTHY':
-            raise StateRejected('RESYNC_REQUIRED')
-        snap=source.snapshot(product)
-        if snap['state'] is None:
-            raise StateRejected('RESYNC_REQUIRED')
-        session=health['session_id']
+        # Atomic source/initial-book binding. Old separate health() and
+        # snapshot() calls could cross a live collector session rotation.
+        snap=source.stream_initial(product)
+        session=snap['session_id']
         last=self.headers.get('Last-Event-ID')
         if last:
             match=LIVE_CURSOR.fullmatch(last)
