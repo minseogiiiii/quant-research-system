@@ -5,6 +5,10 @@ on:
       - integration/btc-eth-unified-terminal
     paths:
       - '.github/workflows/v36_public_live_observation_smoke.yml'
+      - 'btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs'
+      - 'btc_eth_terminal/scripts/v36_observe_existing_collector.py'
+      - 'btc_eth_terminal/scripts/v36_public_ws_probe.mjs'
+      - 'btc_eth_terminal/tests/test_v36_large_frame_tap.py'
   workflow_dispatch:
 
 permissions:
@@ -36,6 +40,10 @@ jobs:
               assert forbidden not in src
           print('PASS public-only read-only collector: limited static surface check')
           PY
+      - name: Verify large Coinbase-size synthetic snapshot survives archived observer tap
+        env:
+          PYTHONPATH: btc_eth_terminal/backend
+        run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_large_frame_tap.py' -v
       - name: Diagnose public Coinbase WebSocket handshake without subscribing
         run: node btc_eth_terminal/scripts/v36_public_ws_probe.mjs
       - name: Attempt live public WebSocket with exact source admission, no raw artifact upload
