@@ -10,6 +10,7 @@ on:
       - 'btc_eth_terminal/scripts/v36_public_ws_probe.mjs'
       - 'btc_eth_terminal/tests/test_v36_large_frame_tap.py'
       - 'btc_eth_terminal/scripts/v36_verify_live_capture.py'
+      - 'btc_eth_terminal/scripts/v36_verify_live_sse.py'
       - 'btc_eth_terminal/tests/test_v36_observer_full_capture.py'
   workflow_dispatch:
 
@@ -99,6 +100,11 @@ jobs:
               raise SystemExit('BLOCKED_UNVERIFIED_LIVE_SOURCE_NO_VALID_BTC_ETH_SNAPSHOTS')
           PY
           EVIDENCE_RC=$?
+          SSE_RC=2
+          if [ "$EVIDENCE_RC" -eq 0 ]; then
+            python -u btc_eth_terminal/scripts/v36_verify_live_sse.py --port 8766
+            SSE_RC=$?
+          fi
           wait "$CAPTURE_PID"
           COLLECTOR_RC=$?
           if test -f "$WORKDIR/V36_OBSERVER_EVIDENCE.json"; then
@@ -141,9 +147,9 @@ jobs:
               },sort_keys=True))
           PY
           fi
-          echo "CAPTURE_EXIT:$COLLECTOR_RC ADMISSION_EXIT:$EVIDENCE_RC"
+          echo "CAPTURE_EXIT:$COLLECTOR_RC ADMISSION_EXIT:$EVIDENCE_RC LIVE_SSE_EXIT:$SSE_RC"
           # Do not upload or commit any original raw JSONL or source archive.
-          if [ "$COLLECTOR_RC" -ne 0 ] || [ "$EVIDENCE_RC" -ne 0 ]; then
+          if [ "$COLLECTOR_RC" -ne 0 ] || [ "$EVIDENCE_RC" -ne 0 ] || [ "$SSE_RC" -ne 0 ]; then
             echo 'BLOCKED: actual Coinbase LIVE admission and full capture were not independently validated'
             exit 1
           fi
