@@ -63,74 +63,88 @@ def audit_browser(origin:str,browser_executable:str,seconds:int,min_versions:int
                 for product in PRODUCTS:
                     if time.monotonic()>=until:break
                     page.get_by_role('button',name=product).click()
-                    # One browser JS event-loop turn captures the same React
-                    # committed DOM. Sequential Playwright selectors can cross
-                    # a 1-second book update and create a false depth mismatch.
-                    dom=page.evaluate("""() => {
-                      const root=document.querySelector('main.v36-live-terminal');
-                      const top=root?.querySelector('[aria-label="Validated top of book"]');
-                      const depth=root?.querySelector('[aria-label="Live order book 10 levels"]');
-                      const cards={};
-                      for(const c of (top?.querySelectorAll('div')||[])){
-                        const label=c.querySelector(':scope > small')?.textContent?.trim()||'';
-                        const value=c.querySelector(':scope > strong')?.textContent?.trim();
-                        if(label&&value!==undefined)cards[label]=value;
-                      }
-                      return {
-                        status:root?.querySelector('[role="status"]')?.textContent||'',
-                        sourceHealth:root?.querySelector('[aria-label="Source health"]')?.textContent||'',
-                        selected:root?.querySelector('button[aria-pressed="true"]')?.textContent||'',
-                        liveLabel:root?.querySelector('header + p > strong')?.textContent||'',
-                        cards,
-                        depth:Array.from(depth?.querySelectorAll('tbody tr')||[],
-                          tr=>Array.from(tr.querySelectorAll('td'),td=>td.textContent?.trim()||'')),
-                        datafeedProduct:root?.querySelector('[data-testid="funnest-actual-getbars"]')?.getAttribute('data-product'),
-                        datafeedSession:root?.querySelector('[data-testid="funnest-actual-getbars"]')?.getAttribute('data-session'),
-                        datafeedBars:root?.querySelector('[data-testid="funnest-actual-getbars"]')?.getAttribute('data-bars')
-                      };
-                    }""")
-                    if dom['selected'].strip()!=product:continue
-                    if 'OBSERVED LIVE SOURCE' not in dom['liveLabel']:continue
-                    if session not in dom['sourceHealth']:continue
-                    match=VERSION.search(dom['status'])
-                    if not match:continue
-                    v=int(match.group(1))
-                    params=urlencode({'product':product,'session':session,'version':v})
-                    try:back=read(origin,'/api/v36/state?'+params)['state']
-                    except HTTPError as exc:
-                        if exc.code==409:continue  # old version evicted or source no longer healthy
-                        raise
-                    if back['session_id']!=session or back['product']!=product:
-                        fail('BAD_BACKEND_PRODUCT_SESSION')
-                    for metric in METRICS:
-                        observed=dom['cards'].get(metric.upper().replace('_',' '))
-                        if observed is None or Decimal(observed)!=Decimal(str(back[metric])):
-                            fail('EXACT_VERSION_DOM_'+metric+'_MISMATCH_'+product)
-                    expected=[[back['depth']['bids'][k]['price'],
-                               back['depth']['bids'][k]['quantity'],
-                               back['depth']['asks'][k]['price'],
-                               back['depth']['asks'][k]['quantity']] for k in range(10)]
-                    if len(dom['depth'])!=10 or dom['depth']!=expected:
-                        fail('EXACT_VERSION_ATOMIC_DEPTH_MISMATCH_'+product)
-                    versions=results['products'][product]['versions']
-                    if v not in versions:versions.append(v)
-                    candles=read(origin,'/api/v36/candles?product='+product)
-                    if candles.get('session_id')!=session:fail('CANDLE_SESSION_CHANGED')
-                    eligible={b['time']:b for b in candles['rows']}
-                    results['products'][product]['backend_completed_candles']=max(
-                        results['products'][product]['backend_completed_candles'],len(eligible))
-                    if dom.get('datafeedBars') is not None:
-                        if dom.get('datafeedProduct')!=product or dom.get('datafeedSession')!=session:
-                            continue
-                        bars=json.loads(dom.get('datafeedBars') or '[]')
-                        for b in bars:
-                            ref=eligible.get(b['time'])
-                            if ref is None:fail('FUNNEST_GETBARS_UNBACKED_TIME_'+product)
-                            for field in ('open','high','low','close','volume'):
-                                if float(ref[field])!=b[field]:
-                                    fail('FUNNEST_GETBARS_NUMERIC_MISMATCH_'+product+'_'+field)
-                        results['products'][product]['actual_funnest_getbars_matched']=max(
-                            results['products'][product]['actual_funnest_getbars_matched'],len(bars))
+                    # Allow full source-backed initial admission and at least
+                    # several L2 updates per product before switching again.
+                    # The original 1-snapshot-per-switch harness undersampled
+                    # the LIVE DOM despite correct source and archived replay.
+                    dwell_stop=min(until,time.monotonic()+10.0)
+                    while time.monotonic()<dwell_stop:
+                        page.wait_for_timeout(750)
+                        # One browser JS event-loop turn captures the same React
+                        # committed DOM. Sequential Playwright selectors can cross
+                        # a 1-second book update and create a false depth mismatch.
+                        dom=page.evaluate("""() => {
+                          const root=document.querySelector('main.v36-live-terminal');
+                          const top=root?.querySelector('[aria-label="Validated top of book"]');
+                          const depth=root?.querySelector('[aria-label="Live order book 10 levels"]');
+                          const cards={};
+                          for(const c of (top?.querySelectorAll('div')||[])){
+                            const label=c.querySelector(':scope > small')?.textContent?.trim()||'';
+                            const value=c.querySelector(':scope > strong')?.textContent?.trim();
+                            if(label&&value!==undefined)cards[label]=value;
+                          }
+                          return {
+                            status:root?.querySelector('[role="status"]')?.textContent||'',
+                            sourceHealth:root?.querySelector('[aria-label="Source health"]')?.textContent||'',
+                            selected:root?.querySelector('button[aria-pressed="true"]')?.textContent||'',
+                            liveLabel:root?.querySelector('header + p > strong')?.textContent||'',
+                            cards,
+                            depth:Array.from(depth?.querySelectorAll('tbody tr')||[],
+                              tr=>Array.from(tr.querySelectorAll('td'),td=>td.textContent?.trim()||'')),
+                            datafeedProduct:root?.querySelector('[data-testid="funnest-actual-getbars"]')?.getAttribute('data-product'),
+                            datafeedSession:root?.querySelector('[data-testid="funnest-actual-getbars"]')?.getAttribute('data-session'),
+                            datafeedBars:root?.querySelector('[data-testid="funnest-actual-getbars"]')?.getAttribute('data-bars')
+                          };
+                        }""")
+                        if dom['selected'].strip()!=product:continue
+                        if 'OBSERVED LIVE SOURCE' not in dom['liveLabel']:continue
+                        if session not in dom['sourceHealth']:continue
+                        match=VERSION.search(dom['status'])
+                        if not match:continue
+                        v=int(match.group(1))
+                        params=urlencode({'product':product,'session':session,'version':v})
+                        try:back=read(origin,'/api/v36/state?'+params)['state']
+                        except HTTPError as exc:
+                            if exc.code==409:continue  # old version evicted or source no longer healthy
+                            raise
+                        if back['session_id']!=session or back['product']!=product:
+                            fail('BAD_BACKEND_PRODUCT_SESSION')
+                        for metric in METRICS:
+                            observed=dom['cards'].get(metric.upper().replace('_',' '))
+                            if observed is None or Decimal(observed)!=Decimal(str(back[metric])):
+                                fail('EXACT_VERSION_DOM_'+metric+'_MISMATCH_'+product)
+                        expected=[[back['depth']['bids'][k]['price'],
+                                   back['depth']['bids'][k]['quantity'],
+                                   back['depth']['asks'][k]['price'],
+                                   back['depth']['asks'][k]['quantity']] for k in range(10)]
+                        if len(dom['depth'])!=10 or dom['depth']!=expected:
+                            fail('EXACT_VERSION_ATOMIC_DEPTH_MISMATCH_'+product)
+                        versions=results['products'][product]['versions']
+                        if v not in versions:versions.append(v)
+                        candles=read(origin,'/api/v36/candles?product='+product)
+                        if candles.get('session_id')!=session:fail('CANDLE_SESSION_CHANGED')
+                        eligible={b['time']:b for b in candles['rows']}
+                        results['products'][product]['backend_completed_candles']=max(
+                            results['products'][product]['backend_completed_candles'],len(eligible))
+                        if dom.get('datafeedBars') is not None:
+                            if dom.get('datafeedProduct')!=product or dom.get('datafeedSession')!=session:
+                                continue
+                            bars=json.loads(dom.get('datafeedBars') or '[]')
+                            for b in bars:
+                                ref=eligible.get(b['time'])
+                                if ref is None:fail('FUNNEST_GETBARS_UNBACKED_TIME_'+product)
+                                for field in ('open','high','low','close','volume'):
+                                    if float(ref[field])!=b[field]:
+                                        fail('FUNNEST_GETBARS_NUMERIC_MISMATCH_'+product+'_'+field)
+                            results['products'][product]['actual_funnest_getbars_matched']=max(
+                                results['products'][product]['actual_funnest_getbars_matched'],len(bars))
+                print('LIVE_BROWSER_PROGRESS '+json.dumps({
+                    'elapsed_seconds':round(time.monotonic()-started,1),
+                    'verified_versions':{p:len(results['products'][p]['versions'])
+                                         for p in PRODUCTS},
+                    'backed_funnest_bars':{p:results['products'][p]['actual_funnest_getbars_matched']
+                                          for p in PRODUCTS}
+                },sort_keys=True),flush=True)
                 if errors:fail('CHROMIUM_JAVASCRIPT_RUNTIME_ERROR:'+errors[0][:150])
                 page.wait_for_timeout(1500)
         finally:
