@@ -50,7 +50,7 @@ test('new completed bars use subscribeBars onBar exactly once, no in-progress ti
 test('rewritten, omitted or out-of-order completed history is refused',()=>{
  const f=make();
  f.publish([candle(0),candle(1)],start+120500);
- assert.throws(()=>f.publish([candle(0),candle(1,{close:'101'})],start+120500),/REWRITTEN/);
+ assert.throws(()=>f.publish([candle(0),candle(1,{close:'100.03'})],start+120500),/REWRITTEN/);
  assert.throws(()=>f.publish([candle(0)],start+120500),/REWRITTEN/);
  assert.throws(()=>f.publish([candle(1),candle(0)],start+120500),/UNVERIFIED/);
  f.dispose();
