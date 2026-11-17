@@ -54,6 +54,19 @@ function observeCommittedEnvelope(bytes){
  liveTap.write(bytes);
 }
 
+// This is a local PID-bound, invalidation-only control message.
+// It is not an exchange event and never enters the immutable JSONL archive.
+function notifyObserverTransportGap(){
+ if(!tapUsable)return;
+ const frame=Buffer.from('V36_TAP_CONTROL '+JSON.stringify({
+   schema:'v36_tap_transport_control_v1',status:'SOURCE_GAP',
+   connection_id:c?.id??null})+'\n');
+ if(liveTap.writableLength+frame.length>=MAX_TAP_PENDING_BYTES){
+   tapUsable=false;liveTap.destroy();return;
+ }
+ liveTap.write(frame);
+}
+
 if(process.env.SOAK_TEST_FIXTURE!==undefined && !['0','1'].includes(process.env.SOAK_TEST_FIXTURE))throw Error('Bad synthetic fixture flag');
 let injectedFault=false;
 if(rawBudgetBytes<1024||chunkTargetBytes<1024)throw Error('Raw and chunk budget must be >=1024');
@@ -152,6 +165,7 @@ function finish(reason){if(stopped)return;stopped=true;tapUsable=false;
  if(!meta.ready_for_research)process.exitCode=2;
  }catch(e){console.error('ARCHIVE_FINALIZE_ERROR',String(e));process.exitCode=3;}}
 function fail(reason){if(stopped)return;
+ notifyObserverTransportGap();
  meta.faults.push({connection_id:c?.id??null,at_utc:utc(),reason:String(reason).slice(0,280)});
  if(c){c.integrity_fault=true;c.state='QUARANTINED';c.ended_utc=utc();}
  try{ws?.close();}catch(e){meta.faults.push({connection_id:c?.id??null,at_utc:utc(),reason:'SOCKET_CLOSE_ERROR:'+String(e).slice(0,250)});}
