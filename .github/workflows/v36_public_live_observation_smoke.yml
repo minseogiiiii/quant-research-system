@@ -156,3 +156,52 @@ jobs:
           python -u btc_eth_terminal/scripts/v36_verify_live_capture.py \
             --evidence "$WORKDIR/V36_OBSERVER_EVIDENCE.json"
           echo 'PASS HOST_OBSERVED_READ_ONLY_LIVE_SOURCE_AND_INDEPENDENT_CAPTURE_REPLAY'
+          echo "V36_PRIVATE_EVIDENCE_PATH=$WORKDIR/V36_OBSERVER_EVIDENCE.json" >> "$GITHUB_ENV"
+      - name: Real collected Coinbase archive to authenticated Chromium DOM quote parity
+        timeout-minutes: 3
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir playwright==1.55.0
+          cd btc_eth_terminal/frontend
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          cd ..
+          python scripts/v36_build_frontend.py --verify-existing
+          command -v google-chrome
+          cd ../
+          python - "$V36_PRIVATE_EVIDENCE_PATH" <<'PY'
+          import json,os,subprocess,sys
+          from pathlib import Path
+          p=Path(sys.argv[1]).resolve()
+          evidence=json.loads(p.read_bytes())
+          if evidence.get('observer_source_complete') is not True:
+              raise SystemExit('BLOCKED_OBSERVER_LIFECYCLE_NOT_VERIFIED')
+          source=Path(evidence['captured_dir'])
+          source_pin=evidence['captured_manifest_sha256']
+          report=Path(os.environ['RUNNER_TEMP'])/'v36_real_source_browser_report.json'
+          command=[sys.executable,'btc_eth_terminal/scripts/v36_archive_browser_e2e.py',
+                   '--capture',str(source),'--manifest-sha256',source_pin,
+                   '--browser-executable','/usr/bin/google-chrome','--report',str(report)]
+          process=subprocess.run(command,check=False)
+          if not report.is_file():
+              raise SystemExit('BLOCKED_NO_CHROMIUM_REPORT_EXIT_'+str(process.returncode))
+          result=json.loads(report.read_bytes())
+          # The existing harness intentionally exits 2 for numeric canvas
+          # parity not verified. Require REAL source DOM quote parity and do
+          # NOT inflate a canvas-presence assertion into OHLCV visual parity.
+          if (result.get('browser_status')!='PASS_DOM_BOOK_AND_QUOTES_ONLY'
+              or result.get('status')!='PARTIAL_CANVAS_VALUES_UNVERIFIED'
+              or result.get('market_data_mocked') is not False
+              or len(result.get('verified_products',[]))!=2):
+              print('BLOCKED_REAL_CHROMIUM_DOM_VERIFICATION',
+                    json.dumps({'status':result.get('status'),
+                                'browser_status':result.get('browser_status'),
+                                'reason':str(result.get('error',result.get('blocker','')))[:250]}))
+              raise SystemExit(2)
+          print('PASS_REAL_COINBASE_ARCHIVE_CHROMIUM_DOM_QUOTES',
+                json.dumps({'browser_status':result['browser_status'],
+                            'product_versions':{x['product']:x['state_version']
+                                                for x in result['verified_products']},
+                            'source_manifest_sha256':source_pin,
+                            'chart_canvas_OHLCV_numeric_parity':'NOT_VERIFIED',
+                            'market_data_mocked':False,'trading_enabled':False},sort_keys=True))
+          PY
