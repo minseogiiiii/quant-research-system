@@ -78,6 +78,39 @@ def capture_ready_for_research(collector_rc: int, manifest: object) -> bool:
             and manifest.get('all_connections_have_snapshots') is True)
 
 
+def observer_source_complete(manifest: object, health: object, reader_finished: bool) -> bool:
+    """Prove the observer consumed the FULL finalized capture, not only a snapshot.
+
+    Source-readiness alone is insufficient if the optional tap drops packets.
+    This is host-level continuity evidence, not signed exchange attestation.
+    """
+    if not reader_finished or not isinstance(manifest, dict) or not isinstance(health, dict):
+        return False
+    connections = manifest.get('connections')
+    if not isinstance(connections, list) or len(connections) != 1:
+        return False
+    c = connections[0]
+    if not isinstance(c, dict):
+        return False
+    return (
+        health.get('mode') == 'LIVE_SOURCE'
+        and health.get('live_feed') is True
+        and health.get('trading_enabled') is False
+        and type(manifest.get('messages')) is int
+        and manifest['messages'] > 0
+        and type(health.get('messages')) is int
+        and health['messages'] == manifest['messages'] == c.get('messages')
+        and type(health.get('last_sequence')) is int
+        and health['last_sequence'] == c.get('last_sequence') == manifest['messages']-1
+        and health.get('connection_id') == c.get('id') == 0
+        and health.get('connection_gaps') == 0
+        and health.get('heartbeats') == c.get('heartbeat_count')
+        and type(health.get('heartbeats')) is int and health['heartbeats'] > 0
+        and set(health.get('snapshots', [])) == {'BTC-USD', 'ETH-USD'}
+        and set(health.get('subscriptions', [])) == {'level2', 'market_trades', 'heartbeats'}
+    )
+
+
 def main(argv=None)->int:
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--workdir',required=True,type=Path)
@@ -126,7 +159,7 @@ def main(argv=None)->int:
          'SOAK_CHUNK_LIMIT_BYTES':'8000000',
          'SOAK_TEST_FIXTURE':'0','SOAK_TEST_DISCONNECT_AFTER_MESSAGES':'0',
          'V36_LIVE_TAP_SOCKET':str(tap_path)}
-    done=[False];proc=None
+    done=[False];proc=None;worker=None;observer_finished=False;observer_health=None
     start=time.monotonic()
     try:
         with (work/'collector_stdout.log').open('xb') as stdout, (work/'collector_stderr.log').open('xb') as stderr:
@@ -152,6 +185,13 @@ def main(argv=None)->int:
             except KeyboardInterrupt:
                 proc.send_signal(signal.SIGTERM)
             proc.wait(timeout=8)
+            # Accepted multi-megabyte socket writes may remain in-flight
+            # after the collector exits. Wait for the tap reader before
+            # asserting full observer continuity.
+            if worker is not None:
+                worker.join(timeout=8.0)
+                observer_finished=not worker.is_alive()
+            observer_health=engine.health()
             engine.stopped()
             stdout.flush();os.fsync(stdout.fileno())
             stderr.flush();os.fsync(stderr.fileno())
@@ -165,12 +205,17 @@ def main(argv=None)->int:
         except (ValueError, UnicodeError):
             capture_meta=None
         capture_ready=capture_ready_for_research(proc.returncode,capture_meta)
+        observer_complete=observer_source_complete(capture_meta,observer_health,
+                                                   observer_finished)
         evidence={'schema':'v36_observer_evidence_v1','mode':'LIVE_SOURCE',
                   'source_attestation':'HOST_PID_AND_CLOCK_ONLY_NOT_SIGNED_EXCHANGE',
                   'producer_script_sha256':script_hash,'collector_exit_code':proc.returncode,
                   'elapsed_seconds':round(time.monotonic()-start,3),
                   'captured_manifest_sha256':source_hash,
                   'capture_ready_for_research':capture_ready,
+                  'observer_reader_finished':observer_finished,
+                  'observer_source_complete':observer_complete,
+                  'observer_health_before_stop':observer_health,
                   'capture_status':capture_meta.get('status') if isinstance(capture_meta,dict) else None,
                   'capture_message_count':capture_meta.get('messages') if isinstance(capture_meta,dict) else None,
                   'capture_fault_count':len(capture_meta.get('faults',[])) if isinstance(capture_meta,dict) and isinstance(capture_meta.get('faults'),list) else None,
@@ -182,7 +227,7 @@ def main(argv=None)->int:
             json.dump(evidence,stream,indent=2,sort_keys=True);stream.write('\n')
             stream.flush();os.fsync(stream.fileno())
         print(json.dumps(evidence,sort_keys=True))
-        return 0 if capture_ready and source_hash else 2
+        return 0 if capture_ready and observer_complete and source_hash else 2
     finally:
         done[0]=True
         if proc is not None and proc.poll() is None:
