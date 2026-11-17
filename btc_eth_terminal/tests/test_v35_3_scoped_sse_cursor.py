@@ -74,6 +74,14 @@ class ScopedCursorContract(unittest.TestCase):
         self.assertEqual(status,409)
         self.assertEqual(json.loads(body)["error"],"RESYNC_REQUIRED")
 
+    def test_numeric_stream_after_is_rejected_without_source_lineage(self):
+        # A URL after=N is not a source/product-qualified SSE resume token.
+        url=self.servers[1][2]+"/api/v35/stream?product=BTC-USD&after=1&limit=2"
+        with self.assertRaises(HTTPError) as cm:
+            urlopen(url,timeout=4)
+        self.assertEqual(cm.exception.code,409)
+        self.assertEqual(json.loads(cm.exception.read())["error"],"RESYNC_REQUIRED")
+
     def test_invalid_cursor_rejected(self):
         status,body=self.stream(0,"BTC-USD","FAKE")
         self.assertEqual(status,400)
