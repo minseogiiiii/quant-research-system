@@ -15,7 +15,9 @@ import stat
 
 BASE = Path(__file__).resolve().parents[1]
 MANIFEST = BASE / 'frontend' / 'v33_dist_integrity.json'
-DIST = BASE / 'frontend' / 'dist'
+# Legacy /research is still backed by the original SHA-pinned v33 build,
+# not the v34 or v36 working dist tree.
+DIST = BASE / 'frontend' / 'dist_v33'
 MANIFEST_BYTES_MAX = 4096
 PINNED_MANIFEST_SHA256 = 'c29706548d651735a71cc9217b17607fb24060fe4430ef84a61808ae0d1241e4'
 
