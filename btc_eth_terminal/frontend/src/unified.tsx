@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FnChart } from '@funnest/charts-react';
 import type { Datafeed, Bar, SymbolInfo, BarsResult, Resolution } from '@funnest/charts';
 import { validateDepth10 } from './marketStateIntegrity';
+import ArchiveReplayPanel from './ArchiveReplayPanel';
 
 const products = ['BTC-USD', 'ETH-USD'] as const;
 type Product = typeof products[number];
@@ -236,6 +237,7 @@ export default function UnifiedTerminal(){
        <div className="pro-progress"><div className="pro-progress-rail"><div className="pro-progress-fill" style={{width:shownFeatures.length?`${((activeIndex+1)/shownFeatures.length)*100}%`:'0%'}}/></div><span>{Math.max(0,activeIndex+1)} / {shownFeatures.length} SLICES</span></div>
        <div className="pro-utc">{cutoff!==null?fullTime(cutoff):'NO SNAPSHOT'}</div>
      </div>
+     <ArchiveReplayPanel product={product}/>
      <div className="uni-stats pro-metrics" aria-label="Receiver-asof quote statistics">
        <article><div className="pro-metric-top">MIDPRICE <span>L1 / USD</span></div><strong>{compact(mid,2)}</strong><small>{current?'RECEIVER-ASOF QUOTE':'INVALID OR STALE L1'}</small></article>
        <article><div className="pro-metric-top">BEST BID <span>USD</span></div><strong className="pro-positive">{compact(bid,2)}</strong><small>{bidQty!==null?`${compact(bidQty,6)} BTC/ETH BASE`:'NO VALID SIZE'}</small></article>
