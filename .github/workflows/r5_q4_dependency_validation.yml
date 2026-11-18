@@ -1,0 +1,41 @@
+name: R5-Q4 reproducible dependency verification
+on:
+  push:
+    branches:
+      - verification/r5-q4-dependency-build-20261118
+    paths:
+      - .github/workflows/r5_q4_dependency_validation.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pinned-frontend-deps:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify pinned manifest matches frozen R5
+        working-directory: btc_eth_terminal/frontend
+        run: |
+          test "$(git hash-object package-lock.json)" = "f7e3d5cdc727a3c7f91f7b254cab90dafd7817b5"
+          test "$(git hash-object package.json)" = "a593d8b84a27c8a8191955bb9e354b544591e2f7"
+      - name: Fetch exact locked dependencies without package lifecycle scripts
+        working-directory: btc_eth_terminal/frontend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Freeze installed files for offline local Q4 compilation
+        run: |
+          tar -C btc_eth_terminal/frontend -czf r5-q4-locked-dependencies-linux-x64.tar.gz node_modules
+          sha256sum r5-q4-locked-dependencies-linux-x64.tar.gz > r5-q4-dependency-sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r5-q4-locked-deps-linux-x64
+          path: |
+            r5-q4-locked-dependencies-linux-x64.tar.gz
+            r5-q4-dependency-sha256.txt
+          retention-days: 3
+      - name: Check baseline clean TypeScript and Vite compilation
+        working-directory: btc_eth_terminal/frontend
+        run: npm run build
