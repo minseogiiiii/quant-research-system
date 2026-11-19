@@ -58,11 +58,11 @@ jobs:
           print('PASS_SOURCE_ONLY_Q7_BUILD_THREE_PINNED_ASSETS')
           print('NOT_RELEASE_ACCEPTANCE_PRIVATE_ARCHIVES_AND_LIVE_BROWSER_NOT_TESTED')
           PY
-      - name: Execute fixture-free completed-candle contract tests
+      - name: Execute fixture-free completed-candle and source-health contracts
         working-directory: btc_eth_terminal/frontend
         shell: bash
         run: |
           set -euo pipefail
-          node --experimental-strip-types --test tests/v36_1_completed_candle_feed.test.mjs | tee /tmp/q7_candles.log
+          node --experimental-strip-types --test tests/v36_1_completed_candle_feed.test.mjs tests/v36_client_liveness.test.mjs | tee /tmp/q7_candles.log
           grep -q '# fail 0' /tmp/q7_candles.log
           grep -q '# skipped 0' /tmp/q7_candles.log
