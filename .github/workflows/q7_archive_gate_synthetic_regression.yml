@@ -1,0 +1,39 @@
+name: Q7 durable archive gate synthetic verification (not LIVE promotion)
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths:
+      - '.github/workflows/q7_archive_gate_synthetic_regression.yml'
+      - 'btc_eth_terminal/scripts/v36_3_durable_archive_gate.py'
+      - 'btc_eth_terminal/tests/test_v36_3_durable_archive_gate.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  archive-forensic-synthetic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Freeze original Q7 archive gate and 9 tests before execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object btc_eth_terminal/scripts/v36_3_durable_archive_gate.py)" = "034036bf94e52cad291395582e8751798e68eca6"
+          test "$(git hash-object btc_eth_terminal/tests/test_v36_3_durable_archive_gate.py)" = "0c8a52f1c1a2b041d9addfe96bb5bd2c79180052"
+          test "$(git hash-object btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs)" = "e6dc2f2da319775c911249ec2b3b44f0c3e7910c"
+          python -m py_compile btc_eth_terminal/scripts/v36_3_durable_archive_gate.py
+      - name: Verify 520 chunks, hardlink and symlink injection, and real Node SIGKILL mock collector
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_durable_archive_gate.py' -v 2>&1 | tee /tmp/q7_archive_gate.log
+          grep -q 'Ran 9 tests' /tmp/q7_archive_gate.log
+          grep -q '^OK$' /tmp/q7_archive_gate.log
+          echo 'VERIFIED_SYNTHETIC_ARCHIVE_GATE_ONLY_NO_REAL_LIVE_OR_24H_ATTESTATION'
