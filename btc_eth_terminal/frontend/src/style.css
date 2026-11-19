@@ -118,3 +118,13 @@ main.terminal-root .legacy-workspace-toggle{margin:18px 0 0;padding:14px 18px;bo
 .v36-live-terminal button:focus-visible { outline: 3px solid #8fcbee; outline-offset: 3px; }
 .v36-live-terminal a { color: #75cbf1; }
 .v36-live-terminal table td { padding: 3px 5px; border-bottom: 1px solid #244258; }
+
+/* Q7: research extension to existing unified terminal, no new charting stack. */
+.q7-factor{margin-top:12px;border-radius:4px!important}.q7-factor h3{font-size:14px;color:#d9e9f3;margin:6px 0}
+.q7-factor p{font-size:11px;color:#8da7b8;line-height:1.6}
+.q7-tabs{display:flex;gap:12px;border-bottom:1px solid #304152;margin:14px 0}
+.q7-tabs button{background:transparent;border:0;border-radius:0;color:#97b2c7;padding:10px 4px;cursor:pointer}
+.q7-tabs button[aria-selected=true]{color:#62d6c0;border-bottom:2px solid #62d6c0}
+.q7-factor table{width:100%;border-collapse:collapse;font:11px ui-monospace,monospace;color:#b9cede}
+.q7-factor th,.q7-factor td{padding:9px 8px;text-align:left;border-bottom:1px solid #293c4c}
+.q7-factor th{color:#859fb3}.q7-factor .q7-provenance{overflow-wrap:anywhere;color:#6f8da2;font-size:10px}
