@@ -39,7 +39,7 @@ def require(condition: bool, code: str) -> None:
 def git(*args: str) -> str:
     proc = subprocess.run(
         ["git", *args], check=True, text=True,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        capture_output=True,
     )
     return proc.stdout.strip()
 
