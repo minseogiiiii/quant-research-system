@@ -13,7 +13,7 @@ BASE = "64aa85081cab73c917333249eb8e200c8d4044fa"
 BRANCH = "staging/q7-readonly-qualification-20261119"
 PINS = {
     "btc_eth_terminal/backend/v37_factor_lab.py":
-        "a6d49d3c972d33d978f7a4373e11cd5eef1c1094",
+        "13e14f89e6668f88ee03726f4ef2875df6bdf9af",
     "btc_eth_terminal/backend/v37_frontend_integrity.py":
         "b7cb343a4f921b9a2db110feff2090aa67294f3b",
     "btc_eth_terminal/backend/v37_independent_factor_audit.py":
