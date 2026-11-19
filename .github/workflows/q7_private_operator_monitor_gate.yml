@@ -1,0 +1,39 @@
+name: Q7 private Unix monitor synthetic regression (not persistent-host acceptance)
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths:
+      - '.github/workflows/q7_private_operator_monitor_gate.yml'
+      - 'btc_eth_terminal/backend/v36_operator_monitor.py'
+      - 'btc_eth_terminal/tests/test_v36_3_operator_monitor.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  monitor-fault-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin Q7 monitored source and four immutable fault tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object btc_eth_terminal/backend/v36_operator_monitor.py)" = "01c1392f430d03a05d690b553d8a3b8d3d21662b"
+          test "$(git hash-object btc_eth_terminal/tests/test_v36_3_operator_monitor.py)" = "892c7dbf815b497de448ef0f69a8e55e7915083f"
+          test "$(git hash-object btc_eth_terminal/backend/v36_live_gateway.py)" = "8c7496dc9bcde5ce5d8f84f96ea3fc404bdf5ab9"
+          python -m py_compile btc_eth_terminal/backend/v36_operator_monitor.py btc_eth_terminal/tests/test_v36_3_operator_monitor.py
+      - name: Execute existing Unix monitor admission and Slowloris synthetic regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_operator_monitor.py' -v 2>&1 | tee /tmp/q7_monitor_test.log
+          grep -q 'Ran 4 tests' /tmp/q7_monitor_test.log
+          grep -q '^OK$' /tmp/q7_monitor_test.log
+      - name: Explicit classification
+        run: echo 'VERIFIED_SYNTHETIC_MONITOR_ONLY_NOT_PERSISTENT_LINUX_HOST'
