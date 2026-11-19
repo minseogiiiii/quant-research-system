@@ -57,7 +57,7 @@ def dec(v, *, positive=False, allow_zero=False):
         raise FactorLabReject('Expected decimal string or integer')
     try: d = Decimal(str(v))
     except InvalidOperation as exc: raise FactorLabReject('Invalid decimal') from exc
-    if not d.is_finite() or (positive and d <= 0) or (not positive and not allow_zero and d < 0):
+    if not d.is_finite() or (positive and d <= 0) or (not positive and d < 0):
         raise FactorLabReject('Nonfinite or out-of-domain decimal')
     return d
 
