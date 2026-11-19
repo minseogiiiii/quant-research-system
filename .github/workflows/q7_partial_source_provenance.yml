@@ -27,6 +27,11 @@ jobs:
           python-version: '3.12'
       - name: Verify exact eight Q7 source Git blobs, read-only prereg and legacy asset pins
         run: python .github/scripts/q7_partial_source_provenance.py
+      - name: Check dedicated provenance script against exact root Ruff version
+        shell: bash
+        run: |
+          python -m pip install 'ruff==0.15.22'
+          python -m ruff check .github/scripts/q7_partial_source_provenance.py
       - name: Ensure the same fail-closed verification under optimized Python
         run: python -O .github/scripts/q7_partial_source_provenance.py
       - name: Explicitly refuse to reinterpret partial check as release approval
