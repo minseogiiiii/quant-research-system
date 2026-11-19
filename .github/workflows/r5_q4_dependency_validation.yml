@@ -7,7 +7,7 @@ on:
       - .github/workflows/r5_q4_dependency_validation.yml
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   pinned-frontend-deps:
     runs-on: ubuntu-24.04
@@ -17,25 +17,52 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify pinned manifest matches frozen R5
+      - name: Verify pinned manifests from frozen integration source
+        id: pinned
         working-directory: btc_eth_terminal/frontend
         run: |
           test "$(git hash-object package-lock.json)" = "f7e3d5cdc727a3c7f91f7b254cab90dafd7817b5"
           test "$(git hash-object package.json)" = "a593d8b84a27c8a8191955bb9e354b544591e2f7"
-      - name: Fetch exact locked dependencies without package lifecycle scripts
+      - name: Install exact lockfile dependencies
+        id: install
         working-directory: btc_eth_terminal/frontend
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Freeze installed files for offline local Q4 compilation
+      - name: Retain lockfile-resolved Linux dependency tree
+        if: success()
         run: |
           tar -C btc_eth_terminal/frontend -czf r5-q4-locked-dependencies-linux-x64.tar.gz node_modules
           sha256sum r5-q4-locked-dependencies-linux-x64.tar.gz > r5-q4-dependency-sha256.txt
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: r5-q4-locked-deps-linux-x64
           path: |
             r5-q4-locked-dependencies-linux-x64.tar.gz
             r5-q4-dependency-sha256.txt
           retention-days: 3
-      - name: Check baseline clean TypeScript and Vite compilation
+      - name: Compile frozen R5 frontend baseline
+        id: build
         working-directory: btc_eth_terminal/frontend
         run: npm run build
+      - name: Write execution status to isolated verification branch
+        if: always()
+        env:
+          PIN_STATUS: ${{ steps.pinned.outcome }}
+          INSTALL_STATUS: ${{ steps.install.outcome }}
+          BUILD_STATUS: ${{ steps.build.outcome }}
+        run: |
+          mkdir -p verification
+          python3 - <<'PY'
+          import json,os,pathlib
+          info={'run_id':os.environ['GITHUB_RUN_ID'],'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],
+                'commit':os.environ['GITHUB_SHA'],'source':'GITHUB_ACTIONS_UBUNTU_24_04',
+                'pinned_check':os.environ['PIN_STATUS'],'npm_ci':os.environ['INSTALL_STATUS'],
+                'baseline_vite_build':os.environ['BUILD_STATUS'],
+                'artifact_name':'r5-q4-locked-deps-linux-x64' if os.environ['INSTALL_STATUS']=='success' else None}
+          pathlib.Path('verification/r5_q4_dependency_run_status.json').write_text(json.dumps(info,indent=2,sort_keys=True)+'\n')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add verification/r5_q4_dependency_run_status.json
+          git commit -m 'ci: record isolated dependency build result [skip ci]'
+          git push origin HEAD:verification/r5-q4-dependency-build-20261118
