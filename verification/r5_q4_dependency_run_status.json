@@ -1,0 +1,10 @@
+{
+  "artifact_name": "r5-q4-locked-deps-linux-x64",
+  "baseline_vite_build": "success",
+  "commit": "205c57d0284863589daf407340c687a872a39873",
+  "npm_ci": "success",
+  "pinned_check": "success",
+  "run_attempt": "1",
+  "run_id": "44428392061",
+  "source": "GITHUB_ACTIONS_UBUNTU_24_04"
+}
