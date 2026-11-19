@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git hash-object btc_eth_terminal/backend/v37_factor_lab.py)" = "a6d49d3c972d33d978f7a4373e11cd5eef1c1094"
+          test "$(git hash-object btc_eth_terminal/backend/v37_factor_lab.py)" = "13e14f89e6668f88ee03726f4ef2875df6bdf9af"
           test "$(git hash-object btc_eth_terminal/backend/v37_frontend_integrity.py)" = "b7cb343a4f921b9a2db110feff2090aa67294f3b"
           test "$(git hash-object btc_eth_terminal/backend/v36_live_gateway.py)" = "8c7496dc9bcde5ce5d8f84f96ea3fc404bdf5ab9"
           test "$(git hash-object btc_eth_terminal/backend/bridge.py)" = "75aefb57564c1dfaeadac11b1d929e7bfbbfffcc"
