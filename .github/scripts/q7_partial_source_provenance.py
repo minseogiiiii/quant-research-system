@@ -8,6 +8,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -29,7 +30,8 @@ def git(*args: str) -> str:
 def check(root: Path) -> dict:
     if git('rev-parse','--is-inside-work-tree') != 'true':
         raise ValueError('NOT_GIT_REPOSITORY')
-    branch = git('branch','--show-current')
+    # PR merge refs use detached HEAD; require exact expected source branch.
+    branch = git('branch','--show-current') or os.environ.get('GITHUB_HEAD_REF','') or os.environ.get('GITHUB_REF_NAME','')
     if branch != 'staging/q7-readonly-qualification-20261119':
         raise ValueError('WRONG_STAGING_BRANCH')
     if subprocess.run(['git','merge-base','--is-ancestor',R5_BASE,'HEAD'],check=False).returncode:
