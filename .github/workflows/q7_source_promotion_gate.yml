@@ -13,6 +13,8 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -64,4 +66,9 @@ jobs:
           PY
       - name: Run dependency-independent Node contracts
         working-directory: btc_eth_terminal/frontend
-        run: node --experimental-strip-types --test tests/*.test.mjs
+        shell: bash
+        run: |
+          set -o pipefail
+          node --experimental-strip-types --test tests/*.test.mjs | tee /tmp/q7_node_contract.log
+          grep -q '# fail 0' /tmp/q7_node_contract.log
+          grep -q '# skipped 0' /tmp/q7_node_contract.log
