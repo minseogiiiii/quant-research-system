@@ -7,6 +7,7 @@ on:
     branches: [integration/btc-eth-unified-terminal]
 permissions:
   contents: read
+  actions: read
 jobs:
   q7-source-and-funnest:
     runs-on: ubuntu-24.04
@@ -64,7 +65,34 @@ jobs:
           assert manifest['trading_enabled'] is False
           print('PASS_Q7_VERSIONED_FRONTEND_HASH_PINS')
           PY
-      - name: Run dependency-independent Node contracts
+      - name: Restore reviewed immutable v35.1 frontend from its pinned historical run
+        uses: actions/download-artifact@v4
+        with:
+          name: v35-1-unpinned-candidate-dist
+          run-id: 43993998279
+          github-token: ${{ github.token }}
+          path: btc_eth_terminal/frontend/dist_v35_1
+      - name: Validate restored v35.1 files before invoking historical Node tests
+        working-directory: btc_eth_terminal/frontend
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json
+          folder=Path('dist_v35_1')
+          m=json.loads(Path('v35_1_dist_integrity.json').read_bytes())
+          actual={p.relative_to(folder).as_posix() for p in folder.rglob('*') if p.is_file()}
+          expected=set(m['files'])
+          if actual != expected: raise SystemExit('HISTORICAL_BUILD_FILE_SET_MISMATCH')
+          for name, info in m['files'].items():
+              p=folder/name
+              if p.is_symlink(): raise SystemExit('HISTORICAL_BUILD_SYMLINK')
+              data=p.read_bytes()
+              if len(data)!=info['bytes'] or hashlib.sha256(data).hexdigest()!=info['sha256']:
+                  raise SystemExit('HISTORICAL_BUILD_SHA256_MISMATCH:'+name)
+          print('PASS_HISTORICAL_V35_1_FROZEN_ASSETS_3_OF_3')
+          PY
+      - name: Run Node contracts with explicit fixture coverage
         working-directory: btc_eth_terminal/frontend
         shell: bash
         run: |
