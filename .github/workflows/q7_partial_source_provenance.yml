@@ -27,7 +27,9 @@ jobs:
           python-version: '3.12'
       - name: Verify exact eight Q7 source Git blobs, read-only prereg and legacy asset pins
         run: python .github/scripts/q7_partial_source_provenance.py
-      - name: Ensure the same fail-closed verification under optimized Python\n        run: python -O .github/scripts/q7_partial_source_provenance.py\n      - name: Explicitly refuse to reinterpret partial check as release approval
+      - name: Ensure the same fail-closed verification under optimized Python
+        run: python -O .github/scripts/q7_partial_source_provenance.py
+      - name: Explicitly refuse to reinterpret partial check as release approval
         shell: bash
         run: |
           echo 'PASS_PARTIAL_Q7_BLOB_PROVENANCE_ONLY'
