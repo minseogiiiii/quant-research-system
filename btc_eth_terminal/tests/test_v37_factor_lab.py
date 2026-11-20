@@ -81,6 +81,24 @@ class FactorTests(unittest.TestCase):
         self.assertEqual(constrained['displayed_depth_fraction_assumed'],'0.5')
         for side in ('LONG','SHORT'):
             with self.assertRaises(FactorLabReject):static_walk(d,side,'1','1','0')
+    def test_negative_cost_assumptions_fail_closed(self):
+        d=book()
+        for fee,slip in (('-10','0'),('0','-100'),('-10','-200'),
+                         ('-0.000001','0'),('0','-0.000001')):
+            with self.subTest(fee=fee,slippage=slip):
+                with self.assertRaises(FactorLabReject):
+                    static_walk(d,'BUY','1',fee,slip)
+        for fraction in ('0','-0.1','1.00001'):
+            with self.subTest(fraction=fraction):
+                with self.assertRaises(FactorLabReject):
+                    static_walk(d,'BUY','1','0','0',fraction)
+        for side in ('BUY','SELL'):
+            with self.subTest(side=side):
+                x=static_walk(d,side,'1','0','0')
+                self.assertEqual(x['fee_bps_assumed'],'0')
+                self.assertEqual(x['extra_non_book_slippage_bps_assumed'],'0')
+                self.assertGreaterEqual(Decimal(x['total_indicative_taker_cost_bps_assumed']),0)
+
     def test_pinned_real_archived_report_and_no_asof_leak(self):
         obj,digest=load_report()
         self.assertEqual(obj['research_verdict'],'INSUFFICIENT_EVIDENCE')
