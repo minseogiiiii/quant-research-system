@@ -145,7 +145,7 @@ jobs:
           p=pathlib.Path(os.environ['PUBLIC'])
           replay=(p/'replay.log').read_text()
           fanout=(p/'fanout.log').read_text()
-          match=re.search(r'PASS_REAL_PUBLIC_LIVE_FANOUT (\\{.*\\})',fanout)
+          match=re.search(r'PASS_REAL_PUBLIC_LIVE_FANOUT (\{.*\})',fanout)
           if not match:raise SystemExit('SSE_RESULT_MISSING')
           sse=json.loads(match.group(1))
           if (sse.get('status')!='PASS' or sse.get('max_active_sse',0)<8
