@@ -65,6 +65,30 @@ jobs:
           echo 'VERIFIED_NO_NEW_PRIVATE_ARCHIVE_OR_COMPILED_DIST'
       - name: Compile Python source (syntax only; no raw data access)
         run: python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+      - name: Verify synthetic source gaps, recovery, archive safety and SSE reservations
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          : > "$RUNNER_TEMP/q7_source_synthetic_tests.log"
+          for spec in \
+            test_v36_3_operator_monitor.py \
+            test_v36_3_durable_archive_gate.py \
+            test_v36_2_sse_backpressure.py \
+            test_v36_2_storage_faults.py \
+            test_v36_3_live_health_reservation.py \
+            test_v36_2_transport_gap.py; do
+            python -m unittest discover -s btc_eth_terminal/tests -p "$spec" -v 2>&1 | tee -a "$RUNNER_TEMP/q7_source_synthetic_tests.log"
+          done
+          python - <<'PY'
+          import os,re,pathlib
+          s=(pathlib.Path(os.environ['RUNNER_TEMP'])/'q7_source_synthetic_tests.log').read_text()
+          counts=[int(x) for x in re.findall(r'Ran (\d+) tests? in',s)]
+          if len(counts)!=6 or sum(counts)!=20 or re.search(r'(?m)^FAILED|\bskipped=\d+',s):
+              raise SystemExit('INCOMPLETE_OR_FAILED_SYNTHETIC_COVERAGE:'+repr(counts))
+          print('PASS_20_SYNTHETIC_OPERATOR_ARCHIVE_SSE_GAP_TESTS')
+          PY
       - name: Restore exact npm lockfile
         working-directory: btc_eth_terminal/frontend
         run: |
