@@ -1,0 +1,98 @@
+name: Q7 real Coinbase source controlled-disconnect quarantine
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths: ['.github/workflows/q7_real_source_injected_fault.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-public-source-injected-gap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm exact Q7 observation source and fault isolation semantics
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,pathlib,subprocess
+          m=json.loads(pathlib.Path('.github/release-evidence/q7_q8_source_git_blobs.json').read_text())['paths']
+          for p in ('btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs',
+                    'btc_eth_terminal/scripts/v36_observe_existing_collector.py',
+                    'btc_eth_terminal/scripts/v36_3_durable_archive_gate.py',
+                    'btc_eth_terminal/backend/v36_live_engine.py'):
+              if subprocess.check_output(['git','hash-object',p],text=True).strip()!=m[p]:
+                  raise SystemExit('SOURCE_PIN_MISMATCH:'+p)
+          print('PASS_ACTUAL_Q7_FAULT_TEST_SOURCE_PINS')
+          PY
+      - name: Force one controlled disconnect in genuine Coinbase network capture
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          set +e
+          PRIVATE="$RUNNER_TEMP/q7_private_injected_source_$GITHUB_RUN_ID"
+          PUBLIC="$RUNNER_TEMP/q7_public_injected_summary"
+          mkdir -p "$PUBLIC"
+          python -u btc_eth_terminal/scripts/v36_observe_existing_collector.py \
+            --execute-public-capture --duration 105 --port 8766 \
+            --workdir "$PRIVATE" --fault-test-only \
+            --inject-disconnect-after-messages 350 \
+            --raw-budget-bytes 1000000000 --archive-budget-bytes 2000000000 \
+            --disk-reserve-bytes 4294967296 \
+            > "$PUBLIC/observer.jsonl" 2> "$PUBLIC/observer_stderr.log"
+          OBSERVER_RC=$?
+          export PRIVATE PUBLIC OBSERVER_RC
+          python - <<'PY'
+          import json,os,pathlib,subprocess,sys
+          p=pathlib.Path(os.environ['PUBLIC'])
+          root=pathlib.Path(os.environ['PRIVATE'])
+          r={'schema':'q7_live_real_public_injected_fault_v1','classification':'REAL_PUBLIC_SOURCE_WITH_SYNTHETIC_DISCONNECT',
+             'observer_rc':int(os.environ['OBSERVER_RC']),'raw_archive_uploaded':False,
+             'real_ordering_enabled':False,'uninterrupted_capture_approved':False}
+          efile=root/'V36_OBSERVER_EVIDENCE.json'
+          if not efile.is_file():
+              (p/'result.json').write_text(json.dumps(r,indent=2))
+              raise SystemExit('NO_OBSERVER_FAULT_EVIDENCE')
+          e=json.loads(efile.read_bytes())
+          source=pathlib.Path(e['captured_dir'])
+          m=json.loads((source/'manifest.json').read_bytes())
+          sessions=e.get('observer_health_before_stop',{}).get('source_session_history',[])
+          r.update({'injection_requested':e.get('injected_disconnect_after_messages'),
+                    'fault_test_only':e.get('fault_test_only'),
+                    'observer_source_complete':e.get('observer_source_complete'),
+                    'capture_ready_for_research':e.get('capture_ready_for_research'),
+                    'manifest_status':m.get('status'),'faults':len(m.get('faults',[])),
+                    'source_connections':len(m.get('connections',[])),
+                    'source_session_count':len(sessions),'source_session_ids_distinct':len({s.get('session_id') for s in sessions})==len(sessions)})
+          with (p/'archive_quarantine_gate.log').open('w') as out:
+              gate=subprocess.run([sys.executable,'btc_eth_terminal/scripts/v36_3_durable_archive_gate.py',
+                  '--capture',str(source),'--manifest-sha256',e['captured_manifest_sha256']],
+                  stdout=out,stderr=subprocess.STDOUT)
+          r['gate_exit_code']=gate.returncode
+          (p/'result.json').write_text(json.dumps(r,indent=2,sort_keys=True)+'\n')
+          if not (r['observer_rc']==2 and r['injection_requested']==350 and
+                  r['fault_test_only'] is True and r['observer_source_complete'] is False and
+                  r['capture_ready_for_research'] is False and
+                  r['faults']>=1 and r['source_connections']>=2 and
+                  r['source_session_count']>=2 and r['source_session_ids_distinct'] and
+                  r['gate_exit_code']!=0):
+              raise SystemExit('FAIL_CONTROLLED_GAP_CANNOT_BE_PROMOTED_OR_DID_NOT_RECONNECT')
+          print('PASS_REAL_COINBASE_INJECTED_GAP_NEW_SESSION_AND_ARCHIVE_QUARANTINE')
+          PY
+      - name: Save sanitized injection summary; no raw or credentials
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q7-real-source-injected-gap-summary-not-actual-outage
+          path: ${{ runner.temp }}/q7_public_injected_summary/
+          retention-days: 7
+          if-no-files-found: warn
