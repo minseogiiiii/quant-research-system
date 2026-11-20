@@ -41,6 +41,21 @@ jobs:
           print('PASS_REVIEWED_Q7_Q8_SOURCE_PINS_9_COMPONENTS')
           PY
           node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
+      - name: Validate SSE duration is accepted before starting 30-minute LIVE capture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib,re
+          src=pathlib.Path('btc_eth_terminal/scripts/v36_3_real_live_fanout.py').read_text()
+          m=re.search(r'if not (\d+)<=args\.seconds<=(\d+):p\.error',src)
+          if m is None: raise SystemExit('FANOUT_SECONDS_CONTRACT_NOT_INSPECTABLE')
+          lo,hi=map(int,m.groups())
+          requested=240
+          if not lo <= requested <= hi:
+              raise SystemExit('FANOUT_DURATION_OUTSIDE_EXPLICIT_CLI_CONTRACT')
+          print(f'PASS_SSE_DURATION_PREFLIGHT {requested} seconds within {lo}..{hi}')
+          PY
       - name: Capture 1800 seconds actual Coinbase and independently audit raw stream
         timeout-minutes: 38
         shell: bash
@@ -83,7 +98,7 @@ jobs:
           PY
           METRICS_PID=$!
           python -u btc_eth_terminal/scripts/v36_3_real_live_fanout.py \
-            --seconds 600 --port 8766 --observer-pid "$OBSERVER_PID" \
+            --seconds 240 --port 8766 --observer-pid "$OBSERVER_PID" \
             > "$PUBLIC/fanout.log" 2>&1
           FANOUT_RC=$?
           wait "$OBSERVER_PID"
@@ -113,7 +128,7 @@ jobs:
           import json,os,pathlib
           p=pathlib.Path(os.environ['PUBLIC'])
           o={'schema':'q7_30minute_source_acceptance_v1','mode':'REAL_PUBLIC_COINBASE_LIVE',
-             'target_capture_seconds':1800,'client_target_seconds':600,'persistent_host_certified':False,
+             'target_capture_seconds':1800,'client_target_seconds':240,'persistent_host_certified':False,
              '24h_source_certified':False,'real_browser_e2e_certified':False,'real_orders_enabled':False,
              'archive_uploaded':False,
              **{k.lower():int(os.environ[k]) for k in ('CAPTURE_RC','FANOUT_RC','REPLAY_RC','GATE_RC')}}
@@ -129,6 +144,13 @@ jobs:
           import json,os,pathlib,re
           p=pathlib.Path(os.environ['PUBLIC'])
           replay=(p/'replay.log').read_text()
+          fanout=(p/'fanout.log').read_text()
+          match=re.search(r'PASS_REAL_PUBLIC_LIVE_FANOUT (\\{.*\\})',fanout)
+          if not match:raise SystemExit('SSE_RESULT_MISSING')
+          sse=json.loads(match.group(1))
+          if (sse.get('status')!='PASS' or sse.get('max_active_sse',0)<8
+              or len(sse.get('clients',[]))!=8 or sse.get('elapsed_seconds',0)<230):
+              raise SystemExit('SSE_EIGHT_CLIENTS_OR_DURATION_NOT_VERIFIED')
           gate=(p/'archive_gate.log').read_text()
           if 'PASS_COINBASE_LIVE_POST_CAPTURE_AUDIT' not in replay:
               raise SystemExit('REPLAY_NOT_VERIFIED')
