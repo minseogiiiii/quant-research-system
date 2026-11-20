@@ -1,7 +1,7 @@
-"""Adversarial synthetic-only operational regression of source and SSE races.
+"""Adversarial synthetic-only operational tests for R3 live engine + Gateway.
 
-No archived records are promoted to LIVE, and no real exchange orders are made.
-R3 baseline failed BOTH tests; candidate v36.2 must pass both.
+No archived source is promoted to LIVE. The clock and session are controlled
+explicitly to isolate source-staleness and HTTP/SSE handshake races.
 """
 import json
 import sys
@@ -9,13 +9,12 @@ from pathlib import Path
 import threading
 import unittest
 from urllib.request import urlopen
-
-# Frozen older v34 modules prepend their own backend to sys.path. Keep the
-# current candidate's package ahead of those historical helper paths.
-ROOT = str(Path(__file__).resolve().parents[1] / 'backend')
-sys.path.insert(0, ROOT)
+# Some frozen v34 modules prepend their own backend to sys.path.
+# Explicitly keep the local candidate overlay ahead of frozen imports.
+OVERLAY = str(Path(__file__).resolve().parents[1] / 'backend')
+sys.path.insert(0, OVERLAY)
 from v36_live_engine import LiveMarketEngine
-sys.path.insert(0, ROOT)
+sys.path.insert(0, OVERLAY)
 from v36_live_gateway import server_for_live
 
 SESSION_A='a'*32
@@ -31,15 +30,17 @@ class OperationalRaceContract(unittest.TestCase):
         with e._cv:
             e.status='HEALTHY';e.reason=None;e.session_id=SESSION_A
             e.last_local_mono=mono[0];e.last_heartbeat_local_mono=mono[0]
-            for p in ('BTC-USD','ETH-USD'):
-                e.last_l2[p]=(clock[0],3,'a'*64,'10000000000')
+            for product in ('BTC-USD','ETH-USD'):
+                e.last_l2[product]=(clock[0],3,'a'*64,'10000000000')
+                # The source L2 was last observed now, but a monotonic interval
+                # of 6001ms without new L2 must invalidate the book.
                 if hasattr(e,'last_l2_ingest_mono'):
-                    e.last_l2_ingest_mono[p]=mono[0]
+                    e.last_l2_ingest_mono[product]=mono[0]
         mono[0]+=6_001_000_000
         clock[0]-=20_000
         with e._cv:
-            # Global messages and heartbeats remain current, but individual
-            # L2 prices have not been refreshed for more than five seconds.
+            # Other channels continued to arrive, so global feed and heartbeat
+            # recency cannot mask per-product L2 silence.
             e.last_local_mono=mono[0];e.last_heartbeat_local_mono=mono[0]
         self.assertEqual(e.health()['status'],'STALE')
         self.assertIsNone(e.snapshot('BTC-USD')['state'])
@@ -61,8 +62,8 @@ class OperationalRaceContract(unittest.TestCase):
             return old
         e.health=racing_health
         server=server_for_live(e)
-        worker=threading.Thread(target=server.serve_forever,daemon=True)
-        worker.start()
+        thread=threading.Thread(target=server.serve_forever,daemon=True)
+        thread.start()
         try:
             with urlopen(f'http://127.0.0.1:{server.server_address[1]}/api/v36/stream?product=BTC-USD',timeout=4) as response:
                 self.assertEqual(response.status,200)
@@ -76,9 +77,8 @@ class OperationalRaceContract(unittest.TestCase):
                     elif line.startswith('id: '):current['id']=line[4:]
                 self.assertEqual([v['event'] for v in events],['source','snapshot'])
                 self.assertEqual(events[0]['data']['session_id'],events[1]['data']['session_id'])
-                self.assertTrue(events[1]['id'].startswith(
-                    'v36:'+events[1]['data']['session_id']+':BTC-USD:'))
+                self.assertTrue(events[1]['id'].startswith('v36:'+events[1]['data']['session_id']+':BTC-USD:'))
         finally:
-            server.shutdown();server.server_close();worker.join(timeout=4)
+            server.shutdown();server.server_close();thread.join(timeout=4)
 
 if __name__=='__main__':unittest.main()

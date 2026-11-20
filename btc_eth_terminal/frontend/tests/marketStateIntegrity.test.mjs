@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateDepth10} from '../src/marketStateIntegrity.ts';
+import {validateDepth10,validateBestImbalance} from '../src/marketStateIntegrity.ts';
 const make=()=>{
  let bid=0n,ask=0n;
  const bids=Array.from({length:10},(_,i)=>{bid+=BigInt(i+1);return {price:String(100-i),quantity:String(i+1)+'.0000',cumulative_base:String(bid)};});
@@ -41,4 +41,24 @@ test('real pinned v34.1 L2 projection validates without floating-point rounding'
   }
  }
  assert.ok(checked>=2,'Insufficient real L2 snapshots: '+checked);
+});
+
+test('best imbalance exact range validation rejects NaN and sub-IEEE boundary overflows',()=>{
+ for(const ok of ['-1','1','0','-0','0.7262005075519759326303425496',
+                  '-0.7262005075519759326303425496','1.00000000000','-1.000']){
+  assert.equal(validateBestImbalance(ok),true,ok);
+ }
+ for(const bad of ['NaN','Infinity','1e0',' 0.5','01','-2','2',1,null,undefined,
+                   '1.0000000000000000000000000001','-1.0000000000000000000000000001',
+                   '0.'.concat('0'.repeat(96)),'']){
+  assert.equal(validateBestImbalance(bad),false,String(bad));
+ }
+});
+
+test('live component wires finite bounded imbalance validation before admitting a quote',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const source=await readFile(new URL('../src/LiveTerminal.tsx',import.meta.url),'utf8');
+ assert.match(source,/!validateQuoteAgainstDepth\(r\)/);
+ const guards=await readFile(new URL('../src/marketStateIntegrity.ts',import.meta.url),'utf8');
+ assert.match(guards,/validateBestImbalance\(r\.best_imbalance\)/);
 });
