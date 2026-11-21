@@ -1,5 +1,5 @@
 #!/bin/sh
-# v36.2 read-only Linux operator launch. Every restart uses a NEW capture.
+# v36.2 read-only Linux operator launch. Each restart gets a NEW source archive.
 set -eu
 umask 077
 ROOT=$(printenv V36_TERMINAL_ROOT 2>/dev/null || printf '/opt/btc-eth-terminal')
@@ -12,7 +12,7 @@ if [ ! -d "$CAPTURES" ] || [ -L "$CAPTURES" ]; then
   echo 'BLOCKED_CAPTURE_DIRECTORY_MISSING_OR_SYMLINK' >&2
   exit 2
 fi
-# Production-like budget minima are never reduced for a smaller host.
+# Long-running collector budget minimums must not be lowered for a small host.
 ID=$(python3 -c 'import secrets;print(secrets.token_hex(8))')
 DATE=$(date -u +%Y%m%dT%H%M%SZ)
 TARGET="$CAPTURES/$DATE-$ID"

@@ -1,0 +1,20 @@
+{
+  "files": {
+    "assets/index-B7ewa_f-.css": {
+      "bytes": 29894,
+      "sha256": "cc3cdaf08dfaed2006744639cb1c8e306ef31050e00a983a8ace00e92b7c9d99"
+    },
+    "assets/index-CwNUwDGE.js": {
+      "bytes": 547268,
+      "sha256": "15d27b5334942e1ed4daba2a133a6a3e6c7fea701f9840c6edbfae3970c97f54"
+    },
+    "index.html": {
+      "bytes": 368,
+      "sha256": "64bb97433e5a71cc3e251e6cae30096bba3358719cac99e5358a9bafe050998a"
+    }
+  },
+  "mode": "SOURCE_ADMISSION_REQUIRED",
+  "release": "v37_factor_lab_engineering_candidate_read_only",
+  "schema": "v34_funnest_build_integrity_v1",
+  "trading_enabled": false
+}

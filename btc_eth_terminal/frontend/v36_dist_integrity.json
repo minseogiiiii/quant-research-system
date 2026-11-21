@@ -1,16 +1,16 @@
 {
   "files": {
+    "assets/index-BpiBDnMe.js": {
+      "bytes": 541246,
+      "sha256": "38775f84f9502e3d3f63f9c02d73ca2d57285ac83d728fcdabfe279cccbe1457"
+    },
     "assets/index-Ckn1nBC7.css": {
       "bytes": 29158,
       "sha256": "e46be294943262601df34f27c14f090e0bf8ca4acd183940c2f21c2e81a6b8b6"
     },
-    "assets/index-C_ljvDPR.js": {
-      "bytes": 537642,
-      "sha256": "fb1b2473f478e068691dd47e37ca4a4ce660e55f2b99c2ff40096c4d437c799b"
-    },
     "index.html": {
       "bytes": 368,
-      "sha256": "1f2b2092f4227dcc896086bee12d2d5e7921a58d4d987fb742c54de32ac2eaec"
+      "sha256": "4f36ff36e83716e30473475b7d4fca1afa15926960b37fe6c48155abcceedb26"
     }
   },
   "mode": "SOURCE_ADMISSION_REQUIRED",

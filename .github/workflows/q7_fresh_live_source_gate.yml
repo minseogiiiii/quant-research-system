@@ -1,0 +1,113 @@
+name: Q7 Q8 actual Coinbase public 8-SSE short qualification
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths: ['.github/workflows/q7_fresh_live_source_gate.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  q7-fresh-public-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pin actual Q7 Observer, Gateway, Collector, archive verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,pathlib,subprocess
+          m=json.loads(pathlib.Path('.github/release-evidence/q7_q8_source_git_blobs.json').read_text())['paths']
+          names=['btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs',
+                 'btc_eth_terminal/scripts/v36_observe_existing_collector.py',
+                 'btc_eth_terminal/scripts/v36_3_real_live_fanout.py',
+                 'btc_eth_terminal/scripts/v36_verify_live_capture.py',
+                 'btc_eth_terminal/scripts/v36_3_durable_archive_gate.py',
+                 'btc_eth_terminal/backend/v36_live_engine.py',
+                 'btc_eth_terminal/backend/v36_live_gateway.py',
+                 'btc_eth_terminal/backend/v36_operator_monitor.py']
+          for name in names:
+              sha=subprocess.check_output(['git','hash-object',name],text=True).strip()
+              if m.get(name)!=sha: raise SystemExit('NOT_Q7_FROZEN_SOURCE:'+name)
+          print('PASS_Q7_SOURCE_PROVENANCE_EIGHT_COMPONENTS')
+          PY
+          node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
+          python -m py_compile btc_eth_terminal/scripts/v36_observe_existing_collector.py
+          python -m py_compile btc_eth_terminal/scripts/v36_3_real_live_fanout.py
+          python -m py_compile btc_eth_terminal/scripts/v36_verify_live_capture.py
+      - name: Actual newly arriving Coinbase BTC ETH and eight persistent SSE clients
+        timeout-minutes: 7
+        shell: bash
+        run: |
+          set +e
+          PRIVATE="$RUNNER_TEMP/q7_fresh_private_source_$GITHUB_RUN_ID"
+          PUBLIC="$RUNNER_TEMP/q7_fresh_public_summary"
+          mkdir -p "$PUBLIC"
+          python -u btc_eth_terminal/scripts/v36_observe_existing_collector.py \
+            --execute-public-capture --duration 210 --port 8766 \
+            --workdir "$PRIVATE" \
+            --raw-budget-bytes 1000000000 --archive-budget-bytes 2000000000 \
+            --disk-reserve-bytes 4294967296 \
+            > "$PUBLIC/observer.jsonl" 2> "$PUBLIC/observer_stderr.log" &
+          OBSERVER_PID=$!
+          python -u btc_eth_terminal/scripts/v36_3_real_live_fanout.py \
+            --seconds 125 --port 8766 --observer-pid "$OBSERVER_PID" \
+            > "$PUBLIC/fanout.log" 2>&1
+          FANOUT_RC=$?
+          wait "$OBSERVER_PID"
+          CAPTURE_RC=$?
+          REPLAY_RC=2
+          GATE_RC=2
+          if [ -f "$PRIVATE/V36_OBSERVER_EVIDENCE.json" ]; then
+            python -u btc_eth_terminal/scripts/v36_verify_live_capture.py \
+              --evidence "$PRIVATE/V36_OBSERVER_EVIDENCE.json" > "$PUBLIC/replay.log" 2>&1
+            REPLAY_RC=$?
+            python - "$PRIVATE/V36_OBSERVER_EVIDENCE.json" \
+              > "$PUBLIC/durable_archive_gate.log" 2>&1 <<'PY'
+          import json,subprocess,sys
+          from pathlib import Path
+          e=json.loads(Path(sys.argv[1]).read_bytes())
+          if e.get('observer_source_complete') is not True:
+              raise SystemExit('INCOMPLETE_SOURCE_NO_PROMOTION')
+          raise SystemExit(subprocess.call([sys.executable,'btc_eth_terminal/scripts/v36_3_durable_archive_gate.py',
+              '--capture',e['captured_dir'],'--manifest-sha256',e['captured_manifest_sha256']]))
+          PY
+            GATE_RC=$?
+          fi
+          export FANOUT_RC CAPTURE_RC REPLAY_RC GATE_RC PUBLIC
+          python - <<'PY'
+          import json,os,pathlib
+          p=pathlib.Path(os.environ['PUBLIC'])
+          result={'schema':'q7_q8_actual_public_source_210s_v1',
+            'mode':'LIVE_PUBLIC_COINBASE',
+            'scope':'Q7_COLLECTOR_OBSERVER_GATEWAY_SSE_NO_BROWSER',
+            'raw_archive_uploaded':False,'real_orders_enabled':False,
+            'frontend_live_browser_verified':False,'durable_linux_verified':False,
+            'uninterrupted_24h_verified':False,'actual_q7_source':True,
+            **{k.lower():int(os.environ[k]) for k in ('FANOUT_RC','CAPTURE_RC','REPLAY_RC','GATE_RC')}}
+          (p/'result.json').write_text(json.dumps(result,sort_keys=True,indent=2)+'\n')
+          PY
+          echo "Q7_LIVE_REAL_RESULT fanout=$FANOUT_RC capture=$CAPTURE_RC replay=$REPLAY_RC gate=$GATE_RC"
+          if [ "$FANOUT_RC" -ne 0 ] || [ "$CAPTURE_RC" -ne 0 ] || \
+             [ "$REPLAY_RC" -ne 0 ] || [ "$GATE_RC" -ne 0 ]; then
+            echo 'FAIL_ACTUAL_Q7_LIVE_SOURCE_GATE'
+            exit 2
+          fi
+          echo 'PASS_ACTUAL_Q7_REAL_COINBASE_210S_SOURCE_AND_EIGHT_SSE'
+      - name: Save summary only, never raw Coinbase source records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q7-q8-actual-public-210s-live-summary
+          path: ${{ runner.temp }}/q7_fresh_public_summary/
+          if-no-files-found: warn
+          retention-days: 7

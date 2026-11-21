@@ -1,0 +1,64 @@
+name: Q7 Ruff baseline vs staged delta (DIAGNOSTIC, NOT MERGE APPROVAL)
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths: ['.github/workflows/q7_ruff_delta_diagnostic.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ruff-delta:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exactly root-project locked Ruff version
+        run: python -m pip install 'ruff==0.15.22'
+      - name: Compare frozen R5 base with staged Q7 without hiding existing lint errors
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/r5_clean" 64aa85081cab73c917333249eb8e200c8d4044fa
+          python - <<'PY'
+          import collections,json,os,pathlib,subprocess
+          r5=pathlib.Path(os.environ['RUNNER_TEMP'])/'r5_clean'
+          stage=pathlib.Path.cwd()
+          def scan(root):
+              p=subprocess.run(['ruff','check','.','--output-format','json'],
+                 cwd=root,text=True,capture_output=True)
+              if p.returncode not in (0,1): raise RuntimeError(p.stderr[:800])
+              items=json.loads(p.stdout)
+              result=[]
+              for x in items:
+                  rel=pathlib.Path(x['filename']).relative_to(root).as_posix()
+                  result.append((rel,x['code'],x['location']['row'],x['location']['column']))
+              return result
+          baseline=scan(r5)
+          candidate=scan(stage)
+          before=set(baseline);after=set(candidate)
+          added=sorted(after-before);fixed=sorted(before-after)
+          product_only=lambda v:sum(x[0].startswith('btc_eth_terminal/') for x in v)
+          result={'status':'DIAGNOSTIC_ONLY_NOT_RELEASE_GATE',
+           'baseline_r5_sha':'64aa85081cab73c917333249eb8e200c8d4044fa',
+           'baseline_errors':len(baseline),'stage_errors':len(candidate),
+           'baseline_btc_errors':product_only(baseline),'stage_btc_errors':product_only(candidate),
+           'new_issue_identifiers':len(added),'resolved_issue_identifiers':len(fixed),
+           'new_issue_files':dict(sorted(collections.Counter(x[0] for x in added).items())),
+           'new_issue_examples':[{'path':x[0],'code':x[1],'row':x[2],'column':x[3]} for x in added[:30]],
+           'overall_validation_passed':False,'q7_source_complete':False}
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])/'q7_ruff_delta.json'
+          out.write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
+          print(json.dumps({k:v for k,v in result.items() if k not in ('new_issue_examples','new_issue_files')},sort_keys=True))
+          PY
+      - name: Save aggregate diagnostic only
+        uses: actions/upload-artifact@v4
+        with:
+          name: q7-ruff-baseline-vs-stage-diagnostic
+          path: ${{ runner.temp }}/q7_ruff_delta.json
+          retention-days: 7
+          if-no-files-found: error

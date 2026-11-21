@@ -530,6 +530,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/fills": {"symbol", "asof"},
             }
             permitted.update({
+                "/api/v37/factor-lab": {"product","asof","section"},
                 "/api/v30/catalog": set(),
                 "/api/v30/series": {"product","kind","from","to","limit","asof","offset"},
                 "/api/v30/book": {"product","asof"},
@@ -546,6 +547,18 @@ class Handler(BaseHTTPRequestHandler):
             if any(key not in permitted[parsed.path] or len(values) != 1
                    for key, values in args.items()):
                 raise InputError("Unknown or repeated query parameter")
+            if parsed.path == "/api/v37/factor-lab":
+                from v37_factor_lab import view as q7_view
+                def factor_required(name):
+                    values=args.get(name)
+                    if not values or len(values)!=1 or not values[0]:
+                        raise InputError('Expected exactly one '+name)
+                    return values[0]
+                product=factor_required('product')
+                asof=_strict_int(factor_required('asof'),'asof')
+                section=factor_required('section')
+                self.send_obj(200,q7_view(product,asof,section))
+                return
             if parsed.path.startswith("/api/v34/"):
                 from v34_l2_api import depth as v34_depth, recovery as v34_recovery
                 def v34_required(name: str) -> str:

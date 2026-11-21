@@ -1,0 +1,98 @@
+name: Q7 promotion gate - pinned shared R5 LIVE collector
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths: [.github/workflows/q7_readonly_source_qualification.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bounded-public-live:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact source collector and SSE client provenance from Q7
+        shell: bash
+        run: |
+          test "$(git hash-object btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs)" = "e6dc2f2da319775c911249ec2b3b44f0c3e7910c"
+          test "$(git hash-object btc_eth_terminal/scripts/v36_3_real_live_fanout.py)" = "f4c1358e3afe1f1fbb85ad2f19e88c00647e4b12"
+          node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
+          python -m py_compile btc_eth_terminal/scripts/v36_3_real_live_fanout.py btc_eth_terminal/scripts/v36_verify_live_capture.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_live_health_reservation.py' -v
+      - name: Real Coinbase 170s observation, 100s eight SSE clients, independent replay
+        id: live
+        timeout-minutes: 6
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "$RUNNER_TEMP/q7_gate_public_summary"
+          PRIVATE="$RUNNER_TEMP/q7_gate_private_capture_$GITHUB_RUN_ID"
+          python -u btc_eth_terminal/scripts/v36_observe_existing_collector.py \
+            --execute-public-capture --duration 170 --port 8766 --workdir "$PRIVATE" \
+            --raw-budget-bytes 1000000000 --archive-budget-bytes 2000000000 \
+            --disk-reserve-bytes 4294967296 \
+            > "$RUNNER_TEMP/q7_gate_public_summary/observer.jsonl" \
+            2> "$RUNNER_TEMP/q7_gate_public_summary/observer_stderr.log" &
+          OBSERVER_PID=$!
+          python -u btc_eth_terminal/scripts/v36_3_real_live_fanout.py \
+            --seconds 100 --port 8766 --observer-pid "$OBSERVER_PID" \
+            > "$RUNNER_TEMP/q7_gate_public_summary/fanout.jsonl" 2>&1
+          FANOUT_RC=$?
+          wait "$OBSERVER_PID"
+          CAPTURE_RC=$?
+          REPLAY_RC=2
+          ARCHIVE_RC=2
+          if [ -f "$PRIVATE/V36_OBSERVER_EVIDENCE.json" ]; then
+            python -u btc_eth_terminal/scripts/v36_verify_live_capture.py \
+              --evidence "$PRIVATE/V36_OBSERVER_EVIDENCE.json" \
+              > "$RUNNER_TEMP/q7_gate_public_summary/independent_replay.log" 2>&1
+            REPLAY_RC=$?
+            python - "$PRIVATE/V36_OBSERVER_EVIDENCE.json" \
+              > "$RUNNER_TEMP/q7_gate_public_summary/archive_gate.log" 2>&1 <<'PY'
+          import json,subprocess,sys
+          from pathlib import Path
+          e=json.loads(Path(sys.argv[1]).read_bytes())
+          if e.get('observer_source_complete') is not True:
+              raise SystemExit('BLOCKED_INCOMPLETE_OBSERVER')
+          cmd=[sys.executable,'btc_eth_terminal/scripts/v36_3_durable_archive_gate.py',
+               '--capture',e['captured_dir'],
+               '--manifest-sha256',e['captured_manifest_sha256']]
+          raise SystemExit(subprocess.call(cmd))
+          PY
+            ARCHIVE_RC=$?
+          fi
+          export FANOUT_RC CAPTURE_RC REPLAY_RC ARCHIVE_RC
+          python - <<'PY'
+          import json,os,pathlib
+          result={'source':'REAL_PUBLIC_COINBASE','scope':'SHARED_R5_COLLECTOR_NOT_Q7_RUNTIME',
+                  'uninterrupted_24h_verified':False,'q7_gateway_verified':False,
+                  'actual_browser_e2e_verified':False,'real_orders_enabled':False,
+                  'capture_rc':int(os.environ['CAPTURE_RC']),
+                  'eight_sse_rc':int(os.environ['FANOUT_RC']),
+                  'independent_replay_rc':int(os.environ['REPLAY_RC']),
+                  'archive_gate_rc':int(os.environ['ARCHIVE_RC']),
+                  'durable_host_verified':False}
+          pathlib.Path(os.environ['RUNNER_TEMP'],'q7_gate_public_summary','result.json').write_text(json.dumps(result,sort_keys=True,indent=2)+'\n')
+          PY
+          if [ "$FANOUT_RC" -ne 0 ] || [ "$CAPTURE_RC" -ne 0 ] || [ "$REPLAY_RC" -ne 0 ] || [ "$ARCHIVE_RC" -ne 0 ]; then
+            echo "FAIL_BOUND_REAL_PUBLIC_LIVE_GATE"
+            exit 2
+          fi
+          echo "PASS_PINNED_R5_SHARED_COLLECTOR_170S_LIVE"
+      - name: Preserve summary only, never raw Coinbase JSONL
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q7-qualification-shared-r5-live-summary
+          path: ${{ runner.temp }}/q7_gate_public_summary/
+          retention-days: 7
+          if-no-files-found: warn
