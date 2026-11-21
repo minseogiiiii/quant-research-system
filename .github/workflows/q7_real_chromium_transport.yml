@@ -1,0 +1,136 @@
+name: Q7 real Chromium HTTP EventSource and pinned research UI
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths:
+      - .github/workflows/q7_real_chromium_transport.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-public-transport:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 13
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Freeze exact Q7 collector and browser transport code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,pathlib,subprocess
+          m=json.loads(pathlib.Path('.github/release-evidence/q7_q8_source_git_blobs.json').read_bytes())['paths']
+          for name in ('btc_eth_terminal/scripts/v36_observe_existing_collector.py',
+                       'btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs',
+                       'btc_eth_terminal/backend/v36_live_gateway.py',
+                       'btc_eth_terminal/backend/v36_live_engine.py',
+                       'btc_eth_terminal/backend/v37_frontend_integrity.py',
+                       'btc_eth_terminal/frontend/v37_dist_integrity.json'):
+              value=subprocess.check_output(['git','hash-object',name],text=True).strip()
+              if value!=m[name]:raise SystemExit('SOURCE_SHA_MISMATCH:'+name)
+          src='btc_eth_terminal/scripts/q7_live_chromium_http_sse_gate.py'
+          assert subprocess.check_output(['git','hash-object',src],text=True).strip()=='c44044e68753a402a66503f4d1cfc42c345817c7'
+          print('PASS_SOURCE_GIT_BLOBS_FROZEN')
+          PY
+          node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
+          python -m py_compile btc_eth_terminal/scripts/q7_live_chromium_http_sse_gate.py
+      - name: Install genuine Chromium automation and pinned React dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-cache-dir playwright==1.55.0
+          command -v google-chrome
+          cd btc_eth_terminal/frontend
+          npm ci --ignore-scripts --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit
+          ./node_modules/.bin/vite build --outDir dist_v37
+          python - <<'PY'
+          import hashlib,json,pathlib
+          base=pathlib.Path('dist_v37')
+          m=json.loads(pathlib.Path('v37_dist_integrity.json').read_bytes())
+          for name,e in m['files'].items():
+              data=(base/name).read_bytes()
+              if len(data)!=e['bytes'] or hashlib.sha256(data).hexdigest()!=e['sha256']:
+                  raise SystemExit('Q7_NEW_BROWSER_ASSET_SHA_MISMATCH:'+name)
+          if sorted(str(p.relative_to(base)) for p in base.rglob('*') if p.is_file())!=sorted(m['files']):
+              raise SystemExit('Q7_BUILD_FILES_CHANGED')
+          print('PASS_V37_BROWSER_ASSET_PINS_3_FILES')
+          PY
+      - name: Collect genuine Coinbase BTC ETH and inspect real Chromium EventSource
+        timeout-minutes: 7
+        shell: bash
+        run: |
+          set +e
+          PRIVATE="$RUNNER_TEMP/q7_real_chrome_private_$GITHUB_RUN_ID"
+          PUBLIC="$RUNNER_TEMP/q7_real_chrome_public"
+          mkdir -p "$PUBLIC"
+          python -u btc_eth_terminal/scripts/v36_observe_existing_collector.py \
+            --execute-public-capture --duration 240 --port 8766 --workdir "$PRIVATE" \
+            --raw-budget-bytes 1000000000 --archive-budget-bytes 2000000000 \
+            --disk-reserve-bytes 4294967296 \
+            > "$PUBLIC/observer_summary.jsonl" 2> "$PUBLIC/observer_stderr.log" &
+          CAPTURE_PID=$!
+          python -u btc_eth_terminal/scripts/q7_live_chromium_http_sse_gate.py \
+            --origin http://127.0.0.1:8766 \
+            --browser-executable "$(command -v google-chrome)" \
+            --seconds 135 --min-states 15 \
+            --report "$PUBLIC/chromium_transport.json" > "$PUBLIC/chromium.log" 2>&1
+          BROWSER_RC=$?
+          wait "$CAPTURE_PID"
+          CAPTURE_RC=$?
+          REPLAY_RC=2
+          GATE_RC=2
+          if [ -f "$PRIVATE/V36_OBSERVER_EVIDENCE.json" ]; then
+            python -u btc_eth_terminal/scripts/v36_verify_live_capture.py \
+              --evidence "$PRIVATE/V36_OBSERVER_EVIDENCE.json" \
+              > "$PUBLIC/replay.log" 2>&1
+            REPLAY_RC=$?
+            python - "$PRIVATE/V36_OBSERVER_EVIDENCE.json" \
+              > "$PUBLIC/archive_gate.log" 2>&1 <<'PY'
+          import json,sys,subprocess
+          from pathlib import Path
+          e=json.loads(Path(sys.argv[1]).read_bytes())
+          if e.get('observer_source_complete') is not True:raise SystemExit('SOURCE_INCOMPLETE_NO_PROMOTION')
+          raise SystemExit(subprocess.call([sys.executable,
+              'btc_eth_terminal/scripts/v36_3_durable_archive_gate.py',
+              '--capture',e['captured_dir'], '--manifest-sha256',e['captured_manifest_sha256']]))
+          PY
+            GATE_RC=$?
+          fi
+          export PUBLIC BROWSER_RC CAPTURE_RC REPLAY_RC GATE_RC
+          python - <<'PY'
+          import json,os,pathlib
+          p=pathlib.Path(os.environ['PUBLIC'])
+          (p/'result.json').write_text(json.dumps({
+             'schema':'q7_genuine_chromium_public_source_acceptance_v1',
+             'mode':'REAL_PUBLIC_COINBASE_LIVE',
+             'q7_live_react_dom_parity':'NOT_VERIFIED',
+             'historical_v37_ui_source_fail_closed':'CHROMIUM_TESTED_SEPARATELY',
+             'real_trading_enabled':False,'private_raw_uploaded':False,
+             'durable_24h_certified':False,
+             **{x.lower():int(os.environ[x]) for x in ('BROWSER_RC','CAPTURE_RC','REPLAY_RC','GATE_RC')}
+          },indent=2,sort_keys=True)+'\n')
+          PY
+          echo "CHROMIUM:$BROWSER_RC COLLECTOR:$CAPTURE_RC REPLAY:$REPLAY_RC GATE:$GATE_RC"
+          if [ "$BROWSER_RC" -ne 0 ] || [ "$CAPTURE_RC" -ne 0 ] || \
+             [ "$REPLAY_RC" -ne 0 ] || [ "$GATE_RC" -ne 0 ]; then
+            echo FAIL_GENUINE_CHROMIUM_HTTP_SSE_GATE
+            exit 2
+          fi
+          echo PASS_GENUINE_CHROMIUM_HTTP_SSE_GATE
+      - name: Upload only bounded summaries, never raw JSONL market tape
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q7-genuine-chromium-http-sse-summary
+          path: ${{ runner.temp }}/q7_real_chrome_public/
+          if-no-files-found: warn
+          retention-days: 7
