@@ -52,11 +52,24 @@ def exact_top(state: dict) -> None:
 def run(origin: str, executable: str, seconds: int, min_states: int) -> dict:
     from playwright.sync_api import sync_playwright
 
-    initial = read_json(origin + "/api/v36/health")
-    if (initial.get("mode") != "LIVE_SOURCE" or initial.get("status") != "HEALTHY"
-            or initial.get("live_feed") is not True or initial.get("trading_enabled") is not False
-            or set(initial.get("snapshots", [])) != set(PRODUCTS)):
-        raise AssertionError("REAL_PUBLIC_LIVE_SOURCE_NOT_ADMITTED")
+    # The separately-started collector needs time to acquire genuine initial
+    # snapshots. An initial connection refusal is not a market-source failure.
+    # Retry only while the bounded startup window remains; never fake health.
+    deadline = time.monotonic() + 45
+    last_reason = "NOT_STARTED"
+    while True:
+        try:
+            initial = read_json(origin + "/api/v36/health")
+            if (initial.get("mode") == "LIVE_SOURCE" and initial.get("status") == "HEALTHY"
+                    and initial.get("live_feed") is True and initial.get("trading_enabled") is False
+                    and set(initial.get("snapshots", [])) == set(PRODUCTS)):
+                break
+            last_reason = "REAL_PUBLIC_LIVE_SOURCE_NOT_ADMITTED"
+        except (OSError, ValueError) as exc:
+            last_reason = type(exc).__name__
+        if time.monotonic() >= deadline:
+            raise AssertionError("REAL_PUBLIC_LIVE_STARTUP_TIMEOUT:" + last_reason)
+        time.sleep(.5)
     session = initial["session_id"]
     if not re.fullmatch(r"[a-f0-9]{32}", session):
         raise AssertionError("INVALID_SOURCE_SESSION")
