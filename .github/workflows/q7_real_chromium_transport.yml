@@ -37,7 +37,7 @@ jobs:
               value=subprocess.check_output(['git','hash-object',name],text=True).strip()
               if value!=m[name]:raise SystemExit('SOURCE_SHA_MISMATCH:'+name)
           src='btc_eth_terminal/scripts/q7_live_chromium_http_sse_gate.py'
-          assert subprocess.check_output(['git','hash-object',src],text=True).strip()=='c44044e68753a402a66503f4d1cfc42c345817c7'
+          assert subprocess.check_output(['git','hash-object',src],text=True).strip()=='e5856ffab6ec107aeba1dfb712beb347a9408bf1'
           print('PASS_SOURCE_GIT_BLOBS_FROZEN')
           PY
           node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
