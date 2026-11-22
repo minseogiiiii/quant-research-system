@@ -240,6 +240,10 @@ def evaluate_monitoring(samples: list[dict], seconds: int,
     if len(samples) < min_samples or len(windows) != expected_windows:
         raise Q22Rejected("INSUFFICIENT_HOST_MONITORING_OR_SSE_COVERAGE")
     first = samples[0]
+    cpu_hz = os.sysconf("SC_CLK_TCK")
+    available_cpus = len(os.sched_getaffinity(0))
+    cpu_cores = []
+    cpu_saturated_samples = 0
     for i, s in enumerate(samples):
         if (
             s["index"] != i
@@ -252,14 +256,38 @@ def evaluate_monitoring(samples: list[dict], seconds: int,
         ):
             raise Q22Rejected("SOURCE_SESSION_OR_HOST_RESOURCE_WITNESS_CHANGED")
         if i:
-            diff = s["monotonic_ns"] - samples[i - 1]["monotonic_ns"]
-            if not 0 < diff <= 40_000_000_000:
-                raise Q22Rejected("HOST_MONITOR_SAMPLE_GAP")
+            previous = samples[i - 1]
+            diff = s["monotonic_ns"] - previous["monotonic_ns"]
+            ticks = s["cpu_ticks_total"] - previous["cpu_ticks_total"]
+            if not 0 < diff <= 40_000_000_000 or ticks < 0:
+                raise Q22Rejected("HOST_MONITOR_SAMPLE_GAP_OR_CPU_REGRESSION")
+            cores = ticks / (diff / 1e9 * cpu_hz)
+            cpu_cores.append(cores)
+            if cores > available_cpus * 1.25:
+                raise Q22Rejected("SUSTAINED_CPU_COUNTER_OR_HOST_LIMIT_INVALID")
+            cpu_saturated_samples = (
+                cpu_saturated_samples + 1
+                if cores >= 0.95 * available_cpus else 0
+            )
+            if cpu_saturated_samples >= 8:
+                raise Q22Rejected("TWO_MINUTES_OF_HOST_CPU_SATURATION")
+    rss_baseline = max(
+        x["rss_total_bytes"] for x in samples[: min(12, len(samples))]
+    )
+    rss_growth = max(0, samples[-1]["rss_total_bytes"] - rss_baseline)
+    if rss_growth > 1_100_000_000:
+        raise Q22Rejected("SUSPICIOUS_OBSERVER_COLLECTOR_RSS_GROWTH")
     return {
         "sample_count": len(samples),
         "sample_span_seconds": round(
             (samples[-1]["monotonic_ns"] - first["monotonic_ns"]) / 1e9, 3),
         "max_rss_bytes": max(x["rss_total_bytes"] for x in samples),
+        "rss_growth_bytes": rss_growth,
+        "cpu_cores_peak": round(max(cpu_cores, default=0), 3),
+        "cpu_cores_p95": round(
+            sorted(cpu_cores)[int((len(cpu_cores) - 1) * 0.95)]
+            if cpu_cores else 0, 3),
+        "available_cpus": available_cpus,
         "max_open_fds": max(x["fd_total"] for x in samples),
         "min_disk_free_bytes": min(x["disk_free_bytes"] for x in samples),
         "total_source_messages_last_sample": samples[-1]["source"]["messages"],
@@ -311,6 +339,7 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
     drain_started = None
     preflight = None
     was_ready = False
+    last_progress_slot = 0
     # Private logs live OUTSIDE the public summary artifact directory.
     with (
         Path(str(work) + ".observer_stdout.log").open("x") as out,
@@ -349,7 +378,9 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                             raise Q22Rejected("LIVE_COLLECTOR_NEVER_HEALTHY") from exc
                         time.sleep(1)
                         continue
-                if now >= next_sample:
+                # The final source-stop transition is adjudicated by the
+                # completed collector manifest, not as a transient LIVE fault.
+                if now >= next_sample and elapsed < seconds - 8:
                     s, child = record_sample(
                         work, observer.pid, child, prior, len(samples))
                     if samples and not (
@@ -360,6 +391,17 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                     samples.append(s)
                     prior = s["source"]
                     next_sample = now + interval
+                progress_slot = int(elapsed // 300)
+                if not smoke and progress_slot > last_progress_slot and samples:
+                    last_progress_slot = progress_slot
+                    print("Q22_5H_PROGRESS " + json.dumps({
+                        "elapsed_minutes": round(elapsed / 60, 2),
+                        "messages": samples[-1]["source"]["messages"],
+                        "window_passed": len(windows),
+                        "rss_bytes": samples[-1]["rss_total_bytes"],
+                        "disk_free_bytes": samples[-1]["disk_free_bytes"],
+                        "real_orders_enabled": False,
+                    }, sort_keys=True), flush=True)
                 if preflight is None and elapsed >= preflight_time:
                     archived = private_archive_size(work)
                     preflight = projected_archive_bound(
