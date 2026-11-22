@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
@@ -18,17 +19,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 def _load_after_backend_path_setup():
-    # Source files live in different pinned backend/scripts roots. Keep
-    # these two explicit runtime imports adjacent without isort reordering.
-    # isort: off
-    from independent_soak_replay import replay as independent_replay
-    from v36_3_durable_archive_gate import BOUNDS, audit as durable_audit
-    # isort: on
+    from v36_3_durable_archive_gate import audit as durable_audit
 
-    return independent_replay, BOUNDS, durable_audit
+    return durable_audit
 
 
-independent_replay, BOUNDS, durable_audit = _load_after_backend_path_setup()
+durable_audit = _load_after_backend_path_setup()
 del _load_after_backend_path_setup
 
 SHA64 = re.compile(r"[a-f0-9]{64}\Z")
@@ -82,14 +78,14 @@ def validate_observer_evidence(
     return source, pin
 
 
-def _book_agreement(primary, independent: dict):
-    if primary.message_count != independent.get("messages"):
+def _book_agreement(primary: dict, independent: dict):
+    if primary["messages"] != independent.get("messages"):
         raise FiveHourReplayRejected("PRIMARY_INDEPENDENT_MESSAGE_COUNT_MISMATCH")
     for product in ("BTC-USD", "ETH-USD"):
-        main = primary.snapshot(product)["state"]
-        check = independent["books_final"][product]
-        if main["status"] != "VALID_ARCHIVED_QUOTE":
-            raise FiveHourReplayRejected("NO_FINAL_VALID_BOOK_" + product)
+        main = primary["products"][product]
+        check = independent["products"][product]
+        if not 0 < main["retained_states"] <= 30_000:
+            raise FiveHourReplayRejected("PRIMARY_NOT_MEMORY_BOUNDED")
         for key in ("best_bid", "best_ask"):
             try:
                 consistent = Decimal(main[key]) == Decimal(check[key])
@@ -97,10 +93,50 @@ def _book_agreement(primary, independent: dict):
                 raise FiveHourReplayRejected("BAD_FINAL_BOOK_" + product) from exc
             if not consistent:
                 raise FiveHourReplayRejected("FINAL_BOOK_DIVERGENCE_" + product)
-        levels = main["l2_book_levels"]
-        if (levels["bid"] != check["bid_levels"]
-                or levels["offer"] != check["ask_levels"]):
+        if (
+            main["bid_levels"] != check["bid_levels"]
+            or main["ask_levels"] != check["ask_levels"]
+        ):
             raise FiveHourReplayRejected("FINAL_BOOK_DEPTH_DIVERGENCE_" + product)
+
+
+def _worker_run(source: Path, pin: str, mode: str) -> dict:
+    # Replay prices are retained only in private files and never uploaded.
+    receipt = source.parent.parent / ("q23_" + mode + "_private.json")
+    if receipt.exists() or receipt.is_symlink():
+        raise FiveHourReplayRejected("PRIVATE_WORKER_OUTPUT_ALREADY_EXISTS")
+    try:
+        process = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts/q23_isolated_replay_worker.py"),
+                "--mode", mode, "--capture", str(source),
+                "--manifest-sha256", pin,
+                "--private-output", str(receipt),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=1100,
+            check=False,
+        )
+        if process.returncode != 0 or not receipt.is_file():
+            raise FiveHourReplayRejected("BOUNDED_" + mode.upper() + "_WORKER_FAILED")
+        if not 0 < receipt.stat().st_size <= 64_000:
+            raise FiveHourReplayRejected("PRIVATE_WORKER_RECEIPT_UNBOUNDED")
+        result = json.loads(receipt.read_bytes())
+        if (
+            result.get("schema") != "q23_bounded_private_replay_worker_v1"
+            or result.get("mode") != mode
+            or result.get("max_as_bytes") != 3 * 1024**3
+            or result.get("real_orders_enabled") is not False
+            or result.get("rss_peak_bytes", 0) > 3 * 1024**3
+        ):
+            raise FiveHourReplayRejected("UNTRUSTED_BOUNDED_WORKER_RECEIPT")
+        return result
+    except subprocess.TimeoutExpired as exc:
+        raise FiveHourReplayRejected("REPLAY_" + mode.upper() + "_TIMEOUT") from exc
+    finally:
+        receipt.unlink(missing_ok=True)
 
 
 def audit(working: Path, duration: int = 18000) -> dict:
@@ -131,18 +167,14 @@ def audit(working: Path, duration: int = 18000) -> dict:
     ):
         raise FiveHourReplayRejected("LARGE_SOURCE_ARCHIVE_GATE_NOT_ADMITTED")
 
-    # The pinned v35 original file is untouched. Follow the v36 durable gate
-    # pattern of enlarging only the verifier's safety limits in this isolated
-    # audit process after checking the externally captured SHA.
-    import v35_archive_ingress as primary_ingress
-    from v35_replay_service import replay_capture
-
-    for key, value in BOUNDS.items():
-        setattr(primary_ingress, key, value)
-    primary = replay_capture(source, pin)
-    independent = independent_replay(source)
+    primary_receipt = _worker_run(source, pin, "primary")
+    independent_receipt = _worker_run(source, pin, "independent")
+    primary = primary_receipt["data"]
+    independent = independent_receipt["data"]
     if (
-        primary.message_count != gate["sealed_messages_verified"]
+        primary["messages"] != gate["sealed_messages_verified"]
+        or primary["chunks"] != gate["sealed_chunks_verified"]
+        or primary["connections"] != 1
         or independent["messages"] != gate["sealed_messages_verified"]
         or independent["chunks"] != gate["sealed_chunks_verified"]
         or independent["connections"] != 1
@@ -165,9 +197,16 @@ def audit(working: Path, duration: int = 18000) -> dict:
         "archive_bytes": gate["sealed_bytes_verified"],
         "manifest_output_sha256": pin,
         "observer_evidence_sha256": sha256(data).hexdigest(),
-        "primary_final_state_sha256": primary.final_state_sha256,
+        "primary_final_state_sha256": primary["final_state_sha256"],
+        "bounded_replay_worker_max_as_bytes": 3 * 1024**3,
+        "primary_replay_peak_rss_bytes": primary_receipt["rss_peak_bytes"],
+        "independent_replay_peak_rss_bytes": independent_receipt["rss_peak_bytes"],
+        "primary_retained_state_rows_per_product": {
+            p: primary["products"][p]["retained_states"]
+            for p in ("BTC-USD", "ETH-USD")
+        },
         "independent_final_book_sha256": {
-            p: independent["books_final"][p]["sha256"]
+            p: independent["products"][p]["sha256"]
             for p in ("BTC-USD", "ETH-USD")
         },
         "primary_independent_final_books_agree": True,

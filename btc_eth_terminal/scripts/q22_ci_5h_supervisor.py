@@ -30,6 +30,11 @@ from q22_ci_long_observer import (  # noqa: E402
     RAW_BUDGET,
     SMOKE_DURATION,
 )
+from q23_redacted_diagnostics import (  # noqa: E402
+    failure_receipt,
+    named_failures,
+    read_private_status,
+)
 
 MONITOR_INTERVAL = 15
 MEMORY_CEILING = 2 * 1024**3
@@ -46,8 +51,19 @@ class Q22Rejected(ValueError):
     pass
 
 
-def check_private_health(health: dict, metrics: dict, previous: dict | None) -> dict:
+def check_private_health(
+    health: dict, metrics: dict, previous: dict | None,
+    health_http: int = 200, metrics_http: int = 200,
+) -> dict:
     now_ms = time.time_ns() // 1_000_000
+    codes = named_failures(
+        health, metrics, previous, now_ms=now_ms,
+        health_http=health_http, metrics_http=metrics_http,
+    )
+    if codes:
+        raise Q22Rejected(
+            "PRIVATE_SOURCE_OR_TRANSPORT_UNHEALTHY:" + ",".join(codes)
+        )
     if (
         health.get("mode") != "LIVE_SOURCE"
         or health.get("status") != "HEALTHY"
@@ -203,9 +219,11 @@ def evaluate_window(output: str, seconds: int) -> dict:
 def record_sample(work: Path, observer_pid: int, known_child: int | None,
                   previous: dict | None, index: int) -> tuple[dict, int]:
     socket_path = work / "v36_monitor.sock"
-    health = unix_json(socket_path, "/api/v36/health")
-    metrics = unix_json(socket_path, "/api/v36/metrics")
-    source = check_private_health(health, metrics, previous)
+    health_http, health = read_private_status(socket_path, "/api/v36/health")
+    metrics_http, metrics = read_private_status(socket_path, "/api/v36/metrics")
+    source = check_private_health(
+        health, metrics, previous, health_http, metrics_http
+    )
     child = child_process(observer_pid)
     if known_child is not None and child != known_child:
         raise Q22Rejected("COLLECTOR_RESTART_NOT_CONTINUOUS")
@@ -482,6 +500,34 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                                 if k != "sse_windows"}, sort_keys=True), flush=True)
             return result
         except (Q22Rejected, OSError, ValueError, KeyError) as exc:
+            # Read the Unix operator even after HTTP 503, before the failure
+            # handler terminates the private collector. Publish only fixed
+            # enums, salted-by-origin session digest and numeric counters.
+            fault_health = {}
+            fault_metrics = {}
+            fault_http = None
+            try:
+                fault_http, fault_health = read_private_status(
+                    work / "v36_monitor.sock", "/api/v36/health"
+                )
+                _, fault_metrics = read_private_status(
+                    work / "v36_monitor.sock", "/api/v36/metrics"
+                )
+                codes = named_failures(
+                    fault_health, fault_metrics, prior,
+                    health_http=fault_http,
+                )
+            except (OSError, ValueError, KeyError, TimeoutError):
+                codes = ["PRIVATE_MONITOR_READ_FAILED"]
+            if not codes:
+                codes = ["UNKNOWN_CHECK_FAILED"]
+            receipt = failure_receipt(
+                fault_health, fault_metrics, codes, samples,
+                time.monotonic() - started, len(windows), fault_http,
+            )
+            (public / "q23_redacted_fault_receipt.json").write_text(
+                json.dumps(receipt, sort_keys=True, indent=2) + "\n"
+            )
             (public / "fail_fast.json").write_text(json.dumps({
                 "schema": "q22_fail_fast_v1",
                 "reason": type(exc).__name__ + ":" + str(exc).splitlines()[0][:180],
