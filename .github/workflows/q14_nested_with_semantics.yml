@@ -1,0 +1,63 @@
+name: Q14 with-order normalized AST and full regression gate (ISOLATED)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_nested_with_semantics.yml']
+permissions:
+  contents: write
+jobs:
+  q14-with:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - run: python -m pip install 'ruff==0.15.22'
+      - name: Preserve context-manager order, comments and normalized AST for each modified file
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q14-import-order-20261122"
+          python .github/scripts/q14_merge_nested_with.py
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+          python - <<'PY'
+          import json,subprocess
+          p=subprocess.run(['ruff','check','.','--select','SIM117','--output-format','json'],
+              capture_output=True,text=True)
+          assert p.returncode in (0,1)
+          errors=json.loads(p.stdout)
+          print('Q14_REMAINING_SIM117',len(errors))
+          PY
+      - name: Run original test sources and root project
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_coinbase_source.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v11_quote_spread.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v15_taker_quote_envelope.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v17_static_depth_stress.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v18_post_quote_markout.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v21_evidence.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v24_paper_oms.py' -q
+          python .github/scripts/q7_static_cost_regression.py
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Commit only passed Q14 candidate files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only | python -c 'import sys; a=[x.strip() for x in sys.stdin if x.strip()]; assert a and all(x.startswith("btc_eth_terminal/") and x.endswith(".py") for x in a)'
+          git add -u -- btc_eth_terminal
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Q14: merge context managers with ordered AST equivalence and retained comments'
+          git push origin HEAD:refs/heads/remediation/q14-import-order-20261122
+# Frozen staging, integration, main and raw archived input remain unchanged.
