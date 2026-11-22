@@ -9,6 +9,7 @@ the source promptly. No raw data/credentials are put in CI artifacts.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
@@ -75,13 +76,12 @@ def check_private_health(health: dict, metrics: dict, previous: dict | None) -> 
     ):
         raise Q22Rejected("PRIVATE_SOURCE_OR_TRANSPORT_UNHEALTHY")
     session_hash = sha256(health["session_id"].encode()).hexdigest()
-    if previous:
-        if (
-            session_hash != previous["session_hash"]
-            or health["messages"] <= previous["messages"]
-            or health["heartbeats"] < previous["heartbeats"]
-        ):
-            raise Q22Rejected("SOURCE_SESSION_CHANGED_OR_NO_MESSAGE_PROGRESS")
+    if previous and (
+        session_hash != previous["session_hash"]
+        or health["messages"] <= previous["messages"]
+        or health["heartbeats"] < previous["heartbeats"]
+    ):
+        raise Q22Rejected("SOURCE_SESSION_CHANGED_OR_NO_MESSAGE_PROGRESS")
     return {
         "session_hash": session_hash,
         "messages": health["messages"],
@@ -156,7 +156,10 @@ def projected_archive_bound(elapsed: float, observed_bytes: int,
         < DISK_RESERVE + MIN_DISK_MARGIN
     ):
         raise Q22Rejected("FIVE_HOUR_RATE_OR_DISK_PROJECTION_UNSAFE")
-    return {"observed_bytes": observed_bytes, "projected_archived_bytes_2p5x": projected}
+    return {
+        "observed_bytes": observed_bytes,
+        "projected_archived_bytes_2p5x": projected,
+    }
 
 
 def evaluate_window(output: str, seconds: int) -> dict:
@@ -278,10 +281,8 @@ def _shutdown(observer: subprocess.Popen, collector: int | None):
             observer.kill()
             observer.wait(timeout=4)
     if collector and (Path("/proc") / str(collector)).exists():
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.kill(collector, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
 
 
 def run(work: Path, public: Path, seconds: int, port: int) -> dict:
@@ -311,150 +312,152 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
     preflight = None
     was_ready = False
     # Private logs live OUTSIDE the public summary artifact directory.
-    with Path(str(work) + ".observer_stdout.log").open("x") as out:
-        with Path(str(work) + ".observer_stderr.log").open("x") as err:
-            observer = subprocess.Popen(
-                [
-                    sys.executable, "-u",
-                    str(ROOT / "scripts/q22_ci_long_observer.py"),
-                    "--execute-public-capture", "--duration", str(seconds),
-                    "--workdir", str(work), "--port", str(port),
-                ],
-                stdout=out, stderr=err, start_new_session=True,
-            )
-            try:
-                while True:
-                    now = time.monotonic()
-                    elapsed = now - started
-                    rc = observer.poll()
-                    if rc is not None:
-                        if rc != 0 or elapsed < seconds - 5:
-                            raise Q22Rejected("COLLECTOR_EXITED_EARLY_OR_FAILED")
-                        break
-                    if elapsed > seconds + 50:
-                        raise Q22Rejected("COLLECTOR_EXCEEDED_CAPTURE_DEADLINE")
-                    if not was_ready:
-                        try:
-                            sample, child = record_sample(
-                                work, observer.pid, child, None, len(samples))
-                            was_ready = True
-                            samples.append(sample)
-                            prior = sample["source"]
-                            next_sample = now + interval
-                        except (OSError, ValueError, KeyError) as exc:
-                            if elapsed > 90:
-                                raise Q22Rejected("LIVE_COLLECTOR_NEVER_HEALTHY") from exc
-                            time.sleep(1)
-                            continue
-                    if now >= next_sample:
-                        s, child = record_sample(
-                            work, observer.pid, child, prior, len(samples))
-                        if samples and not 0 < s["monotonic_ns"] - samples[-1]["monotonic_ns"] <= 40_000_000_000:
-                            raise Q22Rejected("MONITOR_WALLCLOCK_OR_EVENT_LOOP_GAP")
-                        samples.append(s)
-                        prior = s["source"]
+    with (
+        Path(str(work) + ".observer_stdout.log").open("x") as out,
+        Path(str(work) + ".observer_stderr.log").open("x") as err,
+    ):
+        observer = subprocess.Popen(
+            [
+                sys.executable, "-u",
+                str(ROOT / "scripts/q22_ci_long_observer.py"),
+                "--execute-public-capture", "--duration", str(seconds),
+                "--workdir", str(work), "--port", str(port),
+            ],
+            stdout=out, stderr=err, start_new_session=True,
+        )
+        try:
+            while True:
+                now = time.monotonic()
+                elapsed = now - started
+                rc = observer.poll()
+                if rc is not None:
+                    if rc != 0 or elapsed < seconds - 5:
+                        raise Q22Rejected("COLLECTOR_EXITED_EARLY_OR_FAILED")
+                    break
+                if elapsed > seconds + 50:
+                    raise Q22Rejected("COLLECTOR_EXCEEDED_CAPTURE_DEADLINE")
+                if not was_ready:
+                    try:
+                        sample, child = record_sample(
+                            work, observer.pid, child, None, len(samples))
+                        was_ready = True
+                        samples.append(sample)
+                        prior = sample["source"]
                         next_sample = now + interval
-                    if preflight is None and elapsed >= preflight_time:
-                        archived = private_archive_size(work)
-                        preflight = projected_archive_bound(
-                            elapsed, archived,
-                            samples[-1]["disk_free_bytes"], seconds,
-                        )
-                        (public / "preflight.json").write_text(
-                            json.dumps({"schema": "q22_live_five_hour_preflight_v1",
-                                        "source_mode": "LIVE_SOURCE",
-                                        "preflight_seconds": round(elapsed, 2),
-                                        **preflight, "trading_enabled": False},
-                                       sort_keys=True, indent=2) + "\n")
-                        print("PASS_Q22_EARLY_RUN_RATE_DISK_PREFLIGHT", flush=True)
-                    if window_active is not None and window_active.poll() is not None:
-                        rc = window_active.wait()
-                        window_log.close()
-                        output = Path(window_log.name).read_text()
-                        if rc != 0:
-                            raise Q22Rejected("REAL_SSE_WINDOW_PROCESS_FAILED")
-                        summary = evaluate_window(output, window_duration)
-                        summary["window"] = len(windows) + 1
-                        windows.append(summary)
-                        window_active = None
-                        drain_started = now
-                    if drain_started is not None:
-                        m = unix_json(work / "v36_monitor.sock", "/api/v36/metrics")
-                        if (
-                            m.get("active_sse_connections") == 0
-                            and m.get("operationally_healthy") is True
-                        ):
-                            drain_started = None
-                        elif now - drain_started >= 25:
-                            raise Q22Rejected("SSE_SLOTS_NOT_DRAINED_BEFORE_NEXT_WINDOW")
-                    next_idx = len(windows)
+                    except (OSError, ValueError, KeyError) as exc:
+                        if elapsed > 90:
+                            raise Q22Rejected("LIVE_COLLECTOR_NEVER_HEALTHY") from exc
+                        time.sleep(1)
+                        continue
+                if now >= next_sample:
+                    s, child = record_sample(
+                        work, observer.pid, child, prior, len(samples))
+                    if samples and not 0 < s["monotonic_ns"] - samples[-1]["monotonic_ns"] <= 40_000_000_000:
+                        raise Q22Rejected("MONITOR_WALLCLOCK_OR_EVENT_LOOP_GAP")
+                    samples.append(s)
+                    prior = s["source"]
+                    next_sample = now + interval
+                if preflight is None and elapsed >= preflight_time:
+                    archived = private_archive_size(work)
+                    preflight = projected_archive_bound(
+                        elapsed, archived,
+                        samples[-1]["disk_free_bytes"], seconds,
+                    )
+                    (public / "preflight.json").write_text(
+                        json.dumps({"schema": "q22_live_five_hour_preflight_v1",
+                                    "source_mode": "LIVE_SOURCE",
+                                    "preflight_seconds": round(elapsed, 2),
+                                    **preflight, "trading_enabled": False},
+                                   sort_keys=True, indent=2) + "\n")
+                    print("PASS_Q22_EARLY_RUN_RATE_DISK_PREFLIGHT", flush=True)
+                if window_active is not None and window_active.poll() is not None:
+                    rc = window_active.wait()
+                    window_log.close()
+                    output = Path(window_log.name).read_text()
+                    if rc != 0:
+                        raise Q22Rejected("REAL_SSE_WINDOW_PROCESS_FAILED")
+                    summary = evaluate_window(output, window_duration)
+                    summary["window"] = len(windows) + 1
+                    windows.append(summary)
+                    window_active = None
+                    drain_started = now
+                if drain_started is not None:
+                    m = unix_json(work / "v36_monitor.sock", "/api/v36/metrics")
                     if (
-                        preflight is not None
-                        and window_active is None
-                        and drain_started is None
-                        and next_idx < window_count
-                        and elapsed >= first_window + next_idx * period
+                        m.get("active_sse_connections") == 0
+                        and m.get("operationally_healthy") is True
                     ):
-                        log_path = work / ("q22_fanout_%02d.log" % (next_idx + 1))
-                        window_log = log_path.open("x")
-                        window_active = subprocess.Popen(
-                            [sys.executable, "-u", str(
-                                ROOT / "scripts/v36_3_real_live_fanout.py"),
-                             "--seconds", str(window_duration),
-                             "--port", str(port),
-                             "--observer-pid", str(observer.pid)],
-                            stdout=window_log, stderr=subprocess.STDOUT,
-                        )
-                        window_started = now
-                    if (
-                        window_active is not None
-                        and now - window_started > window_duration + 28
-                    ):
-                        raise Q22Rejected("REAL_SSE_WINDOW_TIME_BUDGET_EXCEEDED")
-                    time.sleep(1)
-                if window_active is not None or drain_started is not None:
-                    raise Q22Rejected("SSE_WINDOW_NOT_FINISHED_AT_CAPTURE_END")
-                result = evaluate_monitoring(samples, seconds, windows, window_count)
-                if seconds == CI_DURATION and result["sample_span_seconds"] < 17400:
-                    raise Q22Rejected("HOST_SAMPLE_SPAN_SHORTER_THAN_FIVE_HOUR_SOURCE")
-                result.update({
-                    "schema": "q22_live_ci_source_sse_resource_v1",
-                    "status": "PASS",
-                    "capture_target_seconds": seconds,
-                    "sse_windows": windows,
-                    "preflight": preflight,
-                    "ephemeral_runner_only": True,
-                    "24h_persistent_host_certified": False,
-                    "order_execution_enabled": False,
-                })
-                (public / "live_monitoring_summary.json").write_text(
-                    json.dumps(result, indent=2, sort_keys=True) + "\n")
-                print("PASS_Q22_SOURCE_FANOUT_RESOURCE_MONITORING "
-                      + json.dumps({k: v for k, v in result.items()
-                                    if k != "sse_windows"}, sort_keys=True), flush=True)
-                return result
-            except (Q22Rejected, OSError, ValueError, KeyError) as exc:
-                (public / "fail_fast.json").write_text(json.dumps({
-                    "schema": "q22_fail_fast_v1",
-                    "reason": type(exc).__name__ + ":" + str(exc).splitlines()[0][:180],
-                    "elapsed_seconds": round(time.monotonic() - started, 2),
-                    "sse_windows_passed": len(windows),
-                    "market_source_unverified": True,
-                    "real_orders_enabled": False,
-                }, sort_keys=True, indent=2) + "\n")
-                raise
-            finally:
-                if window_active is not None:
-                    if window_active.poll() is None:
-                        window_active.terminate()
-                        try:
-                            window_active.wait(timeout=5)
-                        except subprocess.TimeoutExpired:
-                            window_active.kill()
-                            window_active.wait(timeout=5)
-                    if window_log is not None and not window_log.closed:
-                        window_log.close()
-                _shutdown(observer, child)
+                        drain_started = None
+                    elif now - drain_started >= 25:
+                        raise Q22Rejected("SSE_SLOTS_NOT_DRAINED_BEFORE_NEXT_WINDOW")
+                next_idx = len(windows)
+                if (
+                    preflight is not None
+                    and window_active is None
+                    and drain_started is None
+                    and next_idx < window_count
+                    and elapsed >= first_window + next_idx * period
+                ):
+                    log_path = work / ("q22_fanout_%02d.log" % (next_idx + 1))
+                    window_log = log_path.open("x")
+                    window_active = subprocess.Popen(
+                        [sys.executable, "-u", str(
+                            ROOT / "scripts/v36_3_real_live_fanout.py"),
+                         "--seconds", str(window_duration),
+                         "--port", str(port),
+                         "--observer-pid", str(observer.pid)],
+                        stdout=window_log, stderr=subprocess.STDOUT,
+                    )
+                    window_started = now
+                if (
+                    window_active is not None
+                    and now - window_started > window_duration + 28
+                ):
+                    raise Q22Rejected("REAL_SSE_WINDOW_TIME_BUDGET_EXCEEDED")
+                time.sleep(1)
+            if window_active is not None or drain_started is not None:
+                raise Q22Rejected("SSE_WINDOW_NOT_FINISHED_AT_CAPTURE_END")
+            result = evaluate_monitoring(samples, seconds, windows, window_count)
+            if seconds == CI_DURATION and result["sample_span_seconds"] < 17400:
+                raise Q22Rejected("HOST_SAMPLE_SPAN_SHORTER_THAN_FIVE_HOUR_SOURCE")
+            result.update({
+                "schema": "q22_live_ci_source_sse_resource_v1",
+                "status": "PASS",
+                "capture_target_seconds": seconds,
+                "sse_windows": windows,
+                "preflight": preflight,
+                "ephemeral_runner_only": True,
+                "24h_persistent_host_certified": False,
+                "order_execution_enabled": False,
+            })
+            (public / "live_monitoring_summary.json").write_text(
+                json.dumps(result, indent=2, sort_keys=True) + "\n")
+            print("PASS_Q22_SOURCE_FANOUT_RESOURCE_MONITORING "
+                  + json.dumps({k: v for k, v in result.items()
+                                if k != "sse_windows"}, sort_keys=True), flush=True)
+            return result
+        except (Q22Rejected, OSError, ValueError, KeyError) as exc:
+            (public / "fail_fast.json").write_text(json.dumps({
+                "schema": "q22_fail_fast_v1",
+                "reason": type(exc).__name__ + ":" + str(exc).splitlines()[0][:180],
+                "elapsed_seconds": round(time.monotonic() - started, 2),
+                "sse_windows_passed": len(windows),
+                "market_source_unverified": True,
+                "real_orders_enabled": False,
+            }, sort_keys=True, indent=2) + "\n")
+            raise
+        finally:
+            if window_active is not None:
+                if window_active.poll() is None:
+                    window_active.terminate()
+                    try:
+                        window_active.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        window_active.kill()
+                        window_active.wait(timeout=5)
+                if window_log is not None and not window_log.closed:
+                    window_log.close()
+            _shutdown(observer, child)
 
 
 def main(argv=None) -> int:
