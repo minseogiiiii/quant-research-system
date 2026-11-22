@@ -94,8 +94,8 @@ def migrate(text: str, offending: set[int]) -> tuple[str, int]:
         # comment can be preserved at its original relative position.
         source_window = lines[first - 1:last]
         preserved_comments = [
-            l for l in source_window
-            if l.lstrip().startswith("#")
+            line for line in source_window
+            if line.lstrip().startswith("#")
         ]
         if preserved_comments:
             body = "".join(preserved_comments) + body
