@@ -101,7 +101,9 @@ def extract_subset(archive: Path, root: Path) -> dict[str, Path]:
             raise ValueError(f"Q13_FIXTURE_INTEGRITY_FAILURE_{key}")
         if key == "Q5_REAL_STATE_JSONL":
             with f.open(encoding="utf-8") as fh:
-                products = {json.loads(line).get("product") for line in fh if line.strip()}
+                products = {
+                    json.loads(line).get("product") for line in fh if line.strip()
+                }
         elif key == "Q4_REAL_STATE_JSON":
             products = set(json.loads(f.read_text(encoding="utf-8")))
         else:
@@ -119,7 +121,9 @@ def compare_checkout(root: Path, checkout: Path) -> None:
         staged = base / part
         if not staged.is_dir():
             raise ValueError("Q13_STAGED_SOURCE_NOT_FOUND")
-        archive_files = {p.relative_to(archived) for p in archived.rglob("*") if p.is_file()}
+        archive_files = {
+            p.relative_to(archived) for p in archived.rglob("*") if p.is_file()
+        }
         staged_files = {p.relative_to(staged) for p in staged.rglob("*") if p.is_file()}
         if archive_files != staged_files:
             raise ValueError("Q13_FRONTEND_SOURCE_FILESET_MISMATCH")
@@ -137,7 +141,9 @@ def run(archive: Path, checkout: Path | None) -> dict[str, object]:
     with tempfile.TemporaryDirectory(prefix="q13_private_") as tmp:
         root = Path(tmp)
         env = dict(os.environ)
-        env.update({key: str(path) for key, path in extract_subset(archive, root).items()})
+        env.update(
+            {key: str(path) for key, path in extract_subset(archive, root).items()}
+        )
         if checkout is not None:
             compare_checkout(root, checkout)
         result = subprocess.run(
@@ -160,7 +166,9 @@ def run(archive: Path, checkout: Path | None) -> dict[str, object]:
             if match is None:
                 raise ValueError("Q13_INCOMPLETE_NODE_TAP")
             metrics[key] = int(match.group(1))
-        if result.returncode or metrics != {"tests": 31, "pass": 31, "fail": 0, "skipped": 0}:
+        if result.returncode or metrics != {
+            "tests": 31, "pass": 31, "fail": 0, "skipped": 0
+        }:
             raise ValueError("Q13_NODE_ZERO_SKIP_GATE_FAILED")
         return {
             "schema": "q13_private_historical_fixture_gate_v1",
