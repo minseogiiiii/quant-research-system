@@ -18,8 +18,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 def _load_after_backend_path_setup():
+    # Source files live in different pinned backend/scripts roots. Keep
+    # these two explicit runtime imports adjacent without isort reordering.
+    # isort: off
     from independent_soak_replay import replay as independent_replay
     from v36_3_durable_archive_gate import BOUNDS, audit as durable_audit
+    # isort: on
 
     return independent_replay, BOUNDS, durable_audit
 
