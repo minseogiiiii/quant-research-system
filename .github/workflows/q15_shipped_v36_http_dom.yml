@@ -40,23 +40,25 @@ jobs:
           python -m py_compile \
             btc_eth_terminal/scripts/q15_shipped_v36_no_source_browser_gate.py
 
+      - name: Verify private downloader HTTPS and token isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.github/scripts python -m unittest discover \
+            -s .github/scripts -p 'test_q16_private_archive_transport.py' -v
+
       - name: Fetch immutable original Q7 release privately and restore ONLY 3 shipped assets
         shell: bash
         env:
           Q13_PRIVATE_RELEASE_URL: ${{ secrets.Q13_PRIVATE_RELEASE_URL }}
+          Q13_GITHUB_ARCHIVE_TOKEN: ${{ secrets.Q13_GITHUB_ARCHIVE_TOKEN }}
         run: |
           set -euo pipefail
           umask 077
-          if [[ -z "$Q13_PRIVATE_RELEASE_URL" ]]; then
-            echo 'BLOCKED_Q15_PRIVATE_ORIGINAL_RELEASE_URL_NOT_CONFIGURED'
-            exit 4
-          fi
           PRIVATE="$(mktemp -d "$RUNNER_TEMP/q15_private.XXXXXX")"
           trap 'rm -rf -- "$PRIVATE"' EXIT
-          curl --fail --silent --show-error --location \
-            --proto '=https' --proto-redir '=https' --max-redirs 4 \
-            --connect-timeout 15 --max-time 300 --retry 1 \
-            --output "$PRIVATE/frozen_q7.zip" "$Q13_PRIVATE_RELEASE_URL"
+          python .github/scripts/q16_secure_private_archive_download.py \
+            --output "$PRIVATE/frozen_q7.zip"
           python .github/scripts/q15_restore_pinned_v36.py \
             --release-zip "$PRIVATE/frozen_q7.zip" \
             --checkout-root "$GITHUB_WORKSPACE"
