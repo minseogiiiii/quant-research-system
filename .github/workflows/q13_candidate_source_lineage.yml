@@ -1,0 +1,59 @@
+name: Q13 candidate source-lineage diff (NO RELEASE REPIN)
+on:
+  push:
+    branches: [remediation/q13-ruff-safe-autofix-20261121]
+    paths: ['.github/workflows/q13_candidate_source_lineage.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  lineage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Calculate exact candidate Git blobs against frozen 278-file Q7 manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import subprocess
+          frozen=pathlib.Path('.github/release-evidence/q7_q8_source_git_blobs.json')
+          m=json.loads(frozen.read_text())
+          assert m['count']==278 and len(m['paths'])==278
+          changed={}
+          current={}
+          for name,sha in sorted(m['paths'].items()):
+              p=pathlib.Path(name)
+              assert p.is_file() and not p.is_symlink()
+              actual=subprocess.check_output(['git','hash-object',name],text=True).strip()
+              current[name]=actual
+              if sha!=actual:changed[name]={'previous':sha,'candidate':actual}
+          result={
+              'schema':'q13_candidate_source_lineage_review_only_v1',
+              'candidate_commit':os.environ['GITHUB_SHA'],
+              'frozen_manifest_sha256':hashlib.sha256(frozen.read_bytes()).hexdigest(),
+              'source_count':278,
+              'changed_source_blobs':len(changed),
+              'unchanged_source_blobs':278-len(changed),
+              'candidate_paths':current,
+              'changes':changed,
+              'previous_release_manifest_unchanged':True,
+              'release_approved':False,
+              'real_ordering_enabled':False,
+          }
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])/'q13_candidate_source_lineage.json'
+          out.write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
+          print('Q13_CANDIDATE_SOURCE_CHANGE_COUNT',len(changed),'UNCHANGED',278-len(changed))
+          PY
+      - name: Preserve review-only source manifest with zero private market data
+        uses: actions/upload-artifact@v4
+        with:
+          name: q13-candidate-source-lineage-review-only
+          path: ${{ runner.temp }}/q13_candidate_source_lineage.json
+          retention-days: 7
+          if-no-files-found: error
