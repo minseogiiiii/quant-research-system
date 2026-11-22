@@ -40,9 +40,7 @@ from world_quant_system.research.point_in_time_models import (
     universe_membership_from_document,
 )
 
-_LIFECYCLE_COLUMNS = (
-    "exchange, symbol, lifecycle_id, lifecycle_json, lifecycle_sha256"
-)
+_LIFECYCLE_COLUMNS = "exchange, symbol, lifecycle_id, lifecycle_json, lifecycle_sha256"
 _MEMBERSHIP_COLUMNS = (
     "membership_id, universe_id, exchange, symbol, member_from, member_until, "
     "available_at, membership_json, membership_sha256"
@@ -236,12 +234,9 @@ class SQLitePointInTimeStore:
                 raise PointInTimeIntegrityError(
                     "Universe membership cannot begin before listing."
                 )
-            if (
-                lifecycle.delisted_at is not None
-                and (
-                    membership.member_until is None
-                    or membership.member_until > lifecycle.delisted_at
-                )
+            if lifecycle.delisted_at is not None and (
+                membership.member_until is None
+                or membership.member_until > lifecycle.delisted_at
             ):
                 raise PointInTimeIntegrityError(
                     "Universe membership cannot extend beyond delisting."
@@ -532,10 +527,7 @@ class SQLitePointInTimeStore:
                 raise PointInTimeEligibilityError(
                     "Security is not tradable at the requested backtest start."
                 )
-            if (
-                lifecycle.tradable_until is not None
-                and end > lifecycle.tradable_until
-            ):
+            if lifecycle.tradable_until is not None and end > lifecycle.tradable_until:
                 raise PointInTimeEligibilityError(
                     "Backtest period extends beyond the tradable lifecycle."
                 )
@@ -677,8 +669,7 @@ class SQLitePointInTimeStore:
             if (
                 availability.exchange != normalized_exchange
                 or availability.symbol != normalized_symbol
-                or availability.effective_at.astimezone(UTC)
-                != event_at.astimezone(UTC)
+                or availability.effective_at.astimezone(UTC) != event_at.astimezone(UTC)
             ):
                 raise PointInTimeIntegrityError(
                     "Data availability metadata does not match the replay event."

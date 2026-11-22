@@ -3,9 +3,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-PACKAGE_ROOT = Path(
-    "src/world_quant_system/order_write_certification"
-)
+PACKAGE_ROOT = Path("src/world_quant_system/order_write_certification")
 FORBIDDEN_IMPORTS = {
     "aiohttp",
     "http.client",

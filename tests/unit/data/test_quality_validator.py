@@ -67,9 +67,7 @@ def test_stale_quote_warns_without_default_quarantine() -> None:
     )
 
     assert result.status is QualityStatus.WARNING
-    assert [issue.code for issue in result.issues] == [
-        QualityIssueCode.STALE_QUOTE
-    ]
+    assert [issue.code for issue in result.issues] == [QualityIssueCode.STALE_QUOTE]
 
 
 def test_policy_can_quarantine_very_stale_quotes() -> None:
@@ -171,19 +169,14 @@ def test_intraday_gap_warns_but_overnight_gap_is_treated_as_session_break() -> N
         expected_source="toss",
     )
 
-    assert QualityIssueCode.CANDLE_GAP in {
-        issue.code for issue in gap_result.issues
-    }
+    assert QualityIssueCode.CANDLE_GAP in {issue.code for issue in gap_result.issues}
     assert QualityIssueCode.CANDLE_GAP not in {
         issue.code for issue in overnight_result.issues
     }
 
 
 def test_zero_volume_and_flatline_runs_warn() -> None:
-    candles = tuple(
-        candle(index, volume=0)
-        for index in range(5)
-    )
+    candles = tuple(candle(index, volume=0) for index in range(5))
     result = DataQualityValidator().assess_candle_page(
         CandlePage(candles=candles, next_before=None),
         now_utc=NOW,

@@ -300,15 +300,9 @@ class RateLimitObservation:
     def from_headers(cls, headers: dict[str, str]) -> RateLimitObservation:
         return cls(
             limit=_optional_nonnegative_int(headers.get("x-ratelimit-limit")),
-            remaining=_optional_nonnegative_int(
-                headers.get("x-ratelimit-remaining")
-            ),
-            reset_seconds=_optional_nonnegative_float(
-                headers.get("x-ratelimit-reset")
-            ),
-            retry_after_seconds=_optional_nonnegative_float(
-                headers.get("retry-after")
-            ),
+            remaining=_optional_nonnegative_int(headers.get("x-ratelimit-remaining")),
+            reset_seconds=_optional_nonnegative_float(headers.get("x-ratelimit-reset")),
+            retry_after_seconds=_optional_nonnegative_float(headers.get("retry-after")),
         )
 
     def to_document(self) -> dict[str, object]:
@@ -456,13 +450,9 @@ class OperationEvidence:
                 "Response digest count must match page count."
             )
         if len(self.request_ids) != self.page_count:
-            raise BrokerAdapterIntegrityError(
-                "Request-ID count must match page count."
-            )
+            raise BrokerAdapterIntegrityError("Request-ID count must match page count.")
         if len(self.rate_limits) != self.page_count:
-            raise BrokerAdapterIntegrityError(
-                "Rate-limit count must match page count."
-            )
+            raise BrokerAdapterIntegrityError("Rate-limit count must match page count.")
         for response_digest in self.response_digests:
             _require_sha256(response_digest, "Response digest")
         for request_id in self.request_ids:
@@ -510,9 +500,7 @@ class AdapterCertificationReport:
         _require_sha256(self.policy_digest, "Policy digest")
         _require_sha256(self.account_fingerprint, "Account fingerprint")
         if not isinstance(self.status, CertificationStatus):
-            raise BrokerAdapterConfigurationError(
-                "Certification status is invalid."
-            )
+            raise BrokerAdapterConfigurationError("Certification status is invalid.")
         if len({operation.operation for operation in self.operations}) != len(
             self.operations
         ):
@@ -732,9 +720,7 @@ def _require_nonnegative_float(value: float, field_name: str) -> None:
 
 def _require_aware(value: datetime, field_name: str) -> None:
     if not isinstance(value, datetime) or value.tzinfo is None:
-        raise BrokerAdapterConfigurationError(
-            f"{field_name} must be timezone-aware."
-        )
+        raise BrokerAdapterConfigurationError(f"{field_name} must be timezone-aware.")
 
 
 OFFICIAL_READ_ONLY_ENDPOINTS: Final[tuple[ReadOnlyEndpointSpec, ...]] = (

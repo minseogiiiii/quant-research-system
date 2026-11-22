@@ -23,10 +23,7 @@ def load_policy(path: str | Path) -> DisabledWriteTransportPolicy:
 def load_approver_fingerprint(path: str | Path) -> str:
     document = _load_object(path)
     value = document.get("approver_fingerprint")
-    if (
-        not isinstance(value, str)
-        or re.fullmatch(r"[0-9a-f]{64}", value) is None
-    ):
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
         raise DisabledWriteTransportConfigurationError(
             "approver_fingerprint must be a SHA-256 digest."
         )
@@ -50,7 +47,5 @@ def _load_object(path: str | Path) -> dict[str, object]:
 def _integer(document: dict[str, object], key: str) -> int:
     value = document.get(key)
     if isinstance(value, bool) or not isinstance(value, int):
-        raise DisabledWriteTransportConfigurationError(
-            f"{key} must be an integer."
-        )
+        raise DisabledWriteTransportConfigurationError(f"{key} must be an integer.")
     return value

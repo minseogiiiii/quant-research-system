@@ -100,9 +100,7 @@ def test_stale_feed_fails_closed_to_cash() -> None:
         observations[0],
         received_at=(
             observations[0].observed_at
-            + timedelta(
-                seconds=policy.maximum_observation_lateness_seconds + 1
-            )
+            + timedelta(seconds=policy.maximum_observation_lateness_seconds + 1)
         ),
     )
     runner = DeterministicForwardShadowRunner(

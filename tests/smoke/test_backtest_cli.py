@@ -100,9 +100,7 @@ async def _seed_normalized_store(root: Path) -> None:
             currency="USD",
             source="test",
         )
-        for index, price in enumerate(
-            (Decimal("10"), Decimal("12"), Decimal("15"))
-        )
+        for index, price in enumerate((Decimal("10"), Decimal("12"), Decimal("15")))
     )
     report = DataQualityReport(
         report_id=str(uuid4()),

@@ -49,9 +49,7 @@ def record(symbol: str, offset: int, price: str) -> NormalizedCandleRecord:
         quality_status=QualityStatus.PASS,
         raw_record_id=str(uuid5(_NAMESPACE, f"raw|{symbol}|{offset}")),
         raw_content_sha256=f"{offset + 1:064x}",
-        quality_report_id=str(
-            uuid5(_NAMESPACE, f"report|{symbol}|{offset}")
-        ),
+        quality_report_id=str(uuid5(_NAMESPACE, f"report|{symbol}|{offset}")),
         normalized_at=timestamp + timedelta(hours=1),
         normalizer_version="1.0.0",
         content_sha256=f"{offset + 100:064x}",
@@ -66,9 +64,7 @@ def context_for(
     symbols: tuple[str, ...],
 ) -> CorporateActionBacktestContext:
     documents = [action.to_document()]
-    dataset_digest = hashlib.sha256(
-        canonical_json_bytes(documents)
-    ).hexdigest()
+    dataset_digest = hashlib.sha256(canonical_json_bytes(documents)).hexdigest()
     return CorporateActionBacktestContext(
         exchange=action.exchange,
         initial_symbol=symbols[0],
@@ -184,6 +180,7 @@ def test_symbol_change_cancels_stale_pending_order() -> None:
         for order in result.orders
     )
     assert result.run_digest
+
 
 def test_post_replay_delisting_cancels_pending_order_at_boundary() -> None:
     records = (

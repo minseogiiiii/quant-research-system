@@ -55,9 +55,7 @@ class SmaCrossoverStrategy:
 
     def __init__(self, *, short_window: int, long_window: int) -> None:
         if isinstance(short_window, bool) or not isinstance(short_window, int):
-            raise BacktestConfigurationError(
-                "Short SMA window must be an integer."
-            )
+            raise BacktestConfigurationError("Short SMA window must be an integer.")
         if isinstance(long_window, bool) or not isinstance(long_window, int):
             raise BacktestConfigurationError("Long SMA window must be an integer.")
         if short_window <= 0 or long_window <= 0:
@@ -124,9 +122,7 @@ class SmaCrossoverStrategy:
             descriptor=self._descriptor,
             event=event,
             target_fraction=target,
-            reason=(
-                f"short_sma={short_average} {relation} long_sma={long_average}"
-            ),
+            reason=(f"short_sma={short_average} {relation} long_sma={long_average}"),
         )
 
 
@@ -162,13 +158,9 @@ def _validate_context(event: ReplayEvent, portfolio: PortfolioSnapshot) -> None:
     if not isinstance(event, ReplayEvent):
         raise BacktestConfigurationError("Strategy requires a ReplayEvent.")
     if not isinstance(portfolio, PortfolioSnapshot):
-        raise BacktestConfigurationError(
-            "Strategy requires a PortfolioSnapshot."
-        )
+        raise BacktestConfigurationError("Strategy requires a PortfolioSnapshot.")
     if event.record.candle.symbol != portfolio.symbol:
-        raise BacktestInvariantError(
-            "Strategy event and portfolio symbols must match."
-        )
+        raise BacktestInvariantError("Strategy event and portfolio symbols must match.")
     if event.event_time != portfolio.timestamp:
         raise BacktestInvariantError(
             "Strategy can only observe a portfolio marked at the current candle."

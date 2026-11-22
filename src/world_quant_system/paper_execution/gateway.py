@@ -173,10 +173,7 @@ class PreTradeRiskGateway:
         if intent.side == PaperOrderSide.BUY:
             projected_position = current_quantity + intent.quantity
             required_cash = intent.notional
-            reserve = (
-                account.cash.settled_cash
-                * policy.minimum_cash_reserve_fraction
-            )
+            reserve = account.cash.settled_cash * policy.minimum_cash_reserve_fraction
             if account.cash.settled_cash - required_cash < reserve:
                 reasons.append("insufficient_cash_after_required_reserve")
             reference_price = market.ask
@@ -194,9 +191,7 @@ class PreTradeRiskGateway:
         if projected_position > policy.maximum_position_quantity:
             reasons.append("maximum_position_quantity_exceeded")
         deviation_bps = (
-            abs(intent.limit_price - reference_price)
-            / reference_price
-            * _BPS
+            abs(intent.limit_price - reference_price) / reference_price * _BPS
         )
         if deviation_bps > policy.maximum_limit_deviation_bps:
             reasons.append("limit_price_deviation_exceeded")
@@ -379,9 +374,7 @@ class PaperOrderCoordinator:
             PaperOrderStatus.UNKNOWN,
         }:
             return record
-        broker_order = await self._broker.find_order_by_client_order_id(
-            client_order_id
-        )
+        broker_order = await self._broker.find_order_by_client_order_id(client_order_id)
         if broker_order is None:
             self._store.activate_kill_switch(
                 KillSwitchMode.SOFT_HALT,
@@ -467,7 +460,8 @@ class PaperOrderCoordinator:
             return record
         event_type = (
             OrderEventType.PRETRADE_REJECTED
-            if record.status in {
+            if record.status
+            in {
                 PaperOrderStatus.CREATED,
                 PaperOrderStatus.VALIDATED,
             }

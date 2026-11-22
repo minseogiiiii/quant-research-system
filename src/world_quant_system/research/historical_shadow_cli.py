@@ -75,9 +75,7 @@ def main(argv: list[str] | None = None) -> None:
         ).run()
         print(format_historical_shadow_report(report))
         if arguments.json_output is not None:
-            AtomicJsonHistoricalShadowReportWriter(arguments.json_output).write(
-                report
-            )
+            AtomicJsonHistoricalShadowReportWriter(arguments.json_output).write(report)
     except (HistoricalShadowError, PortfolioPromotionError) as error:
         parser.error(str(error))
 
@@ -109,8 +107,7 @@ def format_historical_shadow_report(report: HistoricalShadowReport) -> str:
             f"{double_cost.metrics.cumulative_return:.6%}",
             "Extra-delay return:            "
             f"{extra_delay.metrics.cumulative_return:.6%}",
-            "Largest-candidate-removed:      "
-            f"{removed.metrics.cumulative_return:.6%}",
+            f"Largest-candidate-removed:      {removed.metrics.cumulative_return:.6%}",
             f"Maximum drawdown:              {base.metrics.maximum_drawdown:.6%}",
             f"Total turnover:                {base.metrics.total_turnover}",
             f"Total simulated cost:          {base.metrics.total_cost}",

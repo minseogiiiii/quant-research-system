@@ -8,10 +8,7 @@ from pathlib import Path
 
 def test_order_write_certification_cli_contract() -> None:
     extension = ".exe" if os.name == "nt" else ""
-    script = (
-        Path(sysconfig.get_path("scripts"))
-        / f"wqs-order-write-certify{extension}"
-    )
+    script = Path(sysconfig.get_path("scripts")) / f"wqs-order-write-certify{extension}"
     assert script.is_file(), f"Console script was not installed: {script}"
 
     result = subprocess.run(

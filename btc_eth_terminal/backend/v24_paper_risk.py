@@ -3,6 +3,7 @@
 NO broker, internet, order adapter, live trade, or empirical exchange claims.
 The risk parameters are illustrative policy inputs, NOT measured venue rules.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -18,7 +19,9 @@ class PaperReject(ValueError):
     """An explicit, fail-closed paper safety or state rejection."""
 
 
-def dec(value, label: str, *, positive: bool = False, allow_zero: bool = False) -> Decimal:
+def dec(
+    value, label: str, *, positive: bool = False, allow_zero: bool = False
+) -> Decimal:
     """Reject floats, bools, nonfinite decimals and precision mistakes."""
     if isinstance(value, bool) or not isinstance(value, (str, int, Decimal)):
         raise PaperReject(f"{label}: use an exact decimal string, integer or Decimal")
@@ -53,8 +56,13 @@ class PaperPolicy:
     max_open_orders: int = 8
 
     def __post_init__(self) -> None:
-        for name in ("starting_cash_usd", "max_order_usd", "max_gross_usd",
-                     "max_symbol_usd", "max_drawdown_usd"):
+        for name in (
+            "starting_cash_usd",
+            "max_order_usd",
+            "max_gross_usd",
+            "max_symbol_usd",
+            "max_drawdown_usd",
+        ):
             dec(getattr(self, name), name, positive=True)
         fees = dec(self.fee_bps, "fee_bps")
         if fees > 1000:
@@ -84,7 +92,9 @@ class FixtureQuote:
 
     def validate(self, policy: PaperPolicy) -> tuple[Decimal, Decimal]:
         if self.origin != FIXTURE:
-            raise PaperReject("UNVERIFIED_FEED: paper fixture engine refuses external source")
+            raise PaperReject(
+                "UNVERIFIED_FEED: paper fixture engine refuses external source"
+            )
         if self.integrity != "HEALTHY":
             raise PaperReject("INTEGRITY_FAILED: quarantine or stale source")
         if self.instrument not in ASSETS:
@@ -101,8 +111,14 @@ class FixtureQuote:
 
 
 def validate_intent(
-    *, instrument: str, side: str, quantity: str, limit_price: str,
-    quote: FixtureQuote, account: dict, policy: PaperPolicy,
+    *,
+    instrument: str,
+    side: str,
+    quantity: str,
+    limit_price: str,
+    quote: FixtureQuote,
+    account: dict,
+    policy: PaperPolicy,
 ) -> tuple[Decimal, Decimal]:
     """Conservative reservation checks; NO execution probability implied.
 
@@ -136,13 +152,19 @@ def validate_intent(
         # Include pending buy orders and the proposed order at synthetic bid value.
         # Value the new liability at the worse of its limit and the quote.
         # A high buy limit MUST NOT bypass exposure via a low current ask.
-        projected_value = (positions[instrument] * ask +
-                           reservations["buy_notional_usd"][instrument] +
-                           qty * max(px, ask))
+        projected_value = (
+            positions[instrument] * ask
+            + reservations["buy_notional_usd"][instrument]
+            + qty * max(px, ask)
+        )
         if projected_value > dec(policy.max_symbol_usd, "max_symbol_usd"):
             raise PaperReject("MAX_SYMBOL_EXPOSURE")
         other = next(x for x in ASSETS if x != instrument)
-        total = projected_value + positions[other] * account["marks"][other] + reservations["buy_notional_usd"][other]
+        total = (
+            projected_value
+            + positions[other] * account["marks"][other]
+            + reservations["buy_notional_usd"][other]
+        )
         if total > dec(policy.max_gross_usd, "max_gross_usd"):
             raise PaperReject("MAX_GROSS_EXPOSURE")
     else:

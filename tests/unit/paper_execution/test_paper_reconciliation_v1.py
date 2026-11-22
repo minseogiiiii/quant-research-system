@@ -139,10 +139,7 @@ def test_unknown_broker_order_triggers_hard_halt(tmp_path: Path) -> None:
     assert report.decision == ReconciliationDecision.HALT
     assert report.recommended_kill_switch == KillSwitchMode.HARD_HALT
     assert store.get_kill_switch().mode == KillSwitchMode.HARD_HALT
-    assert any(
-        item.code == "unknown_broker_order"
-        for item in report.discrepancies
-    )
+    assert any(item.code == "unknown_broker_order" for item in report.discrepancies)
 
 
 def test_nonterminal_status_difference_requires_manual_review() -> None:
@@ -226,7 +223,4 @@ def test_cash_mismatch_is_critical() -> None:
         compared_at=now,
     )
     assert report.decision == ReconciliationDecision.HALT
-    assert any(
-        item.code == "cash_balance_mismatch"
-        for item in report.discrepancies
-    )
+    assert any(item.code == "cash_balance_mismatch" for item in report.discrepancies)

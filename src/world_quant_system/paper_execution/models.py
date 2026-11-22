@@ -195,9 +195,7 @@ def parse_utc_datetime(value: object, field_name: str) -> datetime:
 
 def decimal_from(value: object, field_name: str) -> Decimal:
     if isinstance(value, bool):
-        raise PaperExecutionConfigurationError(
-            f"{field_name} must be a decimal value."
-        )
+        raise PaperExecutionConfigurationError(f"{field_name} must be a decimal value.")
     try:
         parsed = Decimal(str(value))
     except (InvalidOperation, ValueError) as error:
@@ -292,9 +290,7 @@ class BrokerCapabilityProfile:
             "read_only_access": self.read_only_access,
             "paper_order_submission": self.paper_order_submission,
             "cancellation": self.cancellation,
-            "client_order_id_idempotency": (
-                self.client_order_id_idempotency
-            ),
+            "client_order_id_idempotency": (self.client_order_id_idempotency),
             "margin": self.margin,
             "short_selling": self.short_selling,
             "fractional_quantity": self.fractional_quantity,
@@ -675,9 +671,7 @@ class PaperExecutionPolicy:
                 "Paper policy requires at least one allowed symbol."
             )
         if self.allowed_symbols != tuple(sorted(self.allowed_symbols)):
-            raise PaperExecutionConfigurationError(
-                "Allowed symbols must be sorted."
-            )
+            raise PaperExecutionConfigurationError("Allowed symbols must be sorted.")
         if len(set(self.allowed_symbols)) != len(self.allowed_symbols):
             raise PaperExecutionConfigurationError(
                 "Allowed symbols cannot contain duplicates."
@@ -735,9 +729,7 @@ class PaperExecutionPolicy:
             "maximum_market_age_seconds": self.maximum_market_age_seconds,
             "maximum_account_age_seconds": self.maximum_account_age_seconds,
             "maximum_order_quantity": self.maximum_order_quantity,
-            "maximum_order_notional": _decimal_text(
-                self.maximum_order_notional
-            ),
+            "maximum_order_notional": _decimal_text(self.maximum_order_notional),
             "maximum_position_quantity": self.maximum_position_quantity,
             "maximum_open_orders": self.maximum_open_orders,
             "minimum_cash_reserve_fraction": _decimal_text(
@@ -786,9 +778,7 @@ class KillSwitchState:
             "mode": self.mode.value,
             "reason": self.reason,
             "activated_at": (
-                None
-                if self.activated_at is None
-                else format_utc(self.activated_at)
+                None if self.activated_at is None else format_utc(self.activated_at)
             ),
             "version": self.version,
         }
@@ -913,13 +903,17 @@ class PaperOrderRecord:
             self.intent.quantity,
             self.filled_quantity,
         )
-        if self.status in {
-            PaperOrderStatus.SUBMITTED,
-            PaperOrderStatus.PARTIALLY_FILLED,
-            PaperOrderStatus.FILLED,
-            PaperOrderStatus.CANCEL_PENDING,
-            PaperOrderStatus.CANCELED,
-        } and self.broker_order_id is None:
+        if (
+            self.status
+            in {
+                PaperOrderStatus.SUBMITTED,
+                PaperOrderStatus.PARTIALLY_FILLED,
+                PaperOrderStatus.FILLED,
+                PaperOrderStatus.CANCEL_PENDING,
+                PaperOrderStatus.CANCELED,
+            }
+            and self.broker_order_id is None
+        ):
             raise PaperExecutionIntegrityError(
                 "Submitted or filled records require a broker order ID."
             )
@@ -966,9 +960,7 @@ class PaperOrderEvent:
             self.previous_status,
             PaperOrderStatus,
         ):
-            raise PaperExecutionConfigurationError(
-                "Previous order status is invalid."
-            )
+            raise PaperExecutionConfigurationError("Previous order status is invalid.")
         if not isinstance(self.new_status, PaperOrderStatus):
             raise PaperExecutionConfigurationError("New order status is invalid.")
         if self.previous_status is not None:
@@ -990,9 +982,7 @@ class PaperOrderEvent:
             "timestamp": format_utc(self.timestamp),
             "event_type": self.event_type.value,
             "previous_status": (
-                None
-                if self.previous_status is None
-                else self.previous_status.value
+                None if self.previous_status is None else self.previous_status.value
             ),
             "new_status": self.new_status.value,
             "reason": self.reason,
@@ -1104,9 +1094,7 @@ class ReconciliationDiscrepancy:
     def __post_init__(self) -> None:
         _require_nonblank(self.code, "Discrepancy code")
         if not isinstance(self.severity, DiscrepancySeverity):
-            raise PaperExecutionConfigurationError(
-                "Discrepancy severity is invalid."
-            )
+            raise PaperExecutionConfigurationError("Discrepancy severity is invalid.")
         _require_nonblank(self.message, "Discrepancy message")
         if self.symbol is not None:
             _require_symbol(self.symbol)
@@ -1368,9 +1356,7 @@ def parse_broker_order(document: object) -> BrokerOrderSnapshot:
         limit_price=decimal_from(mapping.get("limit_price"), "Limit price"),
         filled_quantity=_required_int(mapping, "filled_quantity"),
         average_fill_price=(
-            None
-            if average is None
-            else decimal_from(average, "Average fill price")
+            None if average is None else decimal_from(average, "Average fill price")
         ),
         status=_parse_enum(
             PaperOrderStatus,
@@ -1417,16 +1403,12 @@ def parse_account_snapshot(document: object) -> PaperAccountSnapshot:
         ),
         cash=parse_cash_balance(mapping.get("cash")),
         positions=tuple(
-            parse_position(item)
-            for item in _required_list(mapping, "positions")
+            parse_position(item) for item in _required_list(mapping, "positions")
         ),
         orders=tuple(
-            parse_broker_order(item)
-            for item in _required_list(mapping, "orders")
+            parse_broker_order(item) for item in _required_list(mapping, "orders")
         ),
-        fills=tuple(
-            parse_fill(item) for item in _required_list(mapping, "fills")
-        ),
+        fills=tuple(parse_fill(item) for item in _required_list(mapping, "fills")),
         source_digest=_required_str(mapping, "source_digest"),
     )
     _verify_optional_identity(
@@ -1456,9 +1438,7 @@ def parse_policy(document: object) -> PaperExecutionPolicy:
             "expected_endpoint_fingerprint",
         ),
         currency=_required_str(mapping, "currency"),
-        allowed_symbols=tuple(
-            _list_str(item, "Allowed symbol") for item in symbols
-        ),
+        allowed_symbols=tuple(_list_str(item, "Allowed symbol") for item in symbols),
         maximum_market_age_seconds=_required_int(
             mapping,
             "maximum_market_age_seconds",
@@ -1504,9 +1484,7 @@ def parse_internal_order_state(document: object) -> InternalOrderState:
     mapping = _require_mapping(document, "Internal order state")
     broker_order_id = mapping.get("broker_order_id")
     if broker_order_id is not None and not isinstance(broker_order_id, str):
-        raise PaperExecutionConfigurationError(
-            "Broker order ID must be text or null."
-        )
+        raise PaperExecutionConfigurationError("Broker order ID must be text or null.")
     return InternalOrderState(
         client_order_id=_required_str(mapping, "client_order_id"),
         broker_order_id=broker_order_id,
@@ -1529,16 +1507,14 @@ def parse_internal_ledger(document: object) -> InternalPaperLedgerSnapshot:
         ),
         cash=parse_cash_balance(mapping.get("cash")),
         positions=tuple(
-            parse_position(item)
-            for item in _required_list(mapping, "positions")
+            parse_position(item) for item in _required_list(mapping, "positions")
         ),
         orders=tuple(
             parse_internal_order_state(item)
             for item in _required_list(mapping, "orders")
         ),
         fill_ids=tuple(
-            _list_str(item, "Fill ID")
-            for item in _required_list(mapping, "fill_ids")
+            _list_str(item, "Fill ID") for item in _required_list(mapping, "fill_ids")
         ),
     )
     _verify_optional_identity(
@@ -1564,13 +1540,17 @@ def _validate_status_quantities(
         raise PaperExecutionIntegrityError(
             "Partially-filled status requires a partial positive fill."
         )
-    if status in {
-        PaperOrderStatus.CREATED,
-        PaperOrderStatus.VALIDATED,
-        PaperOrderStatus.SUBMITTING,
-        PaperOrderStatus.SUBMITTED,
-        PaperOrderStatus.REJECTED,
-    } and filled_quantity != 0:
+    if (
+        status
+        in {
+            PaperOrderStatus.CREATED,
+            PaperOrderStatus.VALIDATED,
+            PaperOrderStatus.SUBMITTING,
+            PaperOrderStatus.SUBMITTED,
+            PaperOrderStatus.REJECTED,
+        }
+        and filled_quantity != 0
+    ):
         raise PaperExecutionIntegrityError(
             f"{status.value} status cannot have a filled quantity."
         )
@@ -1581,9 +1561,7 @@ def _require_sorted_unique_positions(
 ) -> None:
     symbols = tuple(item.symbol for item in positions)
     if symbols != tuple(sorted(symbols)):
-        raise PaperExecutionConfigurationError(
-            "Positions must be sorted by symbol."
-        )
+        raise PaperExecutionConfigurationError("Positions must be sorted by symbol.")
     if len(set(symbols)) != len(symbols):
         raise PaperExecutionIntegrityError("Positions cannot repeat a symbol.")
 
@@ -1619,9 +1597,7 @@ def _require_mapping(value: object, field_name: str) -> dict[str, object]:
     if not isinstance(value, dict):
         raise PaperExecutionConfigurationError(f"{field_name} must be an object.")
     if not all(isinstance(key, str) for key in value):
-        raise PaperExecutionConfigurationError(
-            f"{field_name} keys must be text."
-        )
+        raise PaperExecutionConfigurationError(f"{field_name} keys must be text.")
     return value
 
 
@@ -1677,9 +1653,7 @@ def _required_int(mapping: dict[str, object], key: str) -> int:
 
 def _list_str(value: object, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise PaperExecutionConfigurationError(
-            f"{field_name} must be nonblank text."
-        )
+        raise PaperExecutionConfigurationError(f"{field_name} must be nonblank text.")
     return value
 
 
@@ -1717,9 +1691,7 @@ def _require_bool(value: object, field_name: str) -> None:
 
 def _require_nonblank(value: str, field_name: str) -> None:
     if not isinstance(value, str) or not value.strip():
-        raise PaperExecutionConfigurationError(
-            f"{field_name} cannot be blank."
-        )
+        raise PaperExecutionConfigurationError(f"{field_name} cannot be blank.")
 
 
 def _require_symbol(value: str) -> None:
@@ -1782,17 +1754,13 @@ def _require_finite_decimal(value: Decimal, field_name: str) -> None:
 def _require_nonnegative_decimal(value: Decimal, field_name: str) -> None:
     _require_finite_decimal(value, field_name)
     if value < _ZERO:
-        raise PaperExecutionConfigurationError(
-            f"{field_name} cannot be negative."
-        )
+        raise PaperExecutionConfigurationError(f"{field_name} cannot be negative.")
 
 
 def _require_positive_decimal(value: Decimal, field_name: str) -> None:
     _require_finite_decimal(value, field_name)
     if value <= _ZERO:
-        raise PaperExecutionConfigurationError(
-            f"{field_name} must be positive."
-        )
+        raise PaperExecutionConfigurationError(f"{field_name} must be positive.")
 
 
 def _require_unit_interval(
@@ -1828,5 +1796,3 @@ def _decimal_text(value: Decimal) -> str:
     if value == _ZERO:
         return "0"
     return format(value.normalize(), "f")
-
-

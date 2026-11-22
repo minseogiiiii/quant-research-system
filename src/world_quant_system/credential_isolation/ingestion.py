@@ -17,8 +17,7 @@ def load_policy(path: str | Path) -> CredentialIsolationPolicy:
     return CredentialIsolationPolicy(
         provider=_text(document, "provider"),
         permitted_sources=tuple(
-            SecretSource(value)
-            for value in _string_list(document, "permitted_sources")
+            SecretSource(value) for value in _string_list(document, "permitted_sources")
         ),
         permitted_purposes=tuple(
             CredentialPurpose(value)
@@ -62,27 +61,21 @@ def _load_object(path: str | Path) -> dict[str, object]:
 def _text(document: dict[str, object], key: str) -> str:
     value = document.get(key)
     if not isinstance(value, str) or not value.strip():
-        raise CredentialIsolationConfigurationError(
-            f"{key} must be nonblank text."
-        )
+        raise CredentialIsolationConfigurationError(f"{key} must be nonblank text.")
     return value
 
 
 def _integer(document: dict[str, object], key: str) -> int:
     value = document.get(key)
     if isinstance(value, bool) or not isinstance(value, int):
-        raise CredentialIsolationConfigurationError(
-            f"{key} must be an integer."
-        )
+        raise CredentialIsolationConfigurationError(f"{key} must be an integer.")
     return value
 
 
 def _string_list(document: dict[str, object], key: str) -> list[str]:
     value = document.get(key)
     if not isinstance(value, list) or not value:
-        raise CredentialIsolationConfigurationError(
-            f"{key} must be a nonempty list."
-        )
+        raise CredentialIsolationConfigurationError(f"{key} must be a nonempty list.")
     if any(not isinstance(item, str) or not item.strip() for item in value):
         raise CredentialIsolationConfigurationError(
             f"{key} must contain nonblank text values."

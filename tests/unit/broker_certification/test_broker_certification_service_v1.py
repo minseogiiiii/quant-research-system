@@ -62,9 +62,7 @@ def test_unknown_order_status_fails_closed(tmp_path: Path) -> None:
         certified_at=CERTIFIED_AT,
     )
     assert report.status is CertificationStatus.FAIL
-    assert any(
-        finding.code == "UNKNOWN_ORDER_STATUS" for finding in report.findings
-    )
+    assert any(finding.code == "UNKNOWN_ORDER_STATUS" for finding in report.findings)
 
 
 def test_account_fingerprint_mismatch_fails(tmp_path: Path) -> None:
@@ -79,8 +77,7 @@ def test_account_fingerprint_mismatch_fails(tmp_path: Path) -> None:
     )
     assert report.status is CertificationStatus.FAIL
     assert any(
-        finding.code == "ACCOUNT_FINGERPRINT_MISMATCH"
-        for finding in report.findings
+        finding.code == "ACCOUNT_FINGERPRINT_MISMATCH" for finding in report.findings
     )
 
 

@@ -16,8 +16,9 @@ SPEC.loader.exec_module(MODULE)
 
 class Q13GuardUnitTests(unittest.TestCase):
     def test_nonexistent_private_archive_fails_closed(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(
-            ValueError, "RELEASE_MISSING"
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            self.assertRaisesRegex(ValueError, "RELEASE_MISSING"),
         ):
             MODULE.verify_zip(Path(tmp) / "no_private_archive.zip")
 

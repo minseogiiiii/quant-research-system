@@ -4,6 +4,7 @@ This deliberately does not import bridge, fetch_coinbase_5m, or fetch_btc_eth.
 Two implementations agreeing reduces coding mistakes; neither proves that bytes
 actually originated at Coinbase. No trading, price forecasts, or PIT claims.
 """
+
 from __future__ import annotations
 
 import csv
@@ -11,13 +12,13 @@ import hashlib
 import io
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 PRODUCTS = {"BTC-USD": "btc_coinbase_spot_5m", "ETH-USD": "eth_coinbase_spot_5m"}
 ROW_NAMES = ["time", "open", "high", "low", "close", "volume"]
-UTC = timezone.utc
+UTC = UTC
 
 
 class IndependentAuditError(ValueError):
@@ -39,10 +40,15 @@ def _bad_constant(value):
 
 def _json(data: bytes) -> dict:
     try:
-        result = json.loads(data.decode("utf-8"), object_pairs_hook=_no_duplicates,
-                            parse_constant=_bad_constant)
+        result = json.loads(
+            data.decode("utf-8"),
+            object_pairs_hook=_no_duplicates,
+            parse_constant=_bad_constant,
+        )
     except (UnicodeError, ValueError) as exc:
-        raise IndependentAuditError("Malformed, nonfinite or ambiguous source JSON") from exc
+        raise IndependentAuditError(
+            "Malformed, nonfinite or ambiguous source JSON"
+        ) from exc
     if not isinstance(result, dict):
         raise IndependentAuditError("Source payload must be a JSON object")
     return result
@@ -55,15 +61,23 @@ def _utc_seconds(value: str) -> int:
         dt = datetime.fromisoformat(value)
     except (ValueError, OverflowError) as exc:
         raise IndependentAuditError("Invalid source timestamp") from exc
-    if (dt.tzinfo is None or dt.utcoffset() is None or
-        dt.utcoffset().total_seconds() != 0 or dt.microsecond != 0):
+    if (
+        dt.tzinfo is None
+        or dt.utcoffset() is None
+        or dt.utcoffset().total_seconds() != 0
+        or dt.microsecond != 0
+    ):
         raise IndependentAuditError("Source horizon must be an exact UTC second")
     return int(dt.timestamp())
 
 
 def _bounded_file(root: Path, relative: str, *, max_bytes=2_000_000) -> bytes:
-    if (not isinstance(relative, str) or relative.startswith("/") or
-        "\\" in relative or any(part in ("", ".", "..") for part in relative.split("/"))):
+    if (
+        not isinstance(relative, str)
+        or relative.startswith("/")
+        or "\\" in relative
+        or any(part in ("", ".", "..") for part in relative.split("/"))
+    ):
         raise IndependentAuditError("Unsafe archive path")
     p = root / relative
     if p.is_symlink() or not p.resolve().is_relative_to(root):
@@ -102,11 +116,14 @@ def audit_bundle_independently(directory: Path) -> dict:
     for product, stem in PRODUCTS.items():
         source_bytes = _bounded_file(root, f"{stem}.source.json")
         source = _json(source_bytes)
-        if (source.get("product") != product or source.get("market") != "SPOT" or
-            source.get("granularity") != "FIVE_MINUTE" or
-            source.get("symbol") != product.split("-")[0] + "_COINBASE_SPOT" or
-            source.get("point_in_time_provenance") != "NOT_ESTABLISHED" or
-            source.get("available_at", "MISSING") is not None):
+        if (
+            source.get("product") != product
+            or source.get("market") != "SPOT"
+            or source.get("granularity") != "FIVE_MINUTE"
+            or source.get("symbol") != product.split("-")[0] + "_COINBASE_SPOT"
+            or source.get("point_in_time_provenance") != "NOT_ESTABLISHED"
+            or source.get("available_at", "MISSING") is not None
+        ):
             raise IndependentAuditError("Source identity or provenance mismatch")
         start = _utc_seconds(source.get("start_inclusive_utc"))
         end = _utc_seconds(source.get("end_exclusive_utc"))
@@ -124,20 +141,28 @@ def audit_bundle_independently(directory: Path) -> dict:
             a, b = page.get("from_sec"), page.get("to_sec")
             if type(a) is not int or type(b) is not int or not start <= a < b <= end:
                 raise IndependentAuditError("Invalid source page bounds")
-            if ("http_request_end_sec_inclusive" in page and
-                page["http_request_end_sec_inclusive"] != b - 1):
-                raise IndependentAuditError("Raw HTTP request end does not agree with UTC grid")
+            if (
+                "http_request_end_sec_inclusive" in page
+                and page["http_request_end_sec_inclusive"] != b - 1
+            ):
+                raise IndependentAuditError(
+                    "Raw HTTP request end does not agree with UTC grid"
+                )
             page_ranges.append((a, b))
             expected_file = f"raw/{stem}/{i:04d}.json"
             if page.get("raw_file") != expected_file:
                 raise IndependentAuditError("Page filename/order inconsistent")
             raw = _bounded_file(root, expected_file)
             actual_digest = hashlib.sha256(raw).hexdigest()
-            if actual_digest != page.get("raw_response_sha256") or len(raw) != page.get("raw_response_bytes"):
+            if actual_digest != page.get("raw_response_sha256") or len(raw) != page.get(
+                "raw_response_bytes"
+            ):
                 raise IndependentAuditError("Raw bytes differ from source metadata")
             candles = _json(raw).get("candles")
             if not isinstance(candles, list) or len(candles) != page.get("count"):
-                raise IndependentAuditError("Raw response missing candle array or wrong count")
+                raise IndependentAuditError(
+                    "Raw response missing candle array or wrong count"
+                )
             for candle in candles:
                 if not isinstance(candle, dict):
                     raise IndependentAuditError("Non-object candle")
@@ -146,23 +171,34 @@ def audit_bundle_independently(directory: Path) -> dict:
                     raise IndependentAuditError("Invalid candle start")
                 stamp = int(t)
                 if stamp % 300 or stamp < a or stamp >= b or stamp in rows:
-                    raise IndependentAuditError("Misaligned, out-of-range or repeated candle")
-                values = {field: _number(candle.get(field), allow_zero=(field == "volume"))
-                          for field in ROW_NAMES[1:]}
-                if values["low"] > min(values["open"], values["close"]) or \
-                   values["high"] < max(values["open"], values["close"]) or \
-                   values["low"] > values["high"]:
+                    raise IndependentAuditError(
+                        "Misaligned, out-of-range or repeated candle"
+                    )
+                values = {
+                    field: _number(candle.get(field), allow_zero=(field == "volume"))
+                    for field in ROW_NAMES[1:]
+                }
+                if (
+                    values["low"] > min(values["open"], values["close"])
+                    or values["high"] < max(values["open"], values["close"])
+                    or values["low"] > values["high"]
+                ):
                     raise IndependentAuditError("Bad OHLC envelope")
                 rows[stamp] = {field: candle[field] for field in ROW_NAMES[1:]}
             digest_parts.append(f"{product}:{i}:{actual_digest}\n")
-        expected_ranges = [(a, min(a + 300 * 300, end)) for a in range(start, end, 300 * 300)]
+        expected_ranges = [
+            (a, min(a + 300 * 300, end)) for a in range(start, end, 300 * 300)
+        ]
         if page_ranges != expected_ranges:
             raise IndependentAuditError("Page grid missing, extra or out of order")
         grid = range(start, end, 300)
         if len(rows) != len(grid) or any(t not in rows for t in grid):
             raise IndependentAuditError("Incomplete five-minute grid")
-        if (source.get("rows") != len(grid) or source.get("expected_rows") != len(grid) or
-            source.get("derived_csv_filename") != stem + ".csv"):
+        if (
+            source.get("rows") != len(grid)
+            or source.get("expected_rows") != len(grid)
+            or source.get("derived_csv_filename") != stem + ".csv"
+        ):
             raise IndependentAuditError("Derived filename or row-count claim mismatch")
         csv_bytes = _bounded_file(root, stem + ".csv", max_bytes=25 * 1024 * 1024)
         actual_csv_sha = hashlib.sha256(csv_bytes).hexdigest()
@@ -186,22 +222,34 @@ def audit_bundle_independently(directory: Path) -> dict:
                 raise IndependentAuditError("Derived candle time/order differs")
             if any(rec[k] != rows[stamp][k] for k in ROW_NAMES[1:]):
                 raise IndependentAuditError("Derived CSV not faithful to raw response")
-        details[product] = {"rows": len(grid), "start_unix_seconds": start,
-                            "end_unix_seconds_exclusive": end, "csv_sha256": actual_csv_sha,
-                            "raw_pages": len(pages)}
+        details[product] = {
+            "rows": len(grid),
+            "start_unix_seconds": start,
+            "end_unix_seconds_exclusive": end,
+            "csv_sha256": actual_csv_sha,
+            "raw_pages": len(pages),
+        }
     if len(cohort) != 1:
         raise IndependentAuditError("BTC and ETH cohort mismatch")
-    return {"status": "INTERNAL_CONSISTENCY_PASSED", "markets": details,
-            "archive_pages_sha256": hashlib.sha256("".join(digest_parts).encode()).hexdigest(),
-            "source_authenticity_proven": False,
-            "historical_point_in_time_proven": False,
-            "independent_exchange_comparison_proven": False,
-            "executable_alpha_proven": False}
+    return {
+        "status": "INTERNAL_CONSISTENCY_PASSED",
+        "markets": details,
+        "archive_pages_sha256": hashlib.sha256(
+            "".join(digest_parts).encode()
+        ).hexdigest(),
+        "source_authenticity_proven": False,
+        "historical_point_in_time_proven": False,
+        "independent_exchange_comparison_proven": False,
+        "executable_alpha_proven": False,
+    }
 
 
 if __name__ == "__main__":
     import argparse
+
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("directory", type=Path)
     args = p.parse_args()
-    print(json.dumps(audit_bundle_independently(args.directory), indent=2, sort_keys=True))
+    print(
+        json.dumps(audit_bundle_independently(args.directory), indent=2, sort_keys=True)
+    )

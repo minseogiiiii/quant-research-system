@@ -80,9 +80,7 @@ async def test_registration_is_deterministic_and_idempotent_under_concurrency(
 
     assert all(result == results[0] for result in results)
     assert results[0].experiment_id == candidate.experiment_id
-    assert await registry.query() == (
-        await registry.get(candidate.experiment_id),
-    )
+    assert await registry.query() == (await registry.get(candidate.experiment_id),)
 
 
 @pytest.mark.asyncio

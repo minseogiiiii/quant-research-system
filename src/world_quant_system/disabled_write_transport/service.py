@@ -69,8 +69,7 @@ class DeterministicDisabledWriteTransportIntegrator:
         checks: list[TransportIntegrationCheck] = [
             _check(
                 "dry_run_report_approval_required",
-                dry_run_report.decision
-                is DryRunDecision.HUMAN_APPROVAL_REQUIRED,
+                dry_run_report.decision is DryRunDecision.HUMAN_APPROVAL_REQUIRED,
                 "Dry-run report reached the human-approval boundary.",
                 "Dry-run report did not reach the human-approval boundary.",
             ),
@@ -88,9 +87,7 @@ class DeterministicDisabledWriteTransportIntegrator:
                 "Compiled request unexpectedly enables network or credentials.",
             ),
         ]
-        checks.extend(
-            self._endpoint_policy.evaluate(compiled_request, policy)
-        )
+        checks.extend(self._endpoint_policy.evaluate(compiled_request, policy))
         checks.extend(
             evaluate_approval_binding(
                 challenge,
@@ -102,9 +99,7 @@ class DeterministicDisabledWriteTransportIntegrator:
             _credential_checks(
                 token_lease=token_lease,
                 token_use=token_use,
-                request_account_fingerprint=(
-                    compiled_request.account_fingerprint
-                ),
+                request_account_fingerprint=(compiled_request.account_fingerprint),
                 evaluated_at=normalized_at,
             )
         )
@@ -149,8 +144,7 @@ class DeterministicDisabledWriteTransportIntegrator:
         envelope_expires_at = min(
             approval_grant.expires_at,
             token_lease.expires_at,
-            normalized_at
-            + timedelta(seconds=policy.maximum_envelope_ttl_seconds),
+            normalized_at + timedelta(seconds=policy.maximum_envelope_ttl_seconds),
         )
         envelope = AuthorizedWriteEnvelope(
             compiled_request=compiled_request,
@@ -211,8 +205,7 @@ def _credential_checks(
         ),
         _check(
             "credential_account_binding",
-            token_lease.account_fingerprint
-            == request_account_fingerprint,
+            token_lease.account_fingerprint == request_account_fingerprint,
             "Credential lease matches the request account fingerprint.",
             "Credential lease account fingerprint does not match.",
         ),
@@ -220,8 +213,7 @@ def _credential_checks(
             "credential_receipt_binding",
             (
                 token_use.lease_id == token_lease.lease_id
-                and token_use.token_fingerprint
-                == token_lease.token_fingerprint
+                and token_use.token_fingerprint == token_lease.token_fingerprint
                 and token_use.authorization_header == "Bearer [REDACTED]"
                 and token_lease.use_count >= 1
             ),
@@ -240,10 +232,7 @@ def _credential_checks(
         ),
         _check(
             "credential_side_effect_counts",
-            (
-                token_use.network_call_count == 0
-                and token_use.broker_write_count == 0
-            ),
+            (token_use.network_call_count == 0 and token_use.broker_write_count == 0),
             "Credential authorization recorded no network or broker writes.",
             "Credential authorization recorded a forbidden side effect.",
         ),

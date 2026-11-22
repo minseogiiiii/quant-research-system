@@ -98,13 +98,8 @@ class StrategyBacktestEngine:
                 raise BacktestConfigurationError(
                     "Corporate-action context digest does not match the timeline."
                 )
-            configured_tax_model = (
-                dividend_tax_model or FlatRateDividendTaxModel()
-            )
-            if (
-                config.dividend_tax_model_digest
-                != configured_tax_model.fingerprint
-            ):
+            configured_tax_model = dividend_tax_model or FlatRateDividendTaxModel()
+            if config.dividend_tax_model_digest != configured_tax_model.fingerprint:
                 raise BacktestConfigurationError(
                     "Dividend-tax digest does not match the configured model."
                 )

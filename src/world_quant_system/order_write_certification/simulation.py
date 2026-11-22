@@ -43,21 +43,14 @@ def main() -> None:
     root = _find_project_root()
     evaluated_at = datetime(2026, 8, 3, 21, 31, tzinfo=UTC)
     certification = load_read_only_certification(
-        root
-        / "examples/toss_read_only_certification_report.example.json"
+        root / "examples/toss_read_only_certification_report.example.json"
     )
-    intent = load_order_intent(
-        root / "examples/toss_order_write_intent.example.json"
-    )
+    intent = load_order_intent(root / "examples/toss_order_write_intent.example.json")
     account = load_account_state(
         root / "examples/toss_order_write_account.example.json"
     )
-    market = load_market_state(
-        root / "examples/toss_order_write_market.example.json"
-    )
-    policy = load_policy(
-        root / "examples/toss_order_write_policy.example.json"
-    )
+    market = load_market_state(root / "examples/toss_order_write_market.example.json")
+    policy = load_policy(root / "examples/toss_order_write_policy.example.json")
     kill_switch = KillSwitchState(
         mode=KillSwitchMode.NORMAL,
         reason="normal",

@@ -121,9 +121,7 @@ class TossLiveReadPolicy:
                 "Live-read enable variable cannot be changed."
             )
         if self.enable_value != LIVE_READ_ENABLE_VALUE:
-            raise TossLiveReadSafetyError(
-                "Live-read enable value cannot be changed."
-            )
+            raise TossLiveReadSafetyError("Live-read enable value cannot be changed.")
         if self.redirects_enabled:
             raise TossLiveReadSafetyError("HTTP redirects must remain disabled.")
         if self.proxy_inheritance_enabled:
@@ -146,9 +144,7 @@ class TossLiveReadPolicy:
             "timeout_seconds": float(self.timeout_seconds),
             "maximum_response_bytes": self.maximum_response_bytes,
             "maximum_read_attempts": self.maximum_read_attempts,
-            "maximum_retry_delay_seconds": float(
-                self.maximum_retry_delay_seconds
-            ),
+            "maximum_retry_delay_seconds": float(self.maximum_retry_delay_seconds),
             "closed_order_lookback_days": self.closed_order_lookback_days,
             "closed_order_page_size": self.closed_order_page_size,
             "maximum_closed_order_pages": self.maximum_closed_order_pages,
@@ -425,6 +421,4 @@ def _require_sha256(value: object, field_name: str) -> None:
 
 def _require_aware(value: datetime, field_name: str) -> None:
     if value.tzinfo is None or value.utcoffset() is None:
-        raise TossLiveReadConfigurationError(
-            f"{field_name} must be timezone-aware."
-        )
+        raise TossLiveReadConfigurationError(f"{field_name} must be timezone-aware.")

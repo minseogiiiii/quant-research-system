@@ -178,9 +178,7 @@ class DeterministicPortfolioPromotionEngine:
             evidence.declared_cost_to_gross_profit_ratio
             > self._policy.maximum_cost_to_gross_profit_ratio
         ):
-            rejected_reasons.append(
-                "cost-to-gross-profit ratio exceeds policy maximum"
-            )
+            rejected_reasons.append("cost-to-gross-profit ratio exceeds policy maximum")
         if rejected_reasons:
             decision = CandidateDecision.REJECTED
             reasons = tuple(rejected_reasons + insufficient_reasons)
@@ -535,9 +533,7 @@ def load_candidate_evidence_manifest(
             candidate,
             "declared_cost_to_gross_profit_ratio",
         )
-        reported_cost_ratio = _backtest_cost_to_gross_profit_ratio(
-            backtest_document
-        )
+        reported_cost_ratio = _backtest_cost_to_gross_profit_ratio(backtest_document)
         declared_cost_ratio = _reconcile_economic_evidence(
             declared=declared_cost_ratio,
             reported=reported_cost_ratio,
@@ -737,8 +733,7 @@ def _constrained_weights(
         active = tuple(
             candidate_id
             for candidate_id in candidate_ids
-            if weights[candidate_id] + _WEIGHT_EPSILON
-            < policy.maximum_candidate_weight
+            if weights[candidate_id] + _WEIGHT_EPSILON < policy.maximum_candidate_weight
             and _cluster_weight(weights, cluster_for, cluster_for[candidate_id])
             + _WEIGHT_EPSILON
             < policy.maximum_cluster_weight
@@ -749,15 +744,11 @@ def _constrained_weights(
         if active_score <= _ZERO:
             break
         proposed = {
-            candidate_id: remaining
-            * positive_scores[candidate_id]
-            / active_score
+            candidate_id: remaining * positive_scores[candidate_id] / active_score
             for candidate_id in active
         }
         for cluster_id in sorted({cluster_for[item] for item in active}):
-            members = tuple(
-                item for item in active if cluster_for[item] == cluster_id
-            )
+            members = tuple(item for item in active if cluster_for[item] == cluster_id)
             cluster_room = max(
                 _ZERO,
                 policy.maximum_cluster_weight
@@ -805,13 +796,11 @@ def _portfolio_metrics(
     final_equity = _ONE + cumulative
     annualized_return: float | None = None
     if final_equity > _ZERO:
-        annualized_return = float(final_equity) ** (
-            policy.annualization_periods / count
-        ) - 1.0
+        annualized_return = (
+            float(final_equity) ** (policy.annualization_periods / count) - 1.0
+        )
     standard_deviation = statistics.stdev(values) if count >= 2 else 0.0
-    annualized_volatility = standard_deviation * math.sqrt(
-        policy.annualization_periods
-    )
+    annualized_volatility = standard_deviation * math.sqrt(policy.annualization_periods)
     sharpe: float | None = None
     if standard_deviation > 0:
         sharpe = (
@@ -979,13 +968,10 @@ def _build_clusters(
         parents[larger] = smaller
 
     for pair in correlations:
-        high_normal = (
-            pair.pearson_correlation >= policy.maximum_pairwise_correlation
-        )
+        high_normal = pair.pearson_correlation >= policy.maximum_pairwise_correlation
         high_loss = (
             pair.loss_period_correlation is not None
-            and pair.loss_period_correlation
-            >= policy.maximum_loss_period_correlation
+            and pair.loss_period_correlation >= policy.maximum_loss_period_correlation
         )
         if high_normal or high_loss:
             union(pair.left_candidate_id, pair.right_candidate_id)
@@ -1190,7 +1176,6 @@ def _resolve_manifest_path(manifest_path: Path, raw_path: str) -> Path:
     return _require_local_file(candidate, "Evidence report")
 
 
-
 def _verified_manifest_file_sha256(
     candidate: Mapping[str, object],
     field_name: str,
@@ -1204,6 +1189,7 @@ def _verified_manifest_file_sha256(
             f"Evidence file SHA-256 mismatch for {candidate_id}: {field_name}."
         )
     return actual
+
 
 def _sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
@@ -1278,7 +1264,6 @@ def _required_sha256(document: Mapping[str, object], key: str) -> str:
     return value
 
 
-
 def _nested_optional_decimal(
     document: Mapping[str, object],
     path: tuple[str, ...],
@@ -1351,6 +1336,7 @@ def _reconcile_economic_evidence(
             f"{candidate_id}."
         )
     return reported if reported is not None else declared
+
 
 def _optional_decimal(
     document: Mapping[str, object],

@@ -105,9 +105,7 @@ class CredentialIsolationPolicy:
                 "External network access must remain disabled."
             )
         if self.broker_writes_enabled:
-            raise CredentialIsolationSafetyError(
-                "Broker writes must remain disabled."
-            )
+            raise CredentialIsolationSafetyError("Broker writes must remain disabled.")
         if self.secret_persistence_enabled:
             raise CredentialIsolationSafetyError(
                 "Secret persistence must remain disabled."
@@ -117,9 +115,7 @@ class CredentialIsolationPolicy:
         return {
             "provider": self.provider,
             "permitted_sources": [value.value for value in self.permitted_sources],
-            "permitted_purposes": [
-                value.value for value in self.permitted_purposes
-            ],
+            "permitted_purposes": [value.value for value in self.permitted_purposes],
             "maximum_token_ttl_seconds": self.maximum_token_ttl_seconds,
             "expiring_window_seconds": self.expiring_window_seconds,
             "require_normal_kill_switch": self.require_normal_kill_switch,
@@ -154,9 +150,7 @@ class CredentialFingerprint:
             "source": self.source.value,
             "account_fingerprint": self.account_fingerprint,
             "client_id_fingerprint": self.client_id_fingerprint,
-            "credential_version_fingerprint": (
-                self.credential_version_fingerprint
-            ),
+            "credential_version_fingerprint": (self.credential_version_fingerprint),
             "loaded_at": format_utc(self.loaded_at),
         }
 
@@ -248,9 +242,7 @@ class CredentialIsolationCheck:
     def __post_init__(self) -> None:
         _require_nonblank(self.name, "Check name")
         if not isinstance(self.passed, bool):
-            raise CredentialIsolationConfigurationError(
-                "Check result must be boolean."
-            )
+            raise CredentialIsolationConfigurationError("Check result must be boolean.")
         _require_nonblank(self.detail, "Check detail")
 
     def to_document(self) -> dict[str, object]:
@@ -310,17 +302,13 @@ class CredentialIsolationReport:
                 "External network access must remain disabled."
             )
         if self.broker_write_count != 0:
-            raise CredentialIsolationSafetyError(
-                "Broker write count must remain zero."
-            )
+            raise CredentialIsolationSafetyError("Broker write count must remain zero.")
         if self.secret_persistence_enabled:
             raise CredentialIsolationSafetyError(
                 "Secret persistence must remain disabled."
             )
         if self.live_trading_enabled:
-            raise CredentialIsolationSafetyError(
-                "Live trading must remain disabled."
-            )
+            raise CredentialIsolationSafetyError("Live trading must remain disabled.")
         digest = sha256_document(self._identity_document())
         object.__setattr__(self, "report_digest", digest)
         object.__setattr__(self, "report_id", str(uuid5(_REPORT_NAMESPACE, digest)))
@@ -391,9 +379,7 @@ def parse_utc_datetime(value: object, field_name: str) -> datetime:
 
 def _require_nonblank(value: str, field_name: str) -> None:
     if not isinstance(value, str) or not value.strip():
-        raise CredentialIsolationConfigurationError(
-            f"{field_name} cannot be blank."
-        )
+        raise CredentialIsolationConfigurationError(f"{field_name} cannot be blank.")
 
 
 def _require_positive_int(value: int, field_name: str) -> None:

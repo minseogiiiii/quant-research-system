@@ -184,9 +184,7 @@ class DeterministicCredentialIsolationCertifier:
             token_secret_destroyed=token_destroyed,
         )
         try:
-            redactor.assert_safe_bytes(
-                canonical_json_bytes(report.to_document())
-            )
+            redactor.assert_safe_bytes(canonical_json_bytes(report.to_document()))
             if report.lease.state is not TokenLeaseState.DESTROYED:
                 raise CredentialIsolationSafetyError(
                     "Credential report retained an active token lease."

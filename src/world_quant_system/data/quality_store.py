@@ -104,8 +104,7 @@ class SQLiteDataQualityStore:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                f"SELECT {_COLUMNS} FROM quality_reports "
-                "WHERE assessment_key = ?",
+                f"SELECT {_COLUMNS} FROM quality_reports WHERE assessment_key = ?",
                 (report.assessment_key,),
             ).fetchone()
             if row is not None:
@@ -161,9 +160,7 @@ class SQLiteDataQualityStore:
                 (report_id,),
             ).fetchone()
         if row is None:
-            raise DataQualityReportNotFoundError(
-                "Quality report does not exist."
-            )
+            raise DataQualityReportNotFoundError("Quality report does not exist.")
         return self._report_from_row(row)
 
     def _query_sync(

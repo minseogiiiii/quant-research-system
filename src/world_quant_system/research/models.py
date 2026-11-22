@@ -120,9 +120,7 @@ class ParameterSearchAudit:
         _require_positive_int(self.trial_number, "Trial number")
         _require_positive_int(self.total_trials, "Total trials")
         if self.trial_number > self.total_trials:
-            raise ResearchConfigurationError(
-                "Trial number cannot exceed total trials."
-            )
+            raise ResearchConfigurationError("Trial number cannot exceed total trials.")
         _require_nonblank(self.selection_metric, "Selection metric")
 
     def to_document(self) -> dict[str, object]:
@@ -183,10 +181,7 @@ class ExperimentSpec:
             raise ResearchConfigurationError(
                 "Experiment search audit must be a ParameterSearchAudit."
             )
-        if (
-            self.parent_experiment_id is None
-            and self.change_reason is not None
-        ):
+        if self.parent_experiment_id is None and self.change_reason is not None:
             raise ResearchConfigurationError(
                 "Change reason requires a parent experiment."
             )
@@ -272,9 +267,7 @@ class ExperimentSpec:
         if self.corporate_action_context_digest is not None:
             document["corporate_actions"] = {
                 "context_digest": self.corporate_action_context_digest,
-                "policy": _json_object(
-                    cast(str, self.corporate_action_policy_json)
-                ),
+                "policy": _json_object(cast(str, self.corporate_action_policy_json)),
                 "dividend_tax_model_digest": self.dividend_tax_model_digest,
             }
         return document
@@ -486,9 +479,7 @@ def experiment_spec_from_document(document: Mapping[str, object]) -> ExperimentS
             validation=_window_from_document(
                 _required_mapping(split_document, "validation")
             ),
-            holdout=_window_from_document(
-                _required_mapping(split_document, "holdout")
-            ),
+            holdout=_window_from_document(_required_mapping(split_document, "holdout")),
         ),
         search_audit=ParameterSearchAudit(
             search_id=_required_string(audit_document, "search_id"),
@@ -602,9 +593,7 @@ def _validate_uuid(value: object, field_name: str) -> None:
             f"{field_name} must be a UUID string."
         ) from error
     if str(parsed) != value:
-        raise ResearchConfigurationError(
-            f"{field_name} must use canonical UUID form."
-        )
+        raise ResearchConfigurationError(f"{field_name} must use canonical UUID form.")
 
 
 def _require_aware(value: object, field_name: str) -> None:

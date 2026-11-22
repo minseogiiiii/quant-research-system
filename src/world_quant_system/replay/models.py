@@ -36,9 +36,7 @@ class ReplayConfig:
 
     def __post_init__(self) -> None:
         if not isinstance(self.symbols, tuple) or not self.symbols:
-            raise ReplayConfigurationError(
-                "Replay symbols must be a nonempty tuple."
-            )
+            raise ReplayConfigurationError("Replay symbols must be a nonempty tuple.")
         normalized_symbols: list[str] = []
         seen: set[str] = set()
         for symbol in self.symbols:
@@ -144,8 +142,7 @@ class ReplayRunResult:
                 not isinstance(digest_value, str)
                 or len(digest_value) != 64
                 or any(
-                    character not in "0123456789abcdef"
-                    for character in digest_value
+                    character not in "0123456789abcdef" for character in digest_value
                 )
             ):
                 raise ReplayConfigurationError(

@@ -55,18 +55,12 @@ def test_tampered_intent_identity_is_rejected(tmp_path: Path) -> None:
 
 
 def test_atomic_report_writer_round_trips(tmp_path: Path) -> None:
-    intent = load_order_intent(
-        EXAMPLES / "toss_order_write_intent.example.json"
-    )
+    intent = load_order_intent(EXAMPLES / "toss_order_write_intent.example.json")
     certification = load_read_only_certification(
         EXAMPLES / "toss_read_only_certification_report.example.json"
     )
-    account = load_account_state(
-        EXAMPLES / "toss_order_write_account.example.json"
-    )
-    market = load_market_state(
-        EXAMPLES / "toss_order_write_market.example.json"
-    )
+    account = load_account_state(EXAMPLES / "toss_order_write_account.example.json")
+    market = load_market_state(EXAMPLES / "toss_order_write_market.example.json")
     policy = load_policy(EXAMPLES / "toss_order_write_policy.example.json")
     report = DeterministicTossOrderWriteDryRunCertifier().certify(
         intent=intent,

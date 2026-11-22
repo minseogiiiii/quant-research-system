@@ -71,9 +71,7 @@ def main() -> None:
         if arguments.command == "certify-dry-run":
             report = DeterministicTossOrderWriteDryRunCertifier().certify(
                 intent=load_order_intent(arguments.intent),
-                certification=load_read_only_certification(
-                    arguments.read_only_report
-                ),
+                certification=load_read_only_certification(arguments.read_only_report),
                 account=load_account_state(arguments.account),
                 market=load_market_state(arguments.market),
                 policy=load_policy(arguments.policy),
@@ -89,9 +87,9 @@ def main() -> None:
             )
             print(_format_report(report))
             if arguments.json_output is not None:
-                AtomicJsonOrderWriteDryRunReportWriter(
-                    arguments.json_output
-                ).write(report)
+                AtomicJsonOrderWriteDryRunReportWriter(arguments.json_output).write(
+                    report
+                )
             if report.decision is not DryRunDecision.HUMAN_APPROVAL_REQUIRED:
                 raise SystemExit(2)
             return
@@ -109,10 +107,7 @@ def _print_contract() -> None:
         "Create order:             "
         f"{OFFICIAL_ORDER_CREATE_METHOD} {OFFICIAL_ORDER_CREATE_PATH}"
     )
-    print(
-        "clientOrderId TTL:        "
-        f"{OFFICIAL_CLIENT_ORDER_ID_TTL_SECONDS} seconds"
-    )
+    print(f"clientOrderId TTL:        {OFFICIAL_CLIENT_ORDER_ID_TTL_SECONDS} seconds")
     print("Supported request:        quantity-based LIMIT + DAY")
     print("Credentials:              DISABLED")
     print("External network:         DISABLED")

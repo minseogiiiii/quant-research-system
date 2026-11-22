@@ -87,10 +87,9 @@ class StatisticalReturnsMatrix:
             )
         for trial_id in self.trial_ids:
             _require_nonblank(trial_id, "Statistical trial ID")
-        if (
-            not isinstance(self.returns_by_trial, tuple)
-            or len(self.returns_by_trial) != len(self.trial_ids)
-        ):
+        if not isinstance(self.returns_by_trial, tuple) or len(
+            self.returns_by_trial
+        ) != len(self.trial_ids):
             raise StatisticalValidationConfigurationError(
                 "Return-series count must match the trial-ID count."
             )
@@ -518,9 +517,8 @@ class RankStabilityResult:
             raise StatisticalValidationIntegrityError(
                 "Spearman rank correlation must be between -1 and 1."
             )
-        if (
-            not isinstance(self.rank_reversal, bool)
-            or not isinstance(self.passed, bool)
+        if not isinstance(self.rank_reversal, bool) or not isinstance(
+            self.passed, bool
         ):
             raise StatisticalValidationConfigurationError(
                 "Rank-stability states must be boolean."
@@ -709,8 +707,7 @@ class StatisticalValidationReport:
                 "Registry audit has an invalid type."
             )
         if not isinstance(self.warnings, tuple) or any(
-            not isinstance(value, str) or not value.strip()
-            for value in self.warnings
+            not isinstance(value, str) or not value.strip() for value in self.warnings
         ):
             raise StatisticalValidationConfigurationError(
                 "Statistical warnings must be nonblank strings."
@@ -768,11 +765,9 @@ class StatisticalValidationReport:
                 "Selected trial does not exist in trial statistics."
             )
         multiplicity_passed = (
-            (not policy.require_bonferroni_pass or selected.bonferroni_passed)
-            and (
-                not policy.require_false_discovery_pass
-                or selected.false_discovery_passed
-            )
+            not policy.require_bonferroni_pass or selected.bonferroni_passed
+        ) and (
+            not policy.require_false_discovery_pass or selected.false_discovery_passed
         )
         registry_passed = registry_audit is None or registry_audit.complete
         passed = (
@@ -908,13 +903,9 @@ def _require_finite_decimal(value: object, field_name: str) -> None:
 
 def _require_finite_float(value: object, field_name: str) -> None:
     if isinstance(value, bool) or not isinstance(value, float | int):
-        raise StatisticalValidationConfigurationError(
-            f"{field_name} must be numeric."
-        )
+        raise StatisticalValidationConfigurationError(f"{field_name} must be numeric.")
     if not math.isfinite(float(value)):
-        raise StatisticalValidationConfigurationError(
-            f"{field_name} must be finite."
-        )
+        raise StatisticalValidationConfigurationError(f"{field_name} must be finite.")
 
 
 def _require_open_unit_decimal(value: object, field_name: str) -> None:

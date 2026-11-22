@@ -14,8 +14,7 @@ def test_error_string_contains_only_safe_metadata() -> None:
     message = str(error)
 
     assert message == (
-        "Authentication failed. "
-        "(status_code=401, request_id=request-123)"
+        "Authentication failed. (status_code=401, request_id=request-123)"
     )
 
 

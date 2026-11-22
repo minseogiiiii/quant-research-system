@@ -92,9 +92,7 @@ def main(argv: list[str] | None = None) -> None:
         clock = (
             SystemForwardShadowClock()
             if arguments.now is None
-            else FixedForwardShadowClock(
-                parse_utc_datetime(arguments.now, "now")
-            )
+            else FixedForwardShadowClock(parse_utc_datetime(arguments.now, "now"))
         )
         report = DeterministicForwardShadowRunner(
             evidence_manifest=load_shadow_evidence_manifest(
@@ -109,9 +107,7 @@ def main(argv: list[str] | None = None) -> None:
         state_store.save(report.state)
         print(format_forward_shadow_report(report))
         if arguments.json_output is not None:
-            AtomicJsonForwardShadowReportWriter(arguments.json_output).write(
-                report
-            )
+            AtomicJsonForwardShadowReportWriter(arguments.json_output).write(report)
     except (ForwardShadowError, HistoricalShadowError) as error:
         parser.error(str(error))
 
@@ -152,13 +148,9 @@ def _policy(arguments: argparse.Namespace) -> ForwardShadowPolicy:
             "initial equity",
         ),
         allocation_method=AllocationMethod(arguments.allocation),
-        rebalance_every_observations=(
-            arguments.rebalance_every_observations
-        ),
+        rebalance_every_observations=(arguments.rebalance_every_observations),
         volatility_lookback=arguments.volatility_lookback,
-        execution_delay_observations=(
-            arguments.execution_delay_observations
-        ),
+        execution_delay_observations=(arguments.execution_delay_observations),
         minimum_active_candidates=arguments.minimum_active_candidates,
         minimum_cash_weight=decimal_argument(
             arguments.minimum_cash_weight,
@@ -180,9 +172,7 @@ def _policy(arguments: argparse.Namespace) -> ForwardShadowPolicy:
         maximum_observation_lateness_seconds=(
             arguments.maximum_observation_lateness_seconds
         ),
-        maximum_future_clock_skew_seconds=(
-            arguments.maximum_future_clock_skew_seconds
-        ),
+        maximum_future_clock_skew_seconds=(arguments.maximum_future_clock_skew_seconds),
         maximum_drawdown_before_halt=decimal_argument(
             arguments.maximum_drawdown_before_halt,
             "maximum drawdown before halt",

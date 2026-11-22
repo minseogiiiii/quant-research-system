@@ -238,9 +238,7 @@ class DeterministicReadOnlyAdapterCertifier:
                     CertificationFinding(
                         code="PAGINATION_TOKEN_REPEATED",
                         severity=FindingSeverity.CRITICAL,
-                        message=(
-                            f"{operation.value} repeated a pagination token."
-                        ),
+                        message=(f"{operation.value} repeated a pagination token."),
                         operation=operation,
                     )
                 )

@@ -97,10 +97,13 @@ def test_suspension_removes_candidate_after_availability() -> None:
         start + timedelta(days=5),
         maximum_age_days=30,
     ) == ("alpha",)
-    assert resolver.eligible_candidates(
-        start + timedelta(days=6),
-        maximum_age_days=30,
-    ) == ()
+    assert (
+        resolver.eligible_candidates(
+            start + timedelta(days=6),
+            maximum_age_days=30,
+        )
+        == ()
+    )
 
 
 def test_allocation_executes_only_on_next_period() -> None:

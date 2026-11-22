@@ -86,9 +86,9 @@ def main(argv: list[str] | None = None) -> None:
         ).run()
         print(format_portfolio_promotion_report(report))
         if arguments.json_output is not None:
-            AtomicJsonPortfolioPromotionReportWriter(
-                arguments.json_output
-            ).write(report)
+            AtomicJsonPortfolioPromotionReportWriter(arguments.json_output).write(
+                report
+            )
     except PortfolioPromotionError as error:
         parser.error(str(error))
 
@@ -97,20 +97,16 @@ def format_portfolio_promotion_report(
     report: PortfolioPromotionReport,
 ) -> str:
     eligible = sum(
-        item.decision.value == "eligible"
-        for item in report.candidate_results
+        item.decision.value == "eligible" for item in report.candidate_results
     )
     rejected = sum(
-        item.decision.value == "rejected"
-        for item in report.candidate_results
+        item.decision.value == "rejected" for item in report.candidate_results
     )
     insufficient = sum(
         item.decision.value == "insufficient_evidence"
         for item in report.candidate_results
     )
-    base = next(
-        item for item in report.scenarios if item.scenario.value == "base"
-    )
+    base = next(item for item in report.scenarios if item.scenario.value == "base")
     adverse = next(
         item for item in report.scenarios if item.scenario.value == "adverse_cost"
     )
@@ -137,8 +133,7 @@ def format_portfolio_promotion_report(
             f"Severe maximum drawdown:    {severe.metrics.maximum_drawdown:.6%}",
             "Effective strategy count:  "
             f"{base.metrics.average_effective_strategy_count:.4f}",
-            "Walk-forward pass rate:      "
-            f"{report.walk_forward.pass_rate:.2%}",
+            f"Walk-forward pass rate:      {report.walk_forward.pass_rate:.2%}",
             "Worst fold return:           "
             f"{report.walk_forward.worst_cumulative_return:.6%}",
             f"Final decision:             {report.decision.value}",
@@ -183,12 +178,8 @@ def _policy(arguments: argparse.Namespace) -> PromotionPolicy:
             "maximum cluster weight",
         ),
         maximum_pairwise_correlation=arguments.maximum_pairwise_correlation,
-        maximum_loss_period_correlation=(
-            arguments.maximum_loss_period_correlation
-        ),
-        minimum_loss_period_observations=(
-            arguments.minimum_loss_period_observations
-        ),
+        maximum_loss_period_correlation=(arguments.maximum_loss_period_correlation),
+        minimum_loss_period_observations=(arguments.minimum_loss_period_observations),
         base_cost_bps=_decimal(arguments.base_cost_bps, "base cost bps"),
         adverse_cost_bps=_decimal(
             arguments.adverse_cost_bps,

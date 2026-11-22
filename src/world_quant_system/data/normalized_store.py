@@ -265,7 +265,6 @@ class SQLiteNormalizedMarketDataStore:
                 )
             return self._candle_records_by_ids(connection, item_ids)
 
-
     def _quote_records_by_ids(
         self,
         connection: sqlite3.Connection,
@@ -667,9 +666,7 @@ class SQLiteNormalizedMarketDataStore:
         return NormalizedQuoteRecord(
             item_id=self._required_str(row[0], "item ID"),
             quote=quote,
-            quality_status=QualityStatus(
-                self._required_str(row[6], "quality status")
-            ),
+            quality_status=QualityStatus(self._required_str(row[6], "quality status")),
             raw_record_id=self._required_str(row[7], "raw record ID"),
             raw_content_sha256=self._required_str(row[8], "raw content SHA-256"),
             quality_report_id=self._required_str(row[9], "quality report ID"),
@@ -718,9 +715,7 @@ class SQLiteNormalizedMarketDataStore:
         return NormalizedCandleRecord(
             item_id=self._required_str(row[0], "item ID"),
             candle=candle,
-            quality_status=QualityStatus(
-                self._required_str(row[11], "quality status")
-            ),
+            quality_status=QualityStatus(self._required_str(row[11], "quality status")),
             raw_record_id=self._required_str(row[12], "raw record ID"),
             raw_content_sha256=self._required_str(row[13], "raw content SHA-256"),
             quality_report_id=self._required_str(row[14], "quality report ID"),
@@ -736,16 +731,12 @@ class SQLiteNormalizedMarketDataStore:
     def _lineage_from_row(self, row: Sequence[object]) -> NormalizationLineage:
         return NormalizationLineage(
             lineage_id=self._required_str(row[0], "lineage ID"),
-            item_kind=NormalizedDataKind(
-                self._required_str(row[1], "item kind")
-            ),
+            item_kind=NormalizedDataKind(self._required_str(row[1], "item kind")),
             item_id=self._required_str(row[2], "item ID"),
             raw_record_id=self._required_str(row[3], "raw record ID"),
             raw_content_sha256=self._required_str(row[4], "raw content SHA-256"),
             quality_report_id=self._required_str(row[5], "quality report ID"),
-            quality_status=QualityStatus(
-                self._required_str(row[6], "quality status")
-            ),
+            quality_status=QualityStatus(self._required_str(row[6], "quality status")),
             normalized_at=parse_utc(
                 self._required_str(row[7], "normalized-at timestamp")
             ),

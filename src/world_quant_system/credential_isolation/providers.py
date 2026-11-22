@@ -117,9 +117,7 @@ class EnvironmentSecretProvider:
     ) -> None:
         self._environment = os.environ if environment is None else environment
         self._variable_names = dict(
-            _DEFAULT_ENVIRONMENT_NAMES
-            if variable_names is None
-            else variable_names
+            _DEFAULT_ENVIRONMENT_NAMES if variable_names is None else variable_names
         )
         required_keys = set(_DEFAULT_ENVIRONMENT_NAMES)
         if set(self._variable_names) != required_keys:

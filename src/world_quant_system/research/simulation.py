@@ -106,17 +106,12 @@ def main() -> None:
         f"{'match' if result.deterministic_digest_match else 'mismatch'}"
     )
     print(
-        "Idempotent registration: "
-        f"{'yes' if result.idempotent_registration else 'no'}"
+        f"Idempotent registration: {'yes' if result.idempotent_registration else 'no'}"
     )
     print(
-        "Failed outcomes retained: "
-        f"{'yes' if result.failed_outcome_retained else 'no'}"
+        f"Failed outcomes retained: {'yes' if result.failed_outcome_retained else 'no'}"
     )
-    print(
-        "Holdout reuse blocked: "
-        f"{'yes' if result.holdout_reuse_blocked else 'no'}"
-    )
+    print(f"Holdout reuse blocked: {'yes' if result.holdout_reuse_blocked else 'no'}")
     if not all(
         (
             result.deterministic_digest_match,

@@ -133,8 +133,7 @@ class SQLitePaperExecutionStore:
                     (client_order_id,),
                 ).fetchall()
         return tuple(
-            _event_from_document(json.loads(row["event_json"]))
-            for row in rows
+            _event_from_document(json.loads(row["event_json"])) for row in rows
         )
 
     def transition(
@@ -159,9 +158,7 @@ class SQLitePaperExecutionStore:
             validate_order_transition(current.status, target_status)
             next_broker_id = broker_order_id or current.broker_order_id
             next_filled = (
-                current.filled_quantity
-                if filled_quantity is None
-                else filled_quantity
+                current.filled_quantity if filled_quantity is None else filled_quantity
             )
             next_average = (
                 current.average_fill_price
@@ -590,9 +587,7 @@ def _event_from_document(document: object) -> PaperOrderEvent:
         client_order_id=str(document["client_order_id"]),
         timestamp=parse_utc_datetime(document["timestamp"], "Event time"),
         event_type=OrderEventType(str(document["event_type"])),
-        previous_status=(
-            None if previous is None else PaperOrderStatus(str(previous))
-        ),
+        previous_status=(None if previous is None else PaperOrderStatus(str(previous))),
         new_status=PaperOrderStatus(str(document["new_status"])),
         reason=str(document["reason"]),
         broker_order_id=(

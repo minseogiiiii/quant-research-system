@@ -199,9 +199,7 @@ async def test_query_candles_is_deterministic_and_pageable(tmp_path: Path) -> No
         candle(symbol="005930", timestamp=start),
         candle(symbol="005930", timestamp=start + timedelta(days=2)),
     )
-    second_symbol = (
-        candle(symbol="000660", timestamp=start + timedelta(days=1)),
-    )
+    second_symbol = (candle(symbol="000660", timestamp=start + timedelta(days=1)),)
     normalized_at = datetime(2026, 7, 21, tzinfo=UTC)
     await store.save_candle_page(
         CandlePage(first_symbol, None),

@@ -40,19 +40,12 @@ def _inputs() -> tuple[
     TossOrderWritePolicy,
 ]:
     return (
-        load_order_intent(
-            EXAMPLES / "toss_order_write_intent.example.json"
-        ),
+        load_order_intent(EXAMPLES / "toss_order_write_intent.example.json"),
         load_read_only_certification(
-            EXAMPLES
-            / "toss_read_only_certification_report.example.json"
+            EXAMPLES / "toss_read_only_certification_report.example.json"
         ),
-        load_account_state(
-            EXAMPLES / "toss_order_write_account.example.json"
-        ),
-        load_market_state(
-            EXAMPLES / "toss_order_write_market.example.json"
-        ),
+        load_account_state(EXAMPLES / "toss_order_write_account.example.json"),
+        load_market_state(EXAMPLES / "toss_order_write_market.example.json"),
         load_policy(EXAMPLES / "toss_order_write_policy.example.json"),
     )
 
@@ -128,8 +121,7 @@ def test_same_input_is_deterministic() -> None:
     assert first.compiled_request is not None
     assert second.compiled_request is not None
     assert (
-        first.compiled_request.request_digest
-        == second.compiled_request.request_digest
+        first.compiled_request.request_digest == second.compiled_request.request_digest
     )
 
 
@@ -229,6 +221,5 @@ def test_stale_market_is_rejected() -> None:
 
     assert report.decision is DryRunDecision.REJECTED
     assert any(
-        check.code == "MARKET_AGE_VALID" and not check.passed
-        for check in report.checks
+        check.code == "MARKET_AGE_VALID" and not check.passed for check in report.checks
     )

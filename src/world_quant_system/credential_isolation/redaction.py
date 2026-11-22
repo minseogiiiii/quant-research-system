@@ -7,9 +7,7 @@ from world_quant_system.credential_isolation.models import (
     CredentialIsolationSafetyError,
 )
 
-_BEARER_PATTERN = re.compile(
-    r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}\b"
-)
+_BEARER_PATTERN = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}\b")
 _KEY_VALUE_PATTERN = re.compile(
     r"(?i)(client_secret|access_token|refresh_token|account_id)"
     r"\s*[:=]\s*[^\s,;}]+"
@@ -20,8 +18,7 @@ class SecretRedactor:
     def __init__(self, secrets: Iterable[bytes]) -> None:
         unique = {secret for secret in secrets if secret}
         self._secrets = [
-            bytearray(secret)
-            for secret in sorted(unique, key=len, reverse=True)
+            bytearray(secret) for secret in sorted(unique, key=len, reverse=True)
         ]
         self._destroyed = False
 

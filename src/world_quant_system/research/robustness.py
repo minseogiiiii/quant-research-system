@@ -114,9 +114,7 @@ class DelayedTargetStrategy:
             )
         else:
             target, base_reason = self._targets.popleft()
-            reason = (
-                f"Delayed by {self._delay} candle(s): {base_reason}"
-            )
+            reason = f"Delayed by {self._delay} candle(s): {base_reason}"
         return TargetPositionSignal(
             signal_id=observed.signal_id,
             symbol=observed.symbol,
@@ -185,9 +183,7 @@ class DeterministicRobustnessRunner:
                         )
                         strategy = DelayedTargetStrategy(
                             _build_strategy(strategy_spec),
-                            execution_delay_candles=(
-                                scenario.execution_delay_candles
-                            ),
+                            execution_delay_candles=(scenario.execution_delay_candles),
                         )
                         result = await self._run_factory.run(config, strategy)
                         phases[phase] = _phase_result(phase, window, result)
@@ -259,9 +255,7 @@ class DeterministicRobustnessRunner:
             commission_bps=(
                 self._base_config.commission_bps * scenario.cost_multiplier
             ),
-            slippage_bps=(
-                self._base_config.slippage_bps * scenario.cost_multiplier
-            ),
+            slippage_bps=(self._base_config.slippage_bps * scenario.cost_multiplier),
         )
 
 
@@ -326,8 +320,7 @@ def _failure_reasons(
     for phase in (train, validation, test):
         if phase.event_count < policy.minimum_observations:
             reasons.append(
-                f"{phase.phase.value} observations below "
-                f"{policy.minimum_observations}"
+                f"{phase.phase.value} observations below {policy.minimum_observations}"
             )
     if test.total_return < policy.minimum_test_return:
         reasons.append("test return below policy minimum")

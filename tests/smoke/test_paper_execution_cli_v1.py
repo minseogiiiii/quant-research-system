@@ -28,7 +28,9 @@ def _write(path: Path, document: dict[str, object]) -> None:
     )
 
 
-def _documents(now: datetime) -> tuple[
+def _documents(
+    now: datetime,
+) -> tuple[
     PaperAccountSnapshot,
     PaperExecutionPolicy,
     PaperMarketSnapshot,

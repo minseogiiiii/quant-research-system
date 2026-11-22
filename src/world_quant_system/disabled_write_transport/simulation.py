@@ -80,8 +80,7 @@ async def build_simulation_report() -> DisabledWriteTransportReport:
             root / "examples/toss_order_write_intent.example.json"
         ),
         certification=load_read_only_certification(
-            root
-            / "examples/toss_read_only_certification_report.example.json"
+            root / "examples/toss_read_only_certification_report.example.json"
         ),
         account=load_account_state(
             root / "examples/toss_order_write_account.example.json"

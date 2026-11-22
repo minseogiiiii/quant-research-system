@@ -1,26 +1,32 @@
 """Only for isolated network-enabled GitHub Actions evidence capture.
 Do not run for alpha; this script creates an unsigned, read-only source archive.
 """
+
 import csv
 import hashlib
 import io
 import json
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-UTC = timezone.utc
+UTC = UTC
 start = int(datetime(2026, 11, 8, tzinfo=UTC).timestamp())
 end = start + 86400
 root = Path("evidence")
 root.mkdir(exist_ok=True)
-results = {"status": "INCOMPLETE", "requested_range_utc": [start, end],
-           "products": {}, "point_in_time_verified": False,
-           "executable_alpha_verified": False, "orders_enabled": False}
+results = {
+    "status": "INCOMPLETE",
+    "requested_range_utc": [start, end],
+    "products": {},
+    "point_in_time_verified": False,
+    "executable_alpha_verified": False,
+    "orders_enabled": False,
+}
 
 
 def pairs_no_dup(pairs):
@@ -49,11 +55,17 @@ try:
     for product in ("BTC-USD", "ETH-USD"):
         slug = product.split("-")[0].lower() + "_coinbase_spot_5m"
         relative_url = "/api/v3/brokerage/market/products/" + product + "/candles"
-        params = urlencode({"start": start, "end": end - 1,
-                            "granularity": "FIVE_MINUTE", "limit": 300})
+        params = urlencode(
+            {"start": start, "end": end - 1, "granularity": "FIVE_MINUTE", "limit": 300}
+        )
         url = "https://api.coinbase.com" + relative_url + "?" + params
-        request = Request(url, headers={"Accept": "application/json",
-                                        "User-Agent": "btc-eth-evidence-capture/0.1"})
+        request = Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "btc-eth-evidence-capture/0.1",
+            },
+        )
         with urlopen(request, timeout=25) as response:
             if response.status != 200 or response.geturl() != url:
                 raise ValueError("HTTP status or redirected source URL")
@@ -66,8 +78,9 @@ try:
         raw_dir = root / "raw" / slug
         raw_dir.mkdir(parents=True, exist_ok=True)
         (raw_dir / "0000.json").write_bytes(raw)
-        decoded = json.loads(raw, object_pairs_hook=pairs_no_dup,
-                             parse_constant=not_json_constant)
+        decoded = json.loads(
+            raw, object_pairs_hook=pairs_no_dup, parse_constant=not_json_constant
+        )
         candles = decoded.get("candles") if isinstance(decoded, dict) else None
         if not isinstance(candles, list):
             raise ValueError("Candles array missing")
@@ -79,11 +92,15 @@ try:
             t = int(stamp)
             if t % 300 or not start <= t < end or t in by_stamp:
                 raise ValueError("Duplicate, misaligned or out-of-range candle")
-            prices = {k: price(c.get(k), allow_zero=(k == "volume"))
-                      for k in ("open", "high", "low", "close", "volume")}
-            if (prices["low"] > min(prices["open"], prices["close"]) or
-                prices["high"] < max(prices["open"], prices["close"]) or
-                prices["low"] > prices["high"]):
+            prices = {
+                k: price(c.get(k), allow_zero=(k == "volume"))
+                for k in ("open", "high", "low", "close", "volume")
+            }
+            if (
+                prices["low"] > min(prices["open"], prices["close"])
+                or prices["high"] < max(prices["open"], prices["close"])
+                or prices["low"] > prices["high"]
+            ):
                 raise ValueError("Bad OHLC envelope")
             by_stamp[t] = c
         expected = list(range(start, end, 300))
@@ -94,26 +111,39 @@ try:
         writer.writerow(["time", "open", "high", "low", "close", "volume"])
         for t in expected:
             c = by_stamp[t]
-            writer.writerow([str(t * 1000), *(c[k] for k in
-                                                 ("open", "high", "low", "close", "volume"))])
+            writer.writerow(
+                [
+                    str(t * 1000),
+                    *(c[k] for k in ("open", "high", "low", "close", "volume")),
+                ]
+            )
         csv_bytes = buf.getvalue().encode("utf-8")
         (root / f"{slug}.csv").write_bytes(csv_bytes)
         sha = hashlib.sha256(csv_bytes).hexdigest()
         source = {
             "source": "Coinbase Advanced Trade public REST candles",
             "url": "https://api.coinbase.com" + relative_url,
-            "market": "SPOT", "product": product,
-            "granularity": "FIVE_MINUTE", "symbol": product.split("-")[0] + "_COINBASE_SPOT",
+            "market": "SPOT",
+            "product": product,
+            "granularity": "FIVE_MINUTE",
+            "symbol": product.split("-")[0] + "_COINBASE_SPOT",
             "start_inclusive_utc": datetime.fromtimestamp(start, UTC).isoformat(),
             "end_exclusive_utc": datetime.fromtimestamp(end, UTC).isoformat(),
             "retrieved_at_utc": received_at,
-            "rows": len(expected), "expected_rows": len(expected),
-            "pages": [{"from_sec": start, "to_sec": end,
-                       "http_request_end_sec_inclusive": end - 1,
-                       "raw_response_sha256": hashlib.sha256(raw).hexdigest(),
-                       "raw_response_bytes": len(raw), "count": len(candles),
-                       "raw_file": f"raw/{slug}/0000.json",
-                       "local_ingest_clock_utc": received_at}],
+            "rows": len(expected),
+            "expected_rows": len(expected),
+            "pages": [
+                {
+                    "from_sec": start,
+                    "to_sec": end,
+                    "http_request_end_sec_inclusive": end - 1,
+                    "raw_response_sha256": hashlib.sha256(raw).hexdigest(),
+                    "raw_response_bytes": len(raw),
+                    "count": len(candles),
+                    "raw_file": f"raw/{slug}/0000.json",
+                    "local_ingest_clock_utc": received_at,
+                }
+            ],
             "raw_payload_bytes_released": True,
             "event_time_equals_bar_open": True,
             "available_at": None,
@@ -128,9 +158,11 @@ try:
             "derived_csv_sha256": sha,
         }
         (root / f"{slug}.source.json").write_text(
-            json.dumps(source, indent=2, sort_keys=True) + "\n")
+            json.dumps(source, indent=2, sort_keys=True) + "\n"
+        )
         results["products"][product] = {
-            "count": len(expected), "csv_sha256": sha,
+            "count": len(expected),
+            "csv_sha256": sha,
             "original_response_sha256": hashlib.sha256(raw).hexdigest(),
             "original_response_size": len(raw),
         }
@@ -142,7 +174,8 @@ except Exception as exc:
 finally:
     results["finished_at_utc"] = datetime.now(UTC).isoformat()
     (root / "capture_status.json").write_text(
-        json.dumps(results, indent=2, sort_keys=True) + "\n")
+        json.dumps(results, indent=2, sort_keys=True) + "\n"
+    )
     print(json.dumps(results, indent=2, sort_keys=True))
     if results["status"] != "TWO_PRODUCT_CAPTURE_COMPLETE_NOT_PIT_PROVEN":
         sys.exit(1)

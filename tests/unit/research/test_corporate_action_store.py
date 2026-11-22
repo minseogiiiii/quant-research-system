@@ -41,9 +41,7 @@ async def test_action_writes_are_idempotent_and_conflicts_fail(
     store = SQLiteCorporateActionStore(tmp_path / "actions")
     candidate = split_action()
 
-    results = await asyncio.gather(
-        *(store.save_action(candidate) for _ in range(20))
-    )
+    results = await asyncio.gather(*(store.save_action(candidate) for _ in range(20)))
 
     assert all(result == candidate for result in results)
     with pytest.raises(CorporateActionConflictError):
@@ -147,6 +145,7 @@ async def test_store_tampering_is_detected(tmp_path: Path) -> None:
 
     with pytest.raises(CorporateActionIntegrityError):
         await store.get_action(action.action_id)
+
 
 @pytest.mark.asyncio
 async def test_context_rejects_action_on_retired_symbol(

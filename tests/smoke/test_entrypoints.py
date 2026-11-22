@@ -41,9 +41,7 @@ def test_module_entrypoint(tmp_path: Path) -> None:
 
 def test_console_script_entrypoint(tmp_path: Path) -> None:
     extension = ".exe" if os.name == "nt" else ""
-    script = Path(sysconfig.get_path("scripts")) / (
-        f"world-quant-system{extension}"
-    )
+    script = Path(sysconfig.get_path("scripts")) / (f"world-quant-system{extension}")
 
     assert script.is_file(), f"Console script was not installed: {script}"
 

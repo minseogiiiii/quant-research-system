@@ -232,9 +232,7 @@ class OrderRecord:
                     "Expired orders cannot contain execution quantities."
                 )
             if self.quantity != 0 or self.fill_id is not None:
-                raise BacktestInvariantError(
-                    "Expired orders cannot contain a fill."
-                )
+                raise BacktestInvariantError("Expired orders cannot contain a fill.")
             if self.reject_reason is not OrderRejectReason.NO_NEXT_CANDLE:
                 raise BacktestInvariantError(
                     "Expired orders require the no-next-candle reason."
@@ -266,13 +264,9 @@ class OrderRecord:
                 )
         else:
             if self.quantity != 0 or self.fill_id is not None:
-                raise BacktestInvariantError(
-                    "Rejected orders cannot contain a fill."
-                )
+                raise BacktestInvariantError("Rejected orders cannot contain a fill.")
             if self.reject_reason is None:
-                raise BacktestInvariantError(
-                    "Rejected orders require a reason."
-                )
+                raise BacktestInvariantError("Rejected orders require a reason.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -327,9 +321,8 @@ class PortfolioSnapshot:
             raise BacktestInvariantError(
                 "Portfolio equity must equal cash plus market value."
             )
-        if (
-            self.quantity == 0
-            and (self.position_cost_basis != _ZERO or self.average_cost != _ZERO)
+        if self.quantity == 0 and (
+            self.position_cost_basis != _ZERO or self.average_cost != _ZERO
         ):
             raise BacktestInvariantError(
                 "Flat portfolios cannot retain position cost basis."
@@ -440,9 +433,7 @@ class PerformanceMetrics:
         _require_finite_positive_decimal(self.initial_equity, "Initial equity")
         _require_finite_nonnegative_decimal(self.final_equity, "Final equity")
         _require_finite_decimal(self.total_return, "Total return")
-        _require_finite_nonpositive_decimal(
-            self.maximum_drawdown, "Maximum drawdown"
-        )
+        _require_finite_nonpositive_decimal(self.maximum_drawdown, "Maximum drawdown")
         for ratio_name, ratio_value in (
             ("CAGR", self.cagr),
             ("Annualized volatility", self.annualized_volatility),
@@ -475,13 +466,9 @@ class PerformanceMetrics:
         if self.total_return < -_ONE:
             raise BacktestInvariantError("Total return cannot be below -100%.")
         if self.maximum_drawdown < -_ONE:
-            raise BacktestInvariantError(
-                "Maximum drawdown cannot be below -100%."
-            )
+            raise BacktestInvariantError("Maximum drawdown cannot be below -100%.")
         if self.annualized_volatility is not None and self.annualized_volatility < 0:
-            raise BacktestInvariantError(
-                "Annualized volatility cannot be negative."
-            )
+            raise BacktestInvariantError("Annualized volatility cannot be negative.")
         if self.win_rate is not None and not _ZERO <= self.win_rate <= _ONE:
             raise BacktestInvariantError("Win rate must be between 0 and 1.")
         if self.trade_count == 0 and self.win_rate is not None:
@@ -489,9 +476,7 @@ class PerformanceMetrics:
                 "Zero closed trades require an undefined win rate."
             )
         if self.trade_count > 0 and self.win_rate is None:
-            raise BacktestInvariantError(
-                "Closed trades require a defined win rate."
-            )
+            raise BacktestInvariantError("Closed trades require a defined win rate.")
         if self.profit_factor is not None and self.profit_factor < _ZERO:
             raise BacktestInvariantError("Profit factor cannot be negative.")
         if self.average_win is not None and self.average_win <= _ZERO:
@@ -530,8 +515,7 @@ class BacktestConfig:
                 )
             object.__setattr__(self, "initial_symbol", self.replay.symbols[0])
         elif (
-            not isinstance(self.initial_symbol, str)
-            or not self.initial_symbol.strip()
+            not isinstance(self.initial_symbol, str) or not self.initial_symbol.strip()
         ):
             raise BacktestConfigurationError("Initial symbol cannot be blank.")
         else:
@@ -546,18 +530,12 @@ class BacktestConfig:
                 normalized_initial_symbol,
             )
         _require_finite_positive_decimal(self.initial_cash, "Initial cash")
-        _require_finite_nonnegative_decimal(
-            self.commission_bps, "Commission bps"
-        )
+        _require_finite_nonnegative_decimal(self.commission_bps, "Commission bps")
         if self.commission_bps > _BPS_DENOMINATOR:
-            raise BacktestConfigurationError(
-                "Commission bps cannot exceed 10000."
-            )
+            raise BacktestConfigurationError("Commission bps cannot exceed 10000.")
         _require_finite_nonnegative_decimal(self.slippage_bps, "Slippage bps")
         if self.slippage_bps >= _BPS_DENOMINATOR:
-            raise BacktestConfigurationError(
-                "Slippage bps must be less than 10000."
-            )
+            raise BacktestConfigurationError("Slippage bps must be less than 10000.")
         _require_finite_positive_decimal(
             self.max_volume_participation, "Maximum volume participation"
         )
@@ -610,18 +588,14 @@ class BacktestConfig:
             "initial_cash": format(self.initial_cash, "f"),
             "commission_bps": format(self.commission_bps, "f"),
             "slippage_bps": format(self.slippage_bps, "f"),
-            "max_volume_participation": format(
-                self.max_volume_participation, "f"
-            ),
+            "max_volume_participation": format(self.max_volume_participation, "f"),
             "annualization_periods": self.annualization_periods,
             "initial_symbol": self.symbol,
         }
         if self.data_context_digest is not None:
             document["data_context_digest"] = self.data_context_digest
         if self.historical_dataset_digest is not None:
-            document["historical_dataset_digest"] = (
-                self.historical_dataset_digest
-            )
+            document["historical_dataset_digest"] = self.historical_dataset_digest
         if self.corporate_action_context_digest is not None:
             document["corporate_action_context_digest"] = (
                 self.corporate_action_context_digest
@@ -679,9 +653,7 @@ class BacktestRunResult:
         if not isinstance(self.fills, tuple) or not all(
             isinstance(item, Fill) for item in self.fills
         ):
-            raise BacktestConfigurationError(
-                "Fills must be an immutable Fill tuple."
-            )
+            raise BacktestConfigurationError("Fills must be an immutable Fill tuple.")
         if not isinstance(self.trades, tuple) or not all(
             isinstance(item, ClosedTrade) for item in self.trades
         ):
@@ -732,9 +704,7 @@ def backtest_config_document(config: BacktestConfig) -> dict[str, object]:
         "initial_cash": format(config.initial_cash, "f"),
         "commission_bps": format(config.commission_bps, "f"),
         "slippage_bps": format(config.slippage_bps, "f"),
-        "max_volume_participation": format(
-            config.max_volume_participation, "f"
-        ),
+        "max_volume_participation": format(config.max_volume_participation, "f"),
         "annualization_periods": config.annualization_periods,
         "initial_symbol": config.symbol,
         "fingerprint": config.fingerprint,
@@ -742,9 +712,7 @@ def backtest_config_document(config: BacktestConfig) -> dict[str, object]:
     if config.data_context_digest is not None:
         document["data_context_digest"] = config.data_context_digest
     if config.historical_dataset_digest is not None:
-        document["historical_dataset_digest"] = (
-            config.historical_dataset_digest
-        )
+        document["historical_dataset_digest"] = config.historical_dataset_digest
     if config.corporate_action_context_digest is not None:
         document["corporate_action_context_digest"] = (
             config.corporate_action_context_digest
@@ -847,9 +815,7 @@ def metrics_document(metrics: PerformanceMetrics) -> dict[str, object]:
         "total_return": format(metrics.total_return, "f"),
         "cagr": _optional_float_text(metrics.cagr),
         "maximum_drawdown": format(metrics.maximum_drawdown, "f"),
-        "annualized_volatility": _optional_float_text(
-            metrics.annualized_volatility
-        ),
+        "annualized_volatility": _optional_float_text(metrics.annualized_volatility),
         "sharpe_ratio": _optional_float_text(metrics.sharpe_ratio),
         "sortino_ratio": _optional_float_text(metrics.sortino_ratio),
         "calmar_ratio": _optional_float_text(metrics.calmar_ratio),
@@ -932,9 +898,7 @@ def _require_optional_finite_float(value: float | None, field_name: str) -> None
 
 def _require_nonnegative_int(value: object, field_name: str) -> None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise BacktestConfigurationError(
-            f"{field_name} must be a nonnegative integer."
-        )
+        raise BacktestConfigurationError(f"{field_name} must be a nonnegative integer.")
 
 
 def _require_optional_nonnegative_int(

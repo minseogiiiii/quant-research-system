@@ -66,13 +66,9 @@ def test_manifest_rejects_report_bound_to_another_dataset(tmp_path: Path) -> Non
                     "backtest_report": "backtest.json",
                     "backtest_report_sha256": _sha256(tmp_path / "backtest.json"),
                     "robustness_report": "robustness.json",
-                    "robustness_report_sha256": _sha256(
-                        tmp_path / "robustness.json"
-                    ),
+                    "robustness_report_sha256": _sha256(tmp_path / "robustness.json"),
                     "statistical_report": "statistical.json",
-                    "statistical_report_sha256": _sha256(
-                        tmp_path / "statistical.json"
-                    ),
+                    "statistical_report_sha256": _sha256(tmp_path / "statistical.json"),
                     "declared_turnover": "2",
                     "declared_cost_to_gross_profit_ratio": "0.1",
                 }

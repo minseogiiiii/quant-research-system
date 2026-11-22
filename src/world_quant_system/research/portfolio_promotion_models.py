@@ -87,9 +87,7 @@ class CandidateEvidence:
             (self.statistical_passed, "Statistical validation passed"),
         ):
             if not isinstance(boolean_value, bool):
-                raise PortfolioPromotionConfigurationError(
-                    f"{name} must be a boolean."
-                )
+                raise PortfolioPromotionConfigurationError(f"{name} must be a boolean.")
         for digest_value, name in (
             (self.dataset_digest, "Dataset digest"),
             (self.backtest_file_sha256, "Backtest file SHA-256"),
@@ -432,9 +430,7 @@ class PortfolioMetrics:
             "expected_shortfall": _decimal_text(self.expected_shortfall),
             "total_turnover": _decimal_text(self.total_turnover),
             "total_cost": _decimal_text(self.total_cost),
-            "average_effective_strategy_count": (
-                self.average_effective_strategy_count
-            ),
+            "average_effective_strategy_count": (self.average_effective_strategy_count),
             "average_cash_weight": _decimal_text(self.average_cash_weight),
         }
 
@@ -461,13 +457,9 @@ class PortfolioFoldResult:
                 "Fold metrics must be PortfolioMetrics."
             )
         if not isinstance(self.passed, bool):
-            raise PortfolioPromotionConfigurationError(
-                "Fold passed must be a boolean."
-            )
+            raise PortfolioPromotionConfigurationError("Fold passed must be a boolean.")
         if any(not reason.strip() for reason in self.reasons):
-            raise PortfolioPromotionConfigurationError(
-                "Fold reasons must be nonblank."
-            )
+            raise PortfolioPromotionConfigurationError("Fold reasons must be nonblank.")
         if self.passed != (not self.reasons):
             raise PortfolioPromotionConfigurationError(
                 "Fold pass state must agree with its reasons."
@@ -555,12 +547,8 @@ class PortfolioWalkForwardResult:
         return {
             "fold_count": self.fold_count,
             "pass_rate": _decimal_text(self.pass_rate),
-            "worst_cumulative_return": _decimal_text(
-                self.worst_cumulative_return
-            ),
-            "worst_maximum_drawdown": _decimal_text(
-                self.worst_maximum_drawdown
-            ),
+            "worst_cumulative_return": _decimal_text(self.worst_cumulative_return),
+            "worst_maximum_drawdown": _decimal_text(self.worst_maximum_drawdown),
             "passed": self.passed,
             "folds": [item.to_document() for item in self.folds],
         }
@@ -617,9 +605,7 @@ class PortfolioScenarioResult:
         return {
             "scenario": self.scenario.value,
             "cost_bps": _decimal_text(self.cost_bps),
-            "common_loss_multiplier": _decimal_text(
-                self.common_loss_multiplier
-            ),
+            "common_loss_multiplier": _decimal_text(self.common_loss_multiplier),
             "removed_candidate_id": self.removed_candidate_id,
             "metrics": self.metrics.to_document(),
             "passed": self.passed,
@@ -773,11 +759,7 @@ class PromotionPolicy:
             self.minimum_effective_strategy_count,
             "Minimum effective strategy count",
         )
-        if not (
-            self.base_cost_bps
-            <= self.adverse_cost_bps
-            <= self.severe_cost_bps
-        ):
+        if not (self.base_cost_bps <= self.adverse_cost_bps <= self.severe_cost_bps):
             raise PortfolioPromotionConfigurationError(
                 "Scenario costs must be nondecreasing."
             )
@@ -785,9 +767,7 @@ class PromotionPolicy:
     def to_document(self) -> dict[str, object]:
         return {
             "annualization_periods": self.annualization_periods,
-            "minimum_candidate_observations": (
-                self.minimum_candidate_observations
-            ),
+            "minimum_candidate_observations": (self.minimum_candidate_observations),
             "minimum_eligible_candidates": self.minimum_eligible_candidates,
             "minimum_candidate_cumulative_return": _decimal_text(
                 self.minimum_candidate_cumulative_return
@@ -795,57 +775,37 @@ class PromotionPolicy:
             "maximum_candidate_drawdown": _decimal_text(
                 self.maximum_candidate_drawdown
             ),
-            "maximum_declared_turnover": _decimal_text(
-                self.maximum_declared_turnover
-            ),
+            "maximum_declared_turnover": _decimal_text(self.maximum_declared_turnover),
             "maximum_cost_to_gross_profit_ratio": _decimal_text(
                 self.maximum_cost_to_gross_profit_ratio
             ),
             "volatility_lookback": self.volatility_lookback,
             "rebalance_frequency": self.rebalance_frequency,
             "minimum_cash_weight": _decimal_text(self.minimum_cash_weight),
-            "maximum_candidate_weight": _decimal_text(
-                self.maximum_candidate_weight
-            ),
-            "maximum_cluster_weight": _decimal_text(
-                self.maximum_cluster_weight
-            ),
+            "maximum_candidate_weight": _decimal_text(self.maximum_candidate_weight),
+            "maximum_cluster_weight": _decimal_text(self.maximum_cluster_weight),
             "maximum_pairwise_correlation": self.maximum_pairwise_correlation,
-            "maximum_loss_period_correlation": (
-                self.maximum_loss_period_correlation
-            ),
-            "minimum_loss_period_observations": (
-                self.minimum_loss_period_observations
-            ),
+            "maximum_loss_period_correlation": (self.maximum_loss_period_correlation),
+            "minimum_loss_period_observations": (self.minimum_loss_period_observations),
             "base_cost_bps": _decimal_text(self.base_cost_bps),
             "adverse_cost_bps": _decimal_text(self.adverse_cost_bps),
             "severe_cost_bps": _decimal_text(self.severe_cost_bps),
-            "common_loss_multiplier": _decimal_text(
-                self.common_loss_multiplier
-            ),
+            "common_loss_multiplier": _decimal_text(self.common_loss_multiplier),
             "minimum_base_cumulative_return": _decimal_text(
                 self.minimum_base_cumulative_return
             ),
             "minimum_adverse_cumulative_return": _decimal_text(
                 self.minimum_adverse_cumulative_return
             ),
-            "maximum_severe_drawdown": _decimal_text(
-                self.maximum_severe_drawdown
-            ),
-            "minimum_effective_strategy_count": (
-                self.minimum_effective_strategy_count
-            ),
+            "maximum_severe_drawdown": _decimal_text(self.maximum_severe_drawdown),
+            "minimum_effective_strategy_count": (self.minimum_effective_strategy_count),
             "walk_forward_folds": self.walk_forward_folds,
             "minimum_fold_observations": self.minimum_fold_observations,
             "minimum_fold_cumulative_return": _decimal_text(
                 self.minimum_fold_cumulative_return
             ),
-            "maximum_fold_drawdown": _decimal_text(
-                self.maximum_fold_drawdown
-            ),
-            "minimum_fold_pass_rate": _decimal_text(
-                self.minimum_fold_pass_rate
-            ),
+            "maximum_fold_drawdown": _decimal_text(self.maximum_fold_drawdown),
+            "minimum_fold_pass_rate": _decimal_text(self.minimum_fold_pass_rate),
             "expected_shortfall_fraction": _decimal_text(
                 self.expected_shortfall_fraction
             ),
@@ -999,9 +959,7 @@ def _optional_decimal_text(value: Decimal | None) -> str | None:
 
 def _require_nonblank(value: object, field_name: str) -> None:
     if not isinstance(value, str) or not value.strip():
-        raise PortfolioPromotionConfigurationError(
-            f"{field_name} cannot be empty."
-        )
+        raise PortfolioPromotionConfigurationError(f"{field_name} cannot be empty.")
 
 
 def _require_sha256(value: object, field_name: str) -> None:
@@ -1038,9 +996,7 @@ def _require_nonnegative_decimal(value: object, field_name: str) -> None:
     _require_finite_decimal(value, field_name)
     assert isinstance(value, Decimal)
     if value < _ZERO:
-        raise PortfolioPromotionConfigurationError(
-            f"{field_name} cannot be negative."
-        )
+        raise PortfolioPromotionConfigurationError(f"{field_name} cannot be negative.")
 
 
 def _require_unit_decimal(value: object, field_name: str) -> None:

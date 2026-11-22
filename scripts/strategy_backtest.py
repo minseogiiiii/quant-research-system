@@ -43,16 +43,10 @@ def main() -> None:
     print(f"Buy-and-hold total return: {buy.total_return * 100:.4f}%")
     print(f"SMA crossover total return: {sma.total_return * 100:.4f}%")
     print(f"SMA maximum drawdown: {sma.maximum_drawdown * 100:.4f}%")
-    print(
-        "SMA annualized volatility: "
-        f"{_optional_percent(sma.annualized_volatility)}"
-    )
+    print(f"SMA annualized volatility: {_optional_percent(sma.annualized_volatility)}")
     print(f"SMA Sharpe ratio: {_optional_number(sma.sharpe_ratio)}")
     print(f"SMA turnover: {sma.turnover:.6f}")
-    print(
-        "SMA benchmark return: "
-        f"{_optional_decimal_percent(sma.benchmark_return)}"
-    )
+    print(f"SMA benchmark return: {_optional_decimal_percent(sma.benchmark_return)}")
     print(f"SMA commission cost: {sma.commission_cost}")
     print(f"SMA slippage cost: {sma.slippage_cost}")
     print(f"SMA closed trades: {sma.trade_count}")

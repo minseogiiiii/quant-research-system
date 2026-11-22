@@ -66,9 +66,7 @@ class InMemoryNormalizedCandleReader:
         symbol_set = None if symbols is None else set(symbols)
         status_set = None if statuses is None else set(statuses)
         after_key = (
-            None
-            if after is None
-            else (after.timestamp, after.symbol, after.item_id)
+            None if after is None else (after.timestamp, after.symbol, after.item_id)
         )
         for record in self._records:
             candle = record.candle

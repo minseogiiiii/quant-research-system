@@ -23,16 +23,13 @@ def _find_project_root() -> Path:
     policy_relative_path = Path(
         "examples/toss_read_only_certification_policy.example.json"
     )
-    capture_relative_path = Path(
-        "examples/toss_read_only_capture_bundle.example.json"
-    )
+    capture_relative_path = Path("examples/toss_read_only_capture_bundle.example.json")
     search_roots = (Path.cwd(), *Path.cwd().parents)
 
     for root in search_roots:
-        if (
-            (root / policy_relative_path).is_file()
-            and (root / capture_relative_path).is_file()
-        ):
+        if (root / policy_relative_path).is_file() and (
+            root / capture_relative_path
+        ).is_file():
             return root
 
     raise FileNotFoundError(
@@ -43,14 +40,8 @@ def _find_project_root() -> Path:
 
 def main() -> None:
     root = _find_project_root()
-    policy_path = (
-        root
-        / "examples/toss_read_only_certification_policy.example.json"
-    )
-    capture_path = (
-        root
-        / "examples/toss_read_only_capture_bundle.example.json"
-    )
+    policy_path = root / "examples/toss_read_only_certification_policy.example.json"
+    capture_path = root / "examples/toss_read_only_capture_bundle.example.json"
     policy = load_policy(policy_path)
     capture = load_capture_bundle(capture_path)
     certified_at = datetime(2026, 8, 3, 21, 30, tzinfo=UTC)

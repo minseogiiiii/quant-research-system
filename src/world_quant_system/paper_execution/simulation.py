@@ -111,9 +111,7 @@ class DeterministicInMemoryPaperBroker:
                     key=lambda item: item.client_order_id,
                 )
             ),
-            fills=tuple(
-                sorted(self._fills.values(), key=lambda item: item.fill_id)
-            ),
+            fills=tuple(sorted(self._fills.values(), key=lambda item: item.fill_id)),
             source_digest=source_digest,
         )
 
@@ -133,9 +131,7 @@ class DeterministicInMemoryPaperBroker:
         self.submit_calls += 1
         broker_order_id = f"paper-{intent.intent_id[:24]}"
         status = (
-            PaperOrderStatus.FILLED
-            if self._auto_fill
-            else PaperOrderStatus.SUBMITTED
+            PaperOrderStatus.FILLED if self._auto_fill else PaperOrderStatus.SUBMITTED
         )
         filled_quantity = intent.quantity if self._auto_fill else 0
         average_fill_price = intent.limit_price if self._auto_fill else None
@@ -212,9 +208,7 @@ class DeterministicInMemoryPaperBroker:
                 quantity=next_quantity,
                 average_price=intent.limit_price,
             )
-        fill_id = hashlib.sha256(
-            f"{broker_order_id}:1".encode()
-        ).hexdigest()[:24]
+        fill_id = hashlib.sha256(f"{broker_order_id}:1".encode()).hexdigest()[:24]
         self._fills[fill_id] = PaperFillSnapshot(
             fill_id=fill_id,
             broker_order_id=broker_order_id,
@@ -368,12 +362,10 @@ async def _run_simulation() -> PaperExecutionSimulationResult:
             duplicate_status=duplicate.status,
             broker_submit_calls=broker.submit_calls,
             reconciliation_passed=(
-                reconciliation.recommended_kill_switch
-                == KillSwitchMode.NORMAL
+                reconciliation.recommended_kill_switch == KillSwitchMode.NORMAL
             ),
             timeout_recovered=(
-                timed_out
-                and recovered.status == PaperOrderStatus.SUBMITTED
+                timed_out and recovered.status == PaperOrderStatus.SUBMITTED
             ),
             kill_switch_after_timeout=kill_switch,
             live_trading_enabled=False,

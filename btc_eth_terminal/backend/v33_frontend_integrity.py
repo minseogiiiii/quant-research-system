@@ -5,21 +5,26 @@ venue attestation, or a defense against an attacker able to edit Python code.
 All three build files are hashed on each request so a modified sibling asset
 cannot silently be served through an unchanged index page.
 """
+
 from __future__ import annotations
+
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import stat
+from pathlib import Path
 
 BASE = Path(__file__).resolve().parents[1]
-MANIFEST = BASE / 'frontend' / 'v33_dist_integrity.json'
+MANIFEST = BASE / "frontend" / "v33_dist_integrity.json"
 # Legacy /research is still backed by the original SHA-pinned v33 build,
 # not the v34 or v36 working dist tree.
-DIST = BASE / 'frontend' / 'dist_v33'
+DIST = BASE / "frontend" / "dist_v33"
 MANIFEST_BYTES_MAX = 4096
-PINNED_MANIFEST_SHA256 = 'c29706548d651735a71cc9217b17607fb24060fe4430ef84a61808ae0d1241e4'
+PINNED_MANIFEST_SHA256 = (
+    "c29706548d651735a71cc9217b17607fb24060fe4430ef84a61808ae0d1241e4"
+)
+
 
 class FrontendIntegrityError(ValueError):
     pass
@@ -27,80 +32,117 @@ class FrontendIntegrityError(ValueError):
 
 def _read_regular(path: Path, max_bytes: int) -> bytes:
     if path.is_symlink() or path.parent.is_symlink():
-        raise FrontendIntegrityError('Symlinked frontend build file or folder')
+        raise FrontendIntegrityError("Symlinked frontend build file or folder")
     try:
-        fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     except OSError as exc:
-        raise FrontendIntegrityError('Pinned frontend build file missing') from exc
+        raise FrontendIntegrityError("Pinned frontend build file missing") from exc
     try:
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode) or st.st_size < 1 or st.st_size > max_bytes:
-            raise FrontendIntegrityError('Unacceptable frontend build file size or type')
-        with os.fdopen(os.dup(fd), 'rb') as fp:
+            raise FrontendIntegrityError(
+                "Unacceptable frontend build file size or type"
+            )
+        with os.fdopen(os.dup(fd), "rb") as fp:
             content = fp.read(max_bytes + 1)
         if len(content) != st.st_size:
-            raise FrontendIntegrityError('Frontend build changed while reading')
+            raise FrontendIntegrityError("Frontend build changed while reading")
         return content
     finally:
         os.close(fd)
 
 
-def verify_build(dist: Path = DIST, manifest_path: Path = MANIFEST,
-                 pinned_sha256: str = PINNED_MANIFEST_SHA256) -> tuple[dict[str, bytes], dict]:
+def verify_build(
+    dist: Path = DIST,
+    manifest_path: Path = MANIFEST,
+    pinned_sha256: str = PINNED_MANIFEST_SHA256,
+) -> tuple[dict[str, bytes], dict]:
     """Return *only* locally pinned exact bytes to serve, or reject all."""
     if dist.is_symlink() or manifest_path.parent.is_symlink():
-        raise FrontendIntegrityError('Unsafe frontend build directory')
+        raise FrontendIntegrityError("Unsafe frontend build directory")
     raw = _read_regular(manifest_path, MANIFEST_BYTES_MAX)
     if hashlib.sha256(raw).hexdigest() != pinned_sha256:
-        raise FrontendIntegrityError('Frontend integrity manifest not pinned to this release')
+        raise FrontendIntegrityError(
+            "Frontend integrity manifest not pinned to this release"
+        )
+
     def no_dup(pairs):
         result = {}
         for key, value in pairs:
             if key in result:
-                raise FrontendIntegrityError('Duplicate integrity manifest key')
+                raise FrontendIntegrityError("Duplicate integrity manifest key")
             result[key] = value
         return result
+
     try:
-        manifest = json.loads(raw, object_pairs_hook=no_dup,
-                              parse_constant=lambda _: (_ for _ in ()).throw(FrontendIntegrityError('Invalid JSON constant')))
+        manifest = json.loads(
+            raw,
+            object_pairs_hook=no_dup,
+            parse_constant=lambda _: (_ for _ in ()).throw(
+                FrontendIntegrityError("Invalid JSON constant")
+            ),
+        )
     except (UnicodeDecodeError, ValueError, TypeError) as exc:
-        raise FrontendIntegrityError('Invalid pinned frontend manifest') from exc
-    files = manifest.get('files')
-    if manifest.get('schema') != 'v33_funnest_build_integrity_v1' or not isinstance(files, dict) or len(files) != 3:
-        raise FrontendIntegrityError('Unsupported pinned frontend build inventory')
-    expected_paths = {'index.html'}
+        raise FrontendIntegrityError("Invalid pinned frontend manifest") from exc
+    files = manifest.get("files")
+    if (
+        manifest.get("schema") != "v33_funnest_build_integrity_v1"
+        or not isinstance(files, dict)
+        or len(files) != 3
+    ):
+        raise FrontendIntegrityError("Unsupported pinned frontend build inventory")
+    expected_paths = {"index.html"}
     for name in files:
-        if re.fullmatch(r'assets/index-[A-Za-z0-9_-]+\.(?:js|css)', name):
+        if re.fullmatch(r"assets/index-[A-Za-z0-9_-]+\.(?:js|css)", name):
             expected_paths.add(name)
     if len(expected_paths) != 3 or set(files) != expected_paths:
-        raise FrontendIntegrityError('Frontend asset inventory or filename invalid')
-    if {x.rsplit('.', 1)[-1] for x in files if x != 'index.html'} != {'js', 'css'}:
-        raise FrontendIntegrityError('Frontend requires one JS and one CSS bundle')
+        raise FrontendIntegrityError("Frontend asset inventory or filename invalid")
+    if {x.rsplit(".", 1)[-1] for x in files if x != "index.html"} != {"js", "css"}:
+        raise FrontendIntegrityError("Frontend requires one JS and one CSS bundle")
     observed: dict[str, bytes] = {}
     for name, desc in files.items():
-        if not isinstance(desc, dict) or set(desc) != {'sha256', 'bytes'}:
-            raise FrontendIntegrityError('Invalid frontend asset descriptor')
-        limit = 50_000 if name == 'index.html' else (8_000_000 if name.endswith('.js') else 250_000)
+        if not isinstance(desc, dict) or set(desc) != {"sha256", "bytes"}:
+            raise FrontendIntegrityError("Invalid frontend asset descriptor")
+        limit = (
+            50_000
+            if name == "index.html"
+            else (8_000_000 if name.endswith(".js") else 250_000)
+        )
         data = _read_regular(dist / name, limit)
-        if (type(desc['bytes']) is not int or desc['bytes'] != len(data)
-                or not isinstance(desc['sha256'], str)
-                or hashlib.sha256(data).hexdigest() != desc['sha256']):
-            raise FrontendIntegrityError('Frontend asset hash/length mismatch')
+        if (
+            type(desc["bytes"]) is not int
+            or desc["bytes"] != len(data)
+            or not isinstance(desc["sha256"], str)
+            or hashlib.sha256(data).hexdigest() != desc["sha256"]
+        ):
+            raise FrontendIntegrityError("Frontend asset hash/length mismatch")
         observed[name] = data
-    index = observed['index.html']
-    referenced = set(m.decode('ascii') for m in re.findall(rb'/((?:assets/index-[A-Za-z0-9_-]+\.(?:js|css)))', index))
-    if referenced != expected_paths - {'index.html'}:
-        raise FrontendIntegrityError('Frontend index references files outside pinned release')
+    index = observed["index.html"]
+    referenced = set(
+        m.decode("ascii")
+        for m in re.findall(rb"/((?:assets/index-[A-Za-z0-9_-]+\.(?:js|css)))", index)
+    )
+    if referenced != expected_paths - {"index.html"}:
+        raise FrontendIntegrityError(
+            "Frontend index references files outside pinned release"
+        )
     return observed, manifest
 
 
-def get_asset(path: str, *, dist: Path = DIST, manifest_path: Path = MANIFEST,
-              pinned_sha256: str = PINNED_MANIFEST_SHA256) -> tuple[bytes, str]:
+def get_asset(
+    path: str,
+    *,
+    dist: Path = DIST,
+    manifest_path: Path = MANIFEST,
+    pinned_sha256: str = PINNED_MANIFEST_SHA256,
+) -> tuple[bytes, str]:
     known, _ = verify_build(dist, manifest_path, pinned_sha256)
-    if path in ('/research', '/research/index.html'):
-        return known['index.html'], 'text/html'
-    if path.startswith('/assets/'):
-        name = path.removeprefix('/')
+    if path in ("/research", "/research/index.html"):
+        return known["index.html"], "text/html"
+    if path.startswith("/assets/"):
+        name = path.removeprefix("/")
         if name in known:
-            return known[name], 'application/javascript' if name.endswith('.js') else 'text/css'
-    raise FrontendIntegrityError('Frontend file is not part of the pinned build')
+            return known[name], "application/javascript" if name.endswith(
+                ".js"
+            ) else "text/css"
+    raise FrontendIntegrityError("Frontend file is not part of the pinned build")

@@ -87,18 +87,14 @@ def _load_object(path: str | Path) -> dict[str, object]:
             f"Unable to load live-read policy: {path}"
         ) from error
     if not isinstance(value, dict):
-        raise TossLiveReadConfigurationError(
-            "Live-read policy must be an object."
-        )
+        raise TossLiveReadConfigurationError("Live-read policy must be an object.")
     return value
 
 
 def _text(document: dict[str, object], key: str) -> str:
     value = document.get(key)
     if not isinstance(value, str) or not value.strip():
-        raise TossLiveReadConfigurationError(
-            f"{key} must be nonblank text."
-        )
+        raise TossLiveReadConfigurationError(f"{key} must be nonblank text.")
     return value
 
 

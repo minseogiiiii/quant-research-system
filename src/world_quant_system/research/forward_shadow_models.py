@@ -182,9 +182,7 @@ class ForwardShadowJournalEntry:
         _require_nonnegative_int(self.sequence, "Journal sequence")
         _require_aware(self.timestamp, "Journal timestamp")
         if not isinstance(self.event_type, ForwardShadowJournalEventType):
-            raise ForwardShadowConfigurationError(
-                "Journal event type is invalid."
-            )
+            raise ForwardShadowConfigurationError("Journal event type is invalid.")
         _require_nonblank(self.reason, "Journal reason")
         if self.observation_id is not None:
             _require_sha256(self.observation_id, "Journal observation ID")
@@ -247,9 +245,7 @@ class ForwardShadowLedgerSnapshot:
         _require_positive_decimal(self.equity_after, "Equity after")
         _require_finite_decimal(self.drawdown, "Drawdown")
         if self.drawdown > _ZERO:
-            raise ForwardShadowConfigurationError(
-                "Drawdown cannot be positive."
-            )
+            raise ForwardShadowConfigurationError("Drawdown cannot be positive.")
         _validate_weights(self.weights, self.cash_weight)
         _require_nonnegative_decimal(
             self.one_way_turnover,
@@ -260,9 +256,7 @@ class ForwardShadowLedgerSnapshot:
             (self.feed_stale, "Feed-stale state"),
         ):
             if not isinstance(boolean_value, bool):
-                raise ForwardShadowConfigurationError(
-                    f"{field_name} must be boolean."
-                )
+                raise ForwardShadowConfigurationError(f"{field_name} must be boolean.")
 
     def to_document(self) -> dict[str, object]:
         return {
@@ -364,17 +358,11 @@ class ForwardShadowPolicy:
             "allocation_method": self.allocation_method.value,
             "rebalance_every_observations": self.rebalance_every_observations,
             "volatility_lookback": self.volatility_lookback,
-            "execution_delay_observations": (
-                self.execution_delay_observations
-            ),
+            "execution_delay_observations": (self.execution_delay_observations),
             "minimum_active_candidates": self.minimum_active_candidates,
             "minimum_cash_weight": _decimal_text(self.minimum_cash_weight),
-            "maximum_candidate_weight": _decimal_text(
-                self.maximum_candidate_weight
-            ),
-            "maximum_one_way_turnover": _decimal_text(
-                self.maximum_one_way_turnover
-            ),
+            "maximum_candidate_weight": _decimal_text(self.maximum_candidate_weight),
+            "maximum_one_way_turnover": _decimal_text(self.maximum_one_way_turnover),
             "transaction_cost_bps": _decimal_text(self.transaction_cost_bps),
             "maximum_evidence_age_days": self.maximum_evidence_age_days,
             "maximum_observation_lateness_seconds": (
@@ -413,9 +401,7 @@ class ForwardShadowState:
         _require_sha256(self.dataset_digest, "Dataset digest")
         _require_sha256(self.manifest_digest, "Manifest digest")
         if tuple(sorted(self.manifest_event_ids)) != self.manifest_event_ids:
-            raise ForwardShadowIntegrityError(
-                "Manifest event IDs must be sorted."
-            )
+            raise ForwardShadowIntegrityError("Manifest event IDs must be sorted.")
         if len(set(self.manifest_event_ids)) != len(self.manifest_event_ids):
             raise ForwardShadowIntegrityError(
                 "Manifest event IDs cannot contain duplicates."
@@ -448,9 +434,7 @@ class ForwardShadowState:
         previous_hash = _GENESIS_HASH
         for entry in self.journal:
             if entry.previous_hash != previous_hash:
-                raise ForwardShadowIntegrityError(
-                    "Journal hash chain is broken."
-                )
+                raise ForwardShadowIntegrityError("Journal hash chain is broken.")
             previous_hash = entry.entry_hash
         if tuple(item.sequence for item in self.ledger) != sequences:
             raise ForwardShadowIntegrityError(
@@ -468,9 +452,7 @@ class ForwardShadowState:
             (self.feed_stale, "Feed-stale state"),
         ):
             if not isinstance(boolean_value, bool):
-                raise ForwardShadowConfigurationError(
-                    f"{field_name} must be boolean."
-                )
+                raise ForwardShadowConfigurationError(f"{field_name} must be boolean.")
         if tuple(sorted(self.visible_event_ids)) != self.visible_event_ids:
             raise ForwardShadowIntegrityError(
                 "Visible event IDs must be sorted by candidate ID."
@@ -496,15 +478,11 @@ class ForwardShadowState:
                     "State update time must equal the latest receipt time."
                 )
         elif self.updated_at is not None:
-            raise ForwardShadowIntegrityError(
-                "Empty state cannot have an update time."
-            )
+            raise ForwardShadowIntegrityError("Empty state cannot have an update time.")
         object.__setattr__(
             self,
             "state_digest",
-            hashlib.sha256(
-                canonical_json_bytes(self.identity_document())
-            ).hexdigest(),
+            hashlib.sha256(canonical_json_bytes(self.identity_document())).hexdigest(),
         )
 
     @property
@@ -542,9 +520,7 @@ class ForwardShadowState:
             "observations": [item.to_document() for item in self.observations],
             "journal": [item.to_document() for item in self.journal],
             "ledger": [item.to_document() for item in self.ledger],
-            "active_weights": [
-                item.to_document() for item in self.active_weights
-            ],
+            "active_weights": [item.to_document() for item in self.active_weights],
             "cash_weight": _decimal_text(self.cash_weight),
             "pending_allocation": (
                 None
@@ -683,19 +659,13 @@ def _validate_weights(
 ) -> None:
     candidate_ids = tuple(item.candidate_id for item in weights)
     if candidate_ids != tuple(sorted(candidate_ids)):
-        raise ForwardShadowConfigurationError(
-            "Weights must be sorted by candidate ID."
-        )
+        raise ForwardShadowConfigurationError("Weights must be sorted by candidate ID.")
     if len(set(candidate_ids)) != len(candidate_ids):
-        raise ForwardShadowIntegrityError(
-            "Weights cannot repeat candidate IDs."
-        )
+        raise ForwardShadowIntegrityError("Weights cannot repeat candidate IDs.")
     _require_unit_decimal(cash_weight, "Cash weight")
     total = sum((item.weight for item in weights), cash_weight)
     if abs(total - _ONE) > Decimal("0.000000000001"):
-        raise ForwardShadowConfigurationError(
-            "Weights and cash must sum to one."
-        )
+        raise ForwardShadowConfigurationError("Weights and cash must sum to one.")
 
 
 def _decimal_text(value: Decimal) -> str:
@@ -728,32 +698,24 @@ def _require_aware(value: datetime, field_name: str) -> None:
         or value.tzinfo is None
         or value.utcoffset() is None
     ):
-        raise ForwardShadowConfigurationError(
-            f"{field_name} must be timezone-aware."
-        )
+        raise ForwardShadowConfigurationError(f"{field_name} must be timezone-aware.")
 
 
 def _require_finite_decimal(value: Decimal, field_name: str) -> None:
     if not isinstance(value, Decimal) or not value.is_finite():
-        raise ForwardShadowConfigurationError(
-            f"{field_name} must be a finite Decimal."
-        )
+        raise ForwardShadowConfigurationError(f"{field_name} must be a finite Decimal.")
 
 
 def _require_positive_decimal(value: Decimal, field_name: str) -> None:
     _require_finite_decimal(value, field_name)
     if value <= _ZERO:
-        raise ForwardShadowConfigurationError(
-            f"{field_name} must be positive."
-        )
+        raise ForwardShadowConfigurationError(f"{field_name} must be positive.")
 
 
 def _require_nonnegative_decimal(value: Decimal, field_name: str) -> None:
     _require_finite_decimal(value, field_name)
     if value < _ZERO:
-        raise ForwardShadowConfigurationError(
-            f"{field_name} cannot be negative."
-        )
+        raise ForwardShadowConfigurationError(f"{field_name} cannot be negative.")
 
 
 def _require_unit_decimal(value: Decimal, field_name: str) -> None:
