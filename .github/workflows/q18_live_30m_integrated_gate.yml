@@ -1,0 +1,221 @@
+name: Q18 actual Coinbase 30m source and 26m segmented 8-client SSE acceptance
+on:
+  push:
+    branches: [verification/q18-live-30m-integrated-20261122]
+    paths: ['.github/workflows/q18_live_30m_integrated_gate.yml']
+  workflow_dispatch:
+concurrency:
+  group: q18-live-30m-${{ github.ref }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  thirty-minute-read-only-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 42
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate exact Q14 pinned source and a CLI-compliant 26 minute test plan
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,pathlib,subprocess
+          m=json.loads(pathlib.Path('.github/release-evidence/q14_candidate_source_git_blobs.json').read_bytes())
+          pins=m['source_git_blobs']
+          assert m['source_tree_commit']=='ca44e5ee0dc636d8d30446db839ed6d6cb2af091'
+          assert m['source_files']==278 and len(pins)==278
+          assert m['release_approved'] is False and m['merge_approved'] is False
+          assert m['real_orders_enabled'] is False
+          for name, expected in pins.items():
+              actual=subprocess.check_output(['git','hash-object',name],text=True).strip()
+              if actual!=expected:raise SystemExit('Q14_CANDIDATE_SOURCE_HASH_MISMATCH:'+name)
+          print('PASS_Q18_EXACT_278_CANDIDATE_SOURCE_HASHES')
+          PY
+          node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
+          python - <<'PY'
+          import pathlib
+          source=pathlib.Path('btc_eth_terminal/scripts/v36_3_real_live_fanout.py').read_text()
+          assert 'if not 60 <= args.seconds <= 240:' in source
+          plan=[240]*6+[120]
+          assert len(plan)==7 and all(60<=d<=240 for d in plan)
+          assert sum(plan)==1560 and 1800-sum(plan)==240
+          print('PASS_Q18_PRE_REGISTERED_7_SSE_WINDOWS_1560_SECONDS_WITHIN_1800_SECONDS')
+          PY
+      - name: Capture 1800 seconds and evaluate seven real eight-client SSE windows
+        timeout-minutes: 38
+        shell: bash
+        run: |
+          set +e
+          PRIVATE="$RUNNER_TEMP/q7_30m_private_$GITHUB_RUN_ID"
+          PUBLIC="$RUNNER_TEMP/q7_30m_public_summary"
+          mkdir -p "$PUBLIC"
+          trap 'rm -rf -- "$PRIVATE" "$RUNNER_TEMP/q18_observer_stdout.log" "$RUNNER_TEMP/q18_observer_stderr.log"' EXIT
+          python -u btc_eth_terminal/scripts/v36_observe_existing_collector.py \
+            --execute-public-capture --duration 1800 --port 8766 \
+            --workdir "$PRIVATE" \
+            --raw-budget-bytes 2000000000 --archive-budget-bytes 3000000000 \
+            --disk-reserve-bytes 4294967296 \
+            > "$RUNNER_TEMP/q18_observer_stdout.log" 2> "$RUNNER_TEMP/q18_observer_stderr.log" &
+          OBSERVER_PID=$!
+          export PUBLIC OBSERVER_PID
+          python -u - <<'PY' &
+          import json,os,pathlib,time
+          pid=int(os.environ['OBSERVER_PID'])
+          log=pathlib.Path(os.environ['PUBLIC'])/'resource_samples.jsonl'
+          def snapshot(k):
+              out={'schema':'q7_host_process_sample_v1','index':k,'mono_ns':time.monotonic_ns(),'host_disk_free_bytes':os.statvfs('/tmp').f_bavail*os.statvfs('/tmp').f_frsize}
+              tracked=[pid]
+              try:tracked.extend(int(x) for x in pathlib.Path(f'/proc/{pid}/task/{pid}/children').read_text().split())
+              except OSError:pass
+              for proc in tracked:
+                  try:
+                      status=pathlib.Path(f'/proc/{proc}/status').read_text()
+                      rss=next((int(x.split()[1])*1024 for x in status.splitlines() if x.startswith('VmRSS:')),None)
+                      fds=len(list(pathlib.Path(f'/proc/{proc}/fd').iterdir()))
+                      out.setdefault('processes',[]).append({'pid':proc,'rss_bytes':rss,'open_fds':fds})
+                  except OSError:pass
+              return out
+          for i in range(40):
+              if not pathlib.Path(f'/proc/{pid}').exists():break
+              with log.open('a') as f:
+                  f.write(json.dumps(snapshot(i),sort_keys=True)+'\n');f.flush();os.fsync(f.fileno())
+              print('Q7_30M_RESOURCE_SAMPLE',i,flush=True)
+              time.sleep(60)
+          PY
+          METRICS_PID=$!
+          # Each exact pinned CLI invocation respects its 60..240 second contract.
+          # The 1560s span is segmented, not a claim of one uninterrupted SSE socket.
+          capture_session() {
+            python - "$PUBLIC/session_boundaries.jsonl" "$1" "$2" <<'PY'
+          import hashlib,json,sys
+          from urllib.request import urlopen
+          with urlopen('http://127.0.0.1:8766/api/v36/health',timeout=3) as r:
+              h=json.load(r)
+          if not (h.get('mode')=='LIVE_SOURCE' and h.get('status')=='HEALTHY'
+                  and h.get('live_feed') is True and h.get('trading_enabled') is False
+                  and set(h.get('snapshots',[]))=={'BTC-USD','ETH-USD'}):
+              raise SystemExit('SSE_BOUNDARY_SOURCE_NOT_HEALTHY')
+          session=h.get('session_id')
+          if not isinstance(session,str) or not session:raise SystemExit('SOURCE_SESSION_MISSING')
+          o={'window':int(sys.argv[2]),'boundary':sys.argv[3],
+             'session_hash':hashlib.sha256(session.encode()).hexdigest(),
+             'mode':'LIVE_SOURCE','orders_enabled':False}
+          with open(sys.argv[1],'a') as f:f.write(json.dumps(o,sort_keys=True)+'\n')
+          PY
+          }
+          FANOUT_RC=0
+          for i in 1 2 3 4 5 6 7; do
+            seconds=240
+            if [ "$i" -eq 7 ]; then seconds=120; fi
+            if ! kill -0 "$OBSERVER_PID" 2>/dev/null; then FANOUT_RC=2; break; fi
+            capture_session "$i" before
+            if [ "$?" -ne 0 ]; then FANOUT_RC=2; break; fi
+            python -u btc_eth_terminal/scripts/v36_3_real_live_fanout.py \
+              --seconds "$seconds" --port 8766 --observer-pid "$OBSERVER_PID" \
+              > "$PUBLIC/fanout_${i}.log" 2>&1
+            segment_rc=$?
+            capture_session "$i" after
+            boundary_rc=$?
+            if [ "$segment_rc" -ne 0 ] || [ "$boundary_rc" -ne 0 ]; then
+              FANOUT_RC=2
+              break
+            fi
+          done
+          wait "$OBSERVER_PID"
+          CAPTURE_RC=$?
+          kill "$METRICS_PID" 2>/dev/null || :
+          wait "$METRICS_PID" 2>/dev/null || :
+          REPLAY_RC=2
+          GATE_RC=2
+          if [ -f "$PRIVATE/V36_OBSERVER_EVIDENCE.json" ]; then
+            python -u btc_eth_terminal/scripts/v36_verify_live_capture.py \
+              --evidence "$PRIVATE/V36_OBSERVER_EVIDENCE.json" > "$PUBLIC/replay.log" 2>&1
+            REPLAY_RC=$?
+            python - "$PRIVATE/V36_OBSERVER_EVIDENCE.json" \
+              > "$PUBLIC/archive_gate.log" 2>&1 <<'PY'
+          import json,subprocess,sys
+          from pathlib import Path
+          e=json.loads(Path(sys.argv[1]).read_bytes())
+          if not e.get('observer_source_complete'):
+              raise SystemExit('SOURCE_NOT_CONTINUOUS')
+          raise SystemExit(subprocess.call([sys.executable,'btc_eth_terminal/scripts/v36_3_durable_archive_gate.py',
+              '--capture',e['captured_dir'],'--manifest-sha256',e['captured_manifest_sha256']]))
+          PY
+            GATE_RC=$?
+          fi
+          export CAPTURE_RC REPLAY_RC GATE_RC FANOUT_RC
+          python - <<'PY'
+          import json,os,pathlib
+          p=pathlib.Path(os.environ['PUBLIC'])
+          o={'schema':'q18_30minute_source_segmented_sse_acceptance_v1','mode':'REAL_PUBLIC_COINBASE_LIVE',
+             'target_capture_seconds':1800,'client_target_seconds':1560,'sse_windows':[240]*6+[120],'persistent_host_certified':False,
+             '24h_source_certified':False,'real_browser_e2e_certified':False,'real_orders_enabled':False,
+             'archive_uploaded':False,
+             **{k.lower():int(os.environ[k]) for k in ('CAPTURE_RC','FANOUT_RC','REPLAY_RC','GATE_RC')}}
+          (p/'result.json').write_text(json.dumps(o,sort_keys=True,indent=2)+'\n')
+          PY
+          echo "Q18_30M_REAL_RESULTS collector=$CAPTURE_RC fanout=$FANOUT_RC replay=$REPLAY_RC archive=$GATE_RC"
+          if [ "$CAPTURE_RC" -ne 0 ] || [ "$FANOUT_RC" -ne 0 ] || \
+             [ "$REPLAY_RC" -ne 0 ] || [ "$GATE_RC" -ne 0 ]; then
+            echo 'FAIL_Q18_REAL_30MIN_SOURCE_OR_26MIN_SEGMENTED_SSE'
+            exit 2
+          fi
+          python - <<'PY'
+          import json,os,pathlib,re
+          p=pathlib.Path(os.environ['PUBLIC'])
+          replay=(p/'replay.log').read_text()
+          plan=[240]*6+[120]
+          for i, seconds in enumerate(plan,1):
+              fanout=(p/f'fanout_{i}.log').read_text()
+              match=re.search(r'PASS_REAL_PUBLIC_LIVE_FANOUT (\\{.*\\})',fanout)
+              if not match:raise SystemExit('SSE_WINDOW_RESULT_MISSING:'+str(i))
+              report=json.loads(match.group(1))
+              if (report.get('status')!='PASS' or report.get('max_active_sse',0)<8
+                  or len(report.get('clients',[]))!=8
+                  or report.get('elapsed_seconds',0)<seconds-5
+                  or report.get('trading_enabled') is not False
+                  or report.get('certified_24h') is not False):
+                  raise SystemExit('SSE_EIGHT_CLIENTS_OR_WINDOW_FAILURE:'+str(i))
+          boundaries=[json.loads(line) for line in (p/'session_boundaries.jsonl').read_text().splitlines()]
+          if len(boundaries)!=14 or len({item['session_hash'] for item in boundaries})!=1:
+              raise SystemExit('SOURCE_SESSION_CHANGED_ACROSS_WINDOWS')
+          if [(item['window'],item['boundary']) for item in boundaries]!=[
+              (i,b) for i in range(1,8) for b in ('before','after')]:
+              raise SystemExit('SSE_WINDOW_BOUNDARY_SEQUENCE_INVALID')
+          samples=[json.loads(line) for line in (p/'resource_samples.jsonl').read_text().splitlines()]
+          if len(samples)<28:raise SystemExit('INSUFFICIENT_30MIN_RESOURCE_SAMPLES')
+          totals=[sum((proc.get('rss_bytes') or 0) for proc in sample.get('processes',[]))
+                  for sample in samples]
+          resource={'sample_count':len(samples),'peak_tracked_rss_bytes':max(totals),
+                    'tracked_rss_growth_bytes':totals[-1]-totals[min(5,len(totals)-1)],
+                    'minimum_host_disk_free_bytes':min(s['host_disk_free_bytes'] for s in samples)}
+          (p/'resource_summary.json').write_text(json.dumps(resource,indent=2,sort_keys=True)+'\\n')
+          gate=(p/'archive_gate.log').read_text()
+          if 'PASS_COINBASE_LIVE_POST_CAPTURE_AUDIT' not in replay:
+              raise SystemExit('REPLAY_NOT_VERIFIED')
+          m=re.search(r'(\{.*\})',gate)
+          if not m:raise SystemExit('NO_ARCHIVE_GATE_RESULT')
+          data=json.loads(m.group(1))
+          if data.get('source_connections')!=1 or data.get('monotonic_source_span_seconds',0)<1740:
+              raise SystemExit('NOT_30MIN_CONTINUOUS_ONE_CONNECTION')
+          if data.get('classification')!='VERIFIED_CLEAN_ARCHIVE_ENVELOPE':
+              raise SystemExit('ARCHIVE_NOT_ADMITTED')
+          print('PASS_Q18_30MIN_ONE_CONNECTION_RAW_ARCHIVE_AND_26MIN_SEGMENTED_EIGHT_CLIENT_SSE')
+          print('NOT_CERTIFIED 24H_HOST CONTINUOUS_30MIN_SINGLE_SSE LIVE_BROWSER RELEASE ORDERS')
+          PY
+      - name: Retain only bounded run summaries, never raw Coinbase JSONL
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q18-public-30min-archive-and-segmented-sse-summary
+          path: ${{ runner.temp }}/q7_30m_public_summary/
+          retention-days: 7
+          if-no-files-found: warn
