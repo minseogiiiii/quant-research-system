@@ -178,7 +178,7 @@ def run(origin, duration, pid):
             except Exception as exc:
                 raise AssertionError(
                     "LIVE_HEALTH_METRICS_UNAVAILABLE:" + str(exc)[:100]
-                )
+                ) from exc
             time.sleep(0.4)
         for job in jobs:
             job.result(timeout=20)
