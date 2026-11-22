@@ -1,0 +1,76 @@
+name: Q14 scoped import-order remediation (ISOLATED, NOT RELEASE)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_import_order_remediation.yml']
+permissions:
+  contents: write
+jobs:
+  q14-import-order:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - name: Install exact Ruff
+        run: python -m pip install 'ruff==0.15.22'
+      - name: Replace only flagged post-bootstrap imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q14-import-order-20261122"
+          python .github/scripts/q14_import_order_refactor.py --apply
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+          python - <<'PY'
+          import json
+          import subprocess
+          r=subprocess.run(['ruff','check','.','--output-format','json'],
+                            capture_output=True,text=True)
+          if r.returncode not in (0,1):raise SystemExit('INVALID_RUFF_OUTPUT')
+          issues=json.loads(r.stdout)
+          by={}
+          for x in issues:by[x['code']]=by.get(x['code'],0)+1
+          if by.get('E402',0):raise SystemExit('POST_BOOTSTRAP_IMPORT_STILL_FLAGGED')
+          print('Q14_AFTER_IMPORT_REFACTOR_RUFF',json.dumps(by,sort_keys=True))
+          PY
+      - name: Run source-contract safety tests
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python .github/scripts/q7_static_cost_regression.py
+          for f in \
+            test_v36_2_transport_gap.py \
+            test_v36_2_sse_backpressure.py \
+            test_v36_3_durable_archive_gate.py \
+            test_v36_3_operator_monitor.py; do
+            python -m unittest discover -s btc_eth_terminal/tests -p "$f" -q
+          done
+      - name: Run root project regression and guard tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s .github/scripts -p 'test_q13_private_fixture_gate.py' -q
+          python -m unittest discover -s .github/scripts -p 'test_q12_ruff_compare.py' -q
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Commit only tested Python refactor on isolated candidate branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q14-import-order-20261122"
+          git diff --name-only | python -c 'import sys; a=[x.strip() for x in sys.stdin if x.strip()]; assert a and all(x.startswith("btc_eth_terminal/") and x.endswith(".py") for x in a)'
+          git add -u -- btc_eth_terminal
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Q14: explicit immediately-invoked dependency loaders after path setup'
+          git push origin HEAD:refs/heads/remediation/q14-import-order-20261122
+
+# No raw Coinbase archives and no staged/main release mutation.
