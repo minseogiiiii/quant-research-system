@@ -21,7 +21,7 @@ CURSOR = re.compile(r"v36:([0-9a-f]{32}):(BTC-USD|ETH-USD):([1-9][0-9]*)\Z")
 
 def observe(origin: str, product: str, limit_s: float = 14.0) -> dict:
     started = time.monotonic()
-    events = []
+    _ = []
     session = None
     snapshot = None
     states = []
