@@ -1,0 +1,90 @@
+name: Q15 byte-identical shipped v36 HTTP Chromium fail-closed gate
+
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths:
+      - '.github/workflows/q15_shipped_v36_http_dom.yml'
+      - 'btc_eth_terminal/scripts/q15_shipped_v36_no_source_browser_gate.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shipped-v36-no-source-real-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - name: Checkout exact Q15 candidate
+        uses: actions/checkout@v4
+
+      - name: Use reproducible Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned browser automation and linter
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-cache-dir \
+            playwright==1.55.0 ruff==0.15.22
+          command -v google-chrome
+
+      - name: Check full Python source, no exclusions
+        run: |
+          set -euo pipefail
+          ruff check .
+          python -m py_compile \
+            btc_eth_terminal/scripts/q15_shipped_v36_no_source_browser_gate.py
+
+      - name: Verify unchanged shipped v36 binary via actual HTTP browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -u \
+            btc_eth_terminal/scripts/q15_shipped_v36_no_source_browser_gate.py \
+            --browser-executable "$(command -v google-chrome)" \
+            --report "$RUNNER_TEMP/q15_shipped_dom_public.json" \
+            --screenshot "$RUNNER_TEMP/q15_no_source_dom.png"
+
+      - name: Enforce narrow evidence classification and absence of approval
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p=Path(os.environ['RUNNER_TEMP'])/'q15_shipped_dom_public.json'
+          e=json.loads(p.read_text())
+          assert e['verdict']=='PASS_V36_SHIPPED_DOM_FAIL_CLOSED'
+          assert e['browser_transport']=='REAL_LOOPBACK_HTTP'
+          assert e['shipped_js_rewritten'] is False
+          assert e['mocked_fetch_or_eventsource'] is False
+          assert e['market_source']=='NONE_NOT_ADMITTED'
+          assert e['private_historical_archive_used'] is False
+          assert e['live_source_tested'] is False
+          assert e['release_approved'] is False
+          assert e['trading_enabled'] is False
+          assert e['page_errors']==0
+          assert len(e['shipped_v36_sha256'])==3
+          assert e['products_with_no_admitted_quote']==['BTC-USD','ETH-USD']
+          print('PASS_Q15_ORIGINAL_SHIPPED_V36_FAIL_CLOSED_HTTP_DOM')
+          print('NOT_CLAIMED: LIVE_SOURCE ARCHIVAL_HTTP_REPLAY 24H_PRODUCTION')
+          PY
+
+      - name: Preserve safe no-source diagnostics only
+        uses: actions/upload-artifact@v4
+        with:
+          name: q15-shipped-v36-no-source-dom-evidence
+          path: |
+            ${{ runner.temp }}/q15_shipped_dom_public.json
+            ${{ runner.temp }}/q15_no_source_dom.png
+          if-no-files-found: error
+          retention-days: 7
+
+# Never publishes genuine market data or modifies production release assets.
+# The failing secure private-fixture gate remains a separate mandatory requirement.
