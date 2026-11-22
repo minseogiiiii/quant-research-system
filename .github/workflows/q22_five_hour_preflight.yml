@@ -1,0 +1,131 @@
+name: Q22 P0 five-hour source preflight (180s real Coinbase smoke, NO 5H admission)
+on:
+  push:
+    branches: [p0/q22-five-hour-gated-soak-20261122]
+    paths:
+      - '.github/workflows/q22_five_hour_preflight.yml'
+      - '.github/workflows/q22_five_hour_after_q18.yml'
+      - 'btc_eth_terminal/scripts/q22_ci_long_observer.py'
+      - 'btc_eth_terminal/scripts/q22_ci_5h_supervisor.py'
+      - 'btc_eth_terminal/scripts/q22_ci_full_replay.py'
+      - 'btc_eth_terminal/tests/test_q22_ci_5h_contract.py'
+      - 'docs/Q22_FIVE_HOUR_GATED_CI_RUNBOOK.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: q22-preflight-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  preflight-contract-and-real-source-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 19
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Frozen source manifest, strict readonly diff, and storage preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,pathlib,subprocess
+          m=json.loads(pathlib.Path('.github/release-evidence/q14_candidate_source_git_blobs.json').read_bytes())
+          pins=m['source_git_blobs']
+          assert m['source_files']==278 and len(pins)==278
+          assert m['real_orders_enabled'] is False
+          assert m['release_approved'] is False and m['merge_approved'] is False
+          for p, sha in pins.items():
+              actual=subprocess.check_output(['git','hash-object',p],text=True).strip()
+              if actual!=sha:raise SystemExit('Q22_MUTATED_FROZEN_PRODUCT_SOURCE:'+p)
+          allowed={
+              'btc_eth_terminal/scripts/q22_ci_long_observer.py',
+              'btc_eth_terminal/scripts/q22_ci_5h_supervisor.py',
+              'btc_eth_terminal/scripts/q22_ci_full_replay.py',
+              'btc_eth_terminal/tests/test_q22_ci_5h_contract.py',
+              '.github/workflows/q22_five_hour_preflight.yml',
+              '.github/workflows/q22_five_hour_after_q18.yml',
+              'docs/Q22_FIVE_HOUR_GATED_CI_RUNBOOK.md',
+              '.github/q22/arm_after_q18.json',
+          }
+          changed=set(subprocess.check_output(
+              ['git','diff','--name-only','61fa43a8e956fc4a88d206587bc98ce4d85623f8','HEAD'],
+              text=True).splitlines())
+          assert changed<=allowed, 'Q22_UNREVIEWED_PRODUCT_DELTA:'+str(sorted(changed-allowed))
+          import shutil
+          from q22_ci_long_observer import (
+              CI_DURATION,RAW_BUDGET,ARCHIVE_BUDGET,DISK_RESERVE,ci_source_policy
+          )
+          free=shutil.disk_usage('/tmp').free
+          assert ci_source_policy(CI_DURATION,RAW_BUDGET,ARCHIVE_BUDGET,DISK_RESERVE,free), (
+              'Q22_DEFAULT_RUNNER_CANNOT_FIT_5H_ARCHIVE_BUDGET')
+          print('PASS_Q22_PINNED_278_SOURCE_AND_ACTUAL_CI_DISK_PREFLIGHT',free)
+          PY
+      - name: Static analysis and 17 adversarial Q22 contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q22_ci_long_observer.py \
+            btc_eth_terminal/scripts/q22_ci_5h_supervisor.py \
+            btc_eth_terminal/scripts/q22_ci_full_replay.py \
+            btc_eth_terminal/tests/test_q22_ci_5h_contract.py
+          python -m py_compile btc_eth_terminal/scripts/q22_ci_long_observer.py \
+            btc_eth_terminal/scripts/q22_ci_5h_supervisor.py \
+            btc_eth_terminal/scripts/q22_ci_full_replay.py \
+            btc_eth_terminal/tests/test_q22_ci_5h_contract.py
+          node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_q22_ci_5h_contract.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_q21_host_witness.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_v36_2_sse_backpressure.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_v36_2_storage_faults.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_v36_3_durable_archive_gate.py' -v
+      - name: Genuine 180-second Coinbase public-source plus 60-second eight-client LIVE SSE smoke
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          PRIVATE="$RUNNER_TEMP/q22_smoke_$GITHUB_RUN_ID"
+          PUBLIC="$RUNNER_TEMP/q22_smoke_public"
+          mkdir -p "$PUBLIC"
+          trap 'rm -rf -- "$PRIVATE" "$PRIVATE.observer_stdout.log" "$PRIVATE.observer_stderr.log"' EXIT
+          python -u btc_eth_terminal/scripts/q22_ci_5h_supervisor.py \
+            --execute-public-capture \
+            --duration 180 --port 8786 \
+            --private-workdir "$PRIVATE" --public-summary "$PUBLIC"
+          python -u btc_eth_terminal/scripts/q22_ci_full_replay.py \
+            --duration 180 --private-workdir "$PRIVATE" \
+            --output-summary "$PUBLIC/real_180s_independent_replay.json"
+          python - "$PUBLIC" <<'PY'
+          import json,sys
+          from pathlib import Path
+          p=Path(sys.argv[1])
+          r=json.loads((p/'real_180s_independent_replay.json').read_text())
+          m=json.loads((p/'live_monitoring_summary.json').read_text())
+          assert r['status']=='PASS' and r['expected_source_seconds']==180
+          assert r['primary_independent_final_books_agree'] is True
+          assert m['status']=='PASS' and m['windows_passed']==1
+          assert m['sse_total_states']>0 and m['order_execution_enabled'] is False
+          print('PASS_Q22_REAL_180S_FULL_LIFECYCLE_SMOKE_NOT_5H_CERTIFICATION')
+          PY
+      - name: Publish ONLY bounded smoke JSON summaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q22-genuine-public-source-180s-smoke-summary
+          path: ${{ runner.temp }}/q22_smoke_public/*.json
+          if-no-files-found: warn
+          retention-days: 7
