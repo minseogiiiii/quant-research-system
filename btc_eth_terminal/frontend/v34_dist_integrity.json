@@ -1,0 +1,21 @@
+{
+  "ci_run": "https://github.com/minseogiiiii/quant-research-system/actions/runs/43821845567",
+  "files": {
+    "assets/index-DgWkONqN.css": {
+      "bytes": 28896,
+      "sha256": "543e6edd06ef8b462ad0cc7cac4442635b9ae91a071f9daabff1a93c8822ecfd"
+    },
+    "assets/index-JMfM_Z1d.js": {
+      "bytes": 512670,
+      "sha256": "404b42269609309e9a053e85b600e0fdac909328aed3972eaeb685985e0519da"
+    },
+    "index.html": {
+      "bytes": 368,
+      "sha256": "ac7e57a2396fda041a25e073df4a0976ac017e0e66550ea187dad1b67f97414b"
+    }
+  },
+  "git_commit": "36a0edc13f51a740ce17db3c403e1b2e53f66a23",
+  "live_trading_enabled": false,
+  "receiver_time_only": true,
+  "schema": "v34_funnest_build_integrity_v1"
+}

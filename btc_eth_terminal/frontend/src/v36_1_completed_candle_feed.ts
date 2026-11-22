@@ -58,7 +58,7 @@ export function createCompletedCandleFeed(product:'BTC-USD'|'ETH-USD',
       if(req.countBack!==undefined){
         if(!Number.isSafeInteger(req.countBack)||req.countBack<0||req.countBack>500)
           throw Error('INVALID_COUNT_BACK');
-        selected=bars.filter(b=>b.time<req.to).slice(-req.countBack);
+        selected=req.countBack===0?[]:bars.filter(b=>b.time<req.to).slice(-req.countBack);
       }
       const copy=selected.map(b=>({...b}));
       onGetBars?.(copy);

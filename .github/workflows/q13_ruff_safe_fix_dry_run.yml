@@ -1,0 +1,86 @@
+name: Q13 Ruff safe autofix potential (EPHEMERAL DIAGNOSTIC ONLY)
+
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths:
+      - '.github/workflows/q13_ruff_safe_fix_dry_run.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safe-fix-experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned root Ruff
+        run: python -m pip install 'ruff==0.15.22'
+      - name: Simulate safe autofix and format without ever committing product files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import collections
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          def execute(args):
+              result = subprocess.run(args, capture_output=True, text=True)
+              if result.returncode not in (0, 1):
+                  raise RuntimeError(f"UNEXPECTED_DIAGNOSTIC_FAILURE:{args[0]}:{result.stderr[:300]}")
+              return result
+
+          def lint():
+              result=execute(['ruff','check','.','--output-format','json'])
+              rows=json.loads(result.stdout)
+              return rows, dict(sorted(collections.Counter(x['code'] for x in rows).items()))
+
+          before, by_rule_before = lint()
+          fix=execute(['ruff','check','.','--fix','--output-format','json'])
+          fmt=execute(['ruff','format','.'])
+          after, by_rule_after = lint()
+          files=subprocess.check_output(['git','diff','--name-only','--diff-filter=AM','--','*.py'],text=True).splitlines()
+          compile_run=subprocess.run(['python','-m','compileall','-q','.github/scripts','btc_eth_terminal/backend','btc_eth_terminal/tests','src','tests'],capture_output=True,text=True)
+          out={
+              'schema':'q13_ephemeral_safe_ruff_remediation_v1',
+              'status':'DIAGNOSTIC_ONLY_NO_GIT_COMMIT',
+              'base_head':os.environ['GITHUB_SHA'],
+              'before_count':len(before),
+              'after_safe_fix_and_format_count':len(after),
+              'safe_fixes_plus_format_reduction':len(before)-len(after),
+              'remaining_by_rule':by_rule_after,
+              'baseline_by_rule':by_rule_before,
+              'changed_python_files':len(files),
+              'changed_python_file_samples':files[:60],
+              'safe_fix_returncode':fix.returncode,
+              'format_returncode':fmt.returncode,
+              'post_fix_compile_rc':compile_run.returncode,
+              'pinned_source_revalidation_required':True,
+              'release_manifest_still_valid':False,
+              'production_approval':False,
+              'data_archives_uploaded':False
+          }
+          if compile_run.returncode: out['compile_failure_summary']=compile_run.stderr[-400:]
+          result=pathlib.Path(os.environ['RUNNER_TEMP'])/'q13_ruff_safe_fix_dry_run.json'
+          result.write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          print('Q13_RUFF_DRY_RUN_SUMMARY',json.dumps({
+              x:out[x] for x in ('before_count','after_safe_fix_and_format_count','safe_fixes_plus_format_reduction','changed_python_files','post_fix_compile_rc')
+          }))
+          if not files:
+              raise RuntimeError('AUTOFIX_EXPERIMENT_DID_NOT_CHANGE_ANY_FILES')
+          PY
+      - name: Save only aggregate remediation data, never rewritten unreviewed source
+        uses: actions/upload-artifact@v4
+        with:
+          name: q13-ruff-ephemeral-safe-fix-potential
+          path: ${{ runner.temp }}/q13_ruff_safe_fix_dry_run.json
+          retention-days: 7
+          if-no-files-found: error

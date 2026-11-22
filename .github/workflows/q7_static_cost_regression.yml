@@ -1,0 +1,33 @@
+name: Q7 static execution cost fail-closed regression (not runtime acceptance)
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths:
+      - '.github/scripts/q7_static_cost_regression.py'
+      - '.github/workflows/q7_static_cost_regression.yml'
+      - 'btc_eth_terminal/backend/v37_factor_lab.py'
+  pull_request:
+    branches: [integration/btc-eth-unified-terminal]
+permissions:
+  contents: read
+jobs:
+  q7-nonnegative-cost-assumptions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Execute exact staged Q7 decimal and book-walk function bodies
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object btc_eth_terminal/backend/v37_factor_lab.py)" = "13e14f89e6668f88ee03726f4ef2875df6bdf9af"
+          python -m unittest discover -s .github/scripts -p q7_static_cost_regression.py -v
+      - name: Confirm tests do not claim real fill or alpha acceptance
+        shell: bash
+        run: |
+          echo PASS_PARTIAL_Q7_NONNEGATIVE_COST_REGRESSION
+          echo FULL_Q7_RELEASE_CI_STILL_REQUIRED
+          echo NO_REAL_TRADING_ENABLED

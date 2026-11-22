@@ -4,7 +4,8 @@ import {FnChart} from '@funnest/charts-react';
 import type {Bar} from '@funnest/charts';
 import {createCompletedCandleFeed, validateCompletedCandles} from './v36_1_completed_candle_feed';
 import type {CompletedCandle} from './v36_1_completed_candle_feed';
-import {validateDepth10} from './marketStateIntegrity';
+import {validateQuoteAgainstDepth,validateTradeTape} from './marketStateIntegrity';
+import {freshSourceHealth,readOnlyJson} from './v36_client_liveness';
 
 type Product='BTC-USD'|'ETH-USD';
 type Health={mode:string;live_feed:boolean;trading_enabled:boolean;status:string;reason:string|null;
@@ -14,7 +15,7 @@ type Health={mode:string;live_feed:boolean;trading_enabled:boolean;status:string
 type Row={schema:string;mode:string;live_feed:boolean;trading_enabled:boolean;session_id:string;run_id:string;
   product:Product;status:string;state_version:number;source_sequence:number;receiver_time_ms:number;
   source_last_l2_receiver_ms:number;connection_id:number;best_bid:string;best_ask:string;spread:string;
-  microprice:string;best_imbalance:string;ofi_since_connection_base:string;depth:unknown;
+  microprice:string;best_imbalance:string;best_bid_qty:string;best_ask_qty:string;ofi_since_connection_base:string;depth:unknown;
   recent_trades:Array<{price:string;size:string;maker_side:string;received_at_ms:number;trade_id?:string}>};
 type Candle=CompletedCandle;
 const mono=/^(?:0|[1-9]\d*)(?:\.\d+)?$/;
@@ -29,16 +30,11 @@ function validRow(r:Row,p:Product,h:Health):boolean {
     !Number.isSafeInteger(r.receiver_time_ms)||r.receiver_time_ms<1||
     !Number.isSafeInteger(r.source_last_l2_receiver_ms)||
     r.receiver_time_ms<r.source_last_l2_receiver_ms||
-    !validateDepth10(r.depth))return false;
+    !validateQuoteAgainstDepth(r)||!validateTradeTape(r.recent_trades,r.receiver_time_ms))return false;
  return ['best_bid','best_ask','spread','microprice','ofi_since_connection_base']
   .every(k=>typeof r[k as keyof Row]==='string'&&mono.test(r[k as keyof Row] as string) ||
      k==='ofi_since_connection_base' && typeof r.ofi_since_connection_base==='string'&&
      /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(r.ofi_since_connection_base));
-}
-async function api<T>(url:string,signal?:AbortSignal):Promise<T>{
- const res=await fetch(url,{cache:'no-store',signal});
- if(!res.ok)throw new Error(`${url} HTTP ${res.status}`);
- return await res.json() as T;
 }
 const cell:CSSProperties={padding:10,background:'#13263b',border:'1px solid #28435a',borderRadius:8};
 const formatTime=(ms:number)=>new Date(ms).toISOString();
@@ -46,6 +42,8 @@ const formatTime=(ms:number)=>new Date(ms).toISOString();
 export default function LiveTerminal(){
  const [product,setProduct]=useState<Product>('BTC-USD');
  const [health,setHealth]=useState<Health|null>(null);
+ const [healthProbeAt,setHealthProbeAt]=useState<number|null>(null);
+ const [clockNow,setClockNow]=useState(()=>performance.now());
  const [state,setState]=useState<Row|null>(null);
  const [candles,setCandles]=useState<Candle[]>([]);
  const [connection,setConnection]=useState('CONNECTING');
@@ -55,11 +53,25 @@ export default function LiveTerminal(){
  const lastFingerprint=useRef<string|null>(null);
  const lastSourceSequence=useRef(-1);
  const [servedBars,setServedBars]=useState<Bar[]>([]);
+ const healthFresh=freshSourceHealth(health,healthProbeAt,clockNow);
+ const trustedQuote=healthFresh&&state!==null&&state.product===product&&
+   state.session_id===health?.session_id&&connection!=='RESYNC_REQUIRED'&&
+   connection!=='HEALTH_PROBE_EXPIRED'&&error===null;
+ useEffect(()=>{
+  const id=window.setInterval(()=>setClockNow(performance.now()),1000);
+  return ()=>window.clearInterval(id);
+ },[]);
+ useEffect(()=>{
+  if(healthProbeAt===null||!healthy(health)||healthFresh)return;
+  subscription.current?.close();subscription.current=null;
+  setState(null);setCandles([]);setConnection('HEALTH_PROBE_EXPIRED');
+  setError('HEALTH_PROBE_STALE_OR_CLOCK_ANOMALY');
+ },[healthProbeAt,health,healthFresh]);
  const candleFeed=useMemo(()=>createCompletedCandleFeed(product,bars=>setServedBars(bars.map(b=>({...b})))),[product,health?.session_id]);
  useEffect(()=>{setServedBars([]);return ()=>candleFeed.dispose();},[candleFeed]);
  useEffect(()=>{
-  if(!state||!healthy(health)||state.product!==product||
-     state.session_id!==health?.session_id||!candles.length)return;
+  if(!state||!freshSourceHealth(health,healthProbeAt,performance.now())||
+     state.product!==product||state.session_id!==health?.session_id||!candles.length)return;
   try{candleFeed.publish(candles,health.last_receiver_time_ms??state.receiver_time_ms);}
   catch(e){setState(null);setCandles([]);setConnection('RESYNC_REQUIRED');setError('FUNNEST_CANDLE_INTEGRITY:'+String(e));
    subscription.current?.close();subscription.current=null;}
@@ -69,7 +81,7 @@ export default function LiveTerminal(){
   const abort=new AbortController();let pollId:number|null=null;
   subscription.current?.close();subscription.current=null;last.current=0;
   lastFingerprint.current=null;lastSourceSequence.current=-1;
-  setHealth(null);setState(null);setCandles([]);setError(null);setConnection('CONNECTING');
+  setHealth(null);setHealthProbeAt(null);setState(null);setCandles([]);setError(null);setConnection('CONNECTING');
   const block=(reason:string)=>{
    if(!active)return;
    setState(null);setCandles([]);setConnection('RESYNC_REQUIRED');setError(reason);
@@ -79,7 +91,7 @@ export default function LiveTerminal(){
    if(!active||busy)return;
    busy=true;
    try{
-    const h=await api<Health>('/api/v36/health',abort.signal);
+    const h=await readOnlyJson<Health>('/api/v36/health',abort.signal);
     if(!active)return;
     if(healthy(h)&&admittedSession!==null&&admittedSession!==h.session_id){
      // A new authenticated source session is not a continuation.
@@ -88,14 +100,14 @@ export default function LiveTerminal(){
      last.current=0;lastFingerprint.current=null;lastSourceSequence.current=-1;
     }
     if(healthy(h))admittedSession=h.session_id;
-    setHealth(h);
+    setHealth(h);setHealthProbeAt(performance.now());setClockNow(performance.now());
     if(!healthy(h)){
      subscription.current?.close();subscription.current=null;
      setState(null);setConnection(h.status);
      return;
     }
     if(!subscription.current){
-     const snapshot=await api<{state:Row|null}>('/api/v36/snapshot?product='+product,abort.signal);
+     const snapshot=await readOnlyJson<{state:Row|null}>('/api/v36/snapshot?product='+product,abort.signal);
      if(!active)return;
      if(!snapshot.state||!validRow(snapshot.state,product,h))throw new Error('UNTRUSTED_LIVE_SNAPSHOT');
      const current=snapshot.state;
@@ -130,7 +142,7 @@ export default function LiveTerminal(){
       stream.close();subscription.current=null;setConnection('ROTATING_STREAM');});
      stream.onerror=()=>{if(active&&subscription.current===stream)block('SOURCE_SSE_DISCONNECTED_OR_INVALID');};
     }
-    const c=await api<{mode:string;session_id:string;rows:Candle[];incomplete_candle_never_published:boolean}>(
+    const c=await readOnlyJson<{mode:string;session_id:string;rows:Candle[];incomplete_candle_never_published:boolean}>(
       '/api/v36/candles?product='+product,abort.signal);
     if(!active||admittedSession!==h.session_id)return;
     if(c.mode!==h.mode||c.session_id!==h.session_id||c.incomplete_candle_never_published!==true||
@@ -159,15 +171,15 @@ export default function LiveTerminal(){
       aria-pressed={product===p} style={{padding:10,borderRadius:8,color:'#fff',background:product===p?'#185b79':'#1c3448'}}>{p}</button>)}
    </div>
   </header>
-  <p><strong style={{color:healthy(health)?'#5be0b4':'#ffb77a'}}>
-   {health?.mode==='LIVE_SOURCE' && healthy(health)&&state?.session_id===health.session_id && connection!=='RESYNC_REQUIRED'?'OBSERVED LIVE SOURCE':
+  <p><strong style={{color:trustedQuote?'#5be0b4':'#ffb77a'}}>
+   {health?.mode==='LIVE_SOURCE'&&trustedQuote?'OBSERVED LIVE SOURCE':
     health?.mode==='ARCHIVE_SIMULATION'?'ARCHIVE SIMULATION · NOT LIVE':'NOT ADMITTED · NO LIVE MARKET DATA'}
   </strong> · {connection} · {health?.status??'CONNECTING'} · orders disabled</p>
   <p style={{color:'#96b3c9',fontSize:12}} aria-label="Source health">Session {health?.session_id??'none'} · messages {health?.messages??0}
    · source seq {health?.last_sequence??'none'} · heartbeat count {health?.heartbeats??0}
    · gap count {health?.connection_gaps??0}</p>
   {error?<p role="alert" style={{color:'#ff9898'}}>MARKET DATA NOT TRUSTED: {error}</p>:null}
-  {state && state.product===product && state.session_id===health?.session_id && healthy(health) && connection!=='RESYNC_REQUIRED'?<>
+  {trustedQuote && state ?<>
    <p role="status" style={{fontSize:12,color:'#92b6c9'}}>Observed {formatTime(state.receiver_time_ms)} · conn {state.connection_id}
      · source sequence {state.source_sequence} · state version {state.state_version} · {state.mode}</p>
    <section aria-label="Validated top of book" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:8}}>

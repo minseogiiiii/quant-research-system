@@ -1,0 +1,48 @@
+{
+  "datasets": [
+    {
+      "chart_tick_is_display_only": true,
+      "evidence_status": "unverified",
+      "exchange": "Coinbase Advanced Trade",
+      "file": "coinbase_spot_5m_20261108T0000Z_20261109T0000Z/btc_coinbase_spot_5m.csv",
+      "name": "Bitcoin / USD (Coinbase spot)",
+      "pricePrecision": 2,
+      "provenance_file": "coinbase_spot_5m_20261108T0000Z_20261109T0000Z/btc_coinbase_spot_5m.source.json",
+      "resolution": "5",
+      "session": "24x7",
+      "source_type": "real",
+      "symbol": "BTC_COINBASE_SPOT",
+      "tickSize": 0.01,
+      "timezone": "UTC",
+      "type": "crypto"
+    },
+    {
+      "chart_tick_is_display_only": true,
+      "evidence_status": "unverified",
+      "exchange": "Coinbase Advanced Trade",
+      "file": "coinbase_spot_5m_20261108T0000Z_20261109T0000Z/eth_coinbase_spot_5m.csv",
+      "name": "Ether / USD (Coinbase spot)",
+      "pricePrecision": 2,
+      "provenance_file": "coinbase_spot_5m_20261108T0000Z_20261109T0000Z/eth_coinbase_spot_5m.source.json",
+      "resolution": "5",
+      "session": "24x7",
+      "source_type": "real",
+      "symbol": "ETH_COINBASE_SPOT",
+      "tickSize": 0.01,
+      "timezone": "UTC",
+      "type": "crypto"
+    }
+  ],
+  "experiments": [],
+  "research": [
+    {
+      "description": "Cost-aware BTC/ETH intraday research. Historical Coinbase BTC-USD and ETH-USD spot candles are a chart/data integrity pilot only. Existing Binance BTCUSDT and ETHUSDT features and results remain distinct; no cross-venue return claim.",
+      "id": "BTC-ETH-INTRADAY",
+      "market": "BTC/ETH",
+      "next_gate": "Audit source bytes and 5-minute candles, connect existing feature files with explicit event and availability timestamps, evaluate frozen candidate signals against independent out-of-sample data and executable costs.",
+      "status": "NO_CONFIRMED_ALPHA",
+      "validated_executable_alpha": false
+    }
+  ],
+  "scope": "BTC_ETH_SPOT_5M_RESEARCH_ONLY"
+}

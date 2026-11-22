@@ -1,0 +1,173 @@
+name: Q7 Q8 reviewed source and reproducible frontend build
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths:
+      - '.github/workflows/q7_reviewed_source_build.yml'
+      - '.github/release-evidence/q7_q8_source_git_blobs.json'
+      - 'btc_eth_terminal/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-build-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout full source lineage
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Independently verify every Git blob of the Q7 Q8 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, subprocess, pathlib, re
+          m=json.loads(pathlib.Path('.github/release-evidence/q7_q8_source_git_blobs.json').read_text())
+          if m.get('schema') != 'q7_q8_expected_reviewable_source_v1':
+              raise SystemExit('WRONG_SOURCE_MANIFEST_SCHEMA')
+          files=m.get('paths')
+          if not isinstance(files,dict) or m.get('count') != 278 or len(files) != 278:
+              raise SystemExit('INCOMPLETE_Q7_REVIEWABLE_SOURCE')
+          for name,sha in sorted(files.items()):
+              p=pathlib.PurePosixPath(name)
+              if p.is_absolute() or '..' in p.parts or p.parts[:1] != ('btc_eth_terminal',):
+                  raise SystemExit('SOURCE_PATH_OUT_OF_SCOPE')
+              if any(x in ('.env','data','node_modules','__pycache__') or x.startswith('dist') for x in p.parts):
+                  raise SystemExit('PRIVATE_OR_BUILD_CONTENT_NOT_ALLOWED:'+name)
+              if p.suffix in ('.jsonl','.gz','.zip','.pem','.key','.sqlite','.db'):
+                  raise SystemExit('PRIVATE_FILE_EXTENSION:'+name)
+              if not re.fullmatch('[a-f0-9]{40}',sha) or pathlib.Path(name).is_symlink():
+                  raise SystemExit('BAD_SOURCE_BLOB_OR_SYMLINK:'+name)
+              actual=subprocess.check_output(['git','hash-object',name],text=True).strip()
+              if actual != sha: raise SystemExit('SOURCE_BLOB_MISMATCH:'+name)
+          if files.get('btc_eth_terminal/backend/v37_factor_lab.py') != '13e14f89e6668f88ee03726f4ef2875df6bdf9af':
+              raise SystemExit('Q8_NONNEGATIVE_COST_HOTFIX_MISSING')
+          print('VERIFIED_Q7_Q8_SOURCE_BLOBS:278/278')
+          PY
+      - name: Prohibit raw market files in PR Git diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only 64aa85081cab73c917333249eb8e200c8d4044fa..HEAD > /tmp/reviewed_paths
+          if grep -E '(^|/)(node_modules|__pycache__|backend/data|dist_v[0-9.]+|\.env)(/|$)|\.(jsonl|gz|zip|pem|key|sqlite|db)$' /tmp/reviewed_paths; then
+            echo 'FAIL_Q7_PRIVATE_SOURCE_OR_PREBUILT_CHANGE'
+            exit 2
+          fi
+          echo 'VERIFIED_NO_NEW_PRIVATE_ARCHIVE_OR_COMPILED_DIST'
+      - name: Compile Python source (syntax only; no raw data access)
+        run: python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+      - name: Verify synthetic source gaps, recovery, archive safety and SSE reservations
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          : > "$RUNNER_TEMP/q7_source_synthetic_tests.log"
+          for spec in \
+            test_v36_3_operator_monitor.py \
+            test_v36_3_durable_archive_gate.py \
+            test_v36_2_sse_backpressure.py \
+            test_v36_2_storage_faults.py \
+            test_v36_3_live_health_reservation.py \
+            test_v36_2_transport_gap.py; do
+            python -m unittest discover -s btc_eth_terminal/tests -p "$spec" -v 2>&1 | tee -a "$RUNNER_TEMP/q7_source_synthetic_tests.log"
+          done
+          python - <<'PY'
+          import os,re,pathlib
+          s=(pathlib.Path(os.environ['RUNNER_TEMP'])/'q7_source_synthetic_tests.log').read_text()
+          counts=[int(x) for x in re.findall(r'Ran (\d+) tests? in',s)]
+          if len(counts)!=6 or sum(counts)!=20 or re.search(r'(?m)^FAILED|\bskipped=\d+',s):
+              raise SystemExit('INCOMPLETE_OR_FAILED_SYNTHETIC_COVERAGE:'+repr(counts))
+          print('PASS_20_SYNTHETIC_OPERATOR_ARCHIVE_SSE_GAP_TESTS')
+          PY
+      - name: Restore exact npm lockfile
+        working-directory: btc_eth_terminal/frontend
+        run: |
+          test "$(git hash-object package-lock.json)" = 'f7e3d5cdc727a3c7f91f7b254cab90dafd7817b5'
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: TypeScript and pinned Vite build, never replace historical assets
+        working-directory: btc_eth_terminal/frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/tsc --noEmit
+          ./node_modules/.bin/vite build --outDir .dist_v37_candidate
+          python - <<'PY'
+          import json,hashlib,pathlib
+          m=json.loads(pathlib.Path('v37_dist_integrity.json').read_text())
+          if m.get('trading_enabled') is not False:
+              raise SystemExit('REAL_ORDERING_MUST_REMAIN_DISABLED')
+          root=pathlib.Path('.dist_v37_candidate')
+          actual={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
+          if actual != set(m['files']): raise SystemExit('BUILD_FILE_SET_MISMATCH')
+          for name,info in m['files'].items():
+              p=root/name
+              if p.is_symlink(): raise SystemExit('BUILD_SYMLINK')
+              raw=p.read_bytes()
+              if len(raw)!=info['bytes'] or hashlib.sha256(raw).hexdigest()!=info['sha256']:
+                  raise SystemExit('Q7_FRONTEND_PIN_MISMATCH:'+name)
+          print('PASS_Q7_VERSIONED_BROWSER_BUNDLE_3_OF_3_PINNED')
+          PY
+      - name: Restore vetted v35.1 immutable browser fixture
+        uses: actions/download-artifact@v4
+        with:
+          name: v35-1-unpinned-candidate-dist
+          run-id: 43993998279
+          github-token: ${{ github.token }}
+          path: btc_eth_terminal/frontend/dist_v35_1
+      - name: Verify v35.1 historical browser hashes
+        working-directory: btc_eth_terminal/frontend
+        run: |
+          python - <<'PY'
+          import json,hashlib,pathlib
+          m=json.loads(pathlib.Path('v35_1_dist_integrity.json').read_text())
+          root=pathlib.Path('dist_v35_1')
+          actual={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
+          if actual != set(m['files']): raise SystemExit('HISTORICAL_FRONTEND_SET_MISMATCH')
+          for name,info in m['files'].items():
+              raw=(root/name).read_bytes()
+              if len(raw)!=info['bytes'] or hashlib.sha256(raw).hexdigest()!=info['sha256']:
+                  raise SystemExit('HISTORICAL_FRONTEND_SHA_MISMATCH')
+          print('PASS_PINNED_V35_1_BROWSER_ASSETS')
+          PY
+      - name: Run fixture-free Node contracts and explicitly audit three skipped archive-only tests
+        working-directory: btc_eth_terminal/frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types --test tests/*.test.mjs | tee /tmp/q7_contracts.tap
+          python - <<'PY'
+          import re,pathlib
+          text=pathlib.Path('/tmp/q7_contracts.tap').read_text()
+          def metric(label):
+              m=re.search(r'(?m)^# '+re.escape(label)+r' (\d+)$',text)
+              return int(m.group(1)) if m else None
+          if (metric('tests'),metric('pass'),metric('fail'),metric('skipped'))!=(31,28,0,3):
+              raise SystemExit('UNEXPECTED_NODE_CONTRACT_COUNTS_OR_SKIPS')
+          skipped=re.findall(r'(?m)^ok \d+ - (.*?) # SKIP ',text)
+          expected=[
+              'real pinned v34.1 L2 projection validates without floating-point rounding',
+              'verified real Coinbase BTC/ETH archive rows preserve exact Decimal28 derived values',
+              'captured real BTC/ETH source rows satisfy quote and tape integrity'
+          ]
+          if sorted(skipped)!=sorted(expected):
+              raise SystemExit('UNREVIEWED_NODE_SKIP')
+          print('PASS_28_FIXTURE_FREE_CONTRACTS_THREE_EXPLICIT_ARCHIVE_INPUT_BLOCKERS')
+          PY
+      - name: Preserve reviewed Q7 compiled candidate only
+        uses: actions/upload-artifact@v4
+        with:
+          name: q7-q8-reviewed-frontend-candidate-not-release
+          path: btc_eth_terminal/frontend/.dist_v37_candidate/
+          retention-days: 7
+          if-no-files-found: error
+          include-hidden-files: true

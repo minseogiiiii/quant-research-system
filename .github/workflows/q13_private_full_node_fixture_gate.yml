@@ -1,0 +1,74 @@
+name: Q13 private full historical Node fixture replay (MANUAL, NO RAW ARTIFACTS)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  private-node-archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact staging source without persisting credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Pin supported historical Node runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run fixture gate unit tests first
+        run: python -m unittest discover -s .github/scripts -p 'test_q13_private_fixture_gate.py' -v
+
+      - name: Verify frozen staging read-only cost patch and browser source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object btc_eth_terminal/backend/v37_factor_lab.py)" = "13e14f89e6668f88ee03726f4ef2875df6bdf9af"
+          test "$(git hash-object btc_eth_terminal/frontend/src/unified.tsx)" = "8465ff6f97d0ddae4a63c1f88db2f0bc17481b63"
+          test "$(git hash-object btc_eth_terminal/tests/test_v37_factor_lab.py)" = "244a682591835f81a4fdb22e4487c7b97c77c916"
+          echo 'PASS_Q13_REVIEWED_Q8_READONLY_SOURCE_PINS'
+
+      - name: Fetch authenticated private frozen Q7 release only to ephemeral runner
+        env:
+          Q13_PRIVATE_RELEASE_URL: ${{ secrets.Q13_PRIVATE_RELEASE_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          if [[ -z "${Q13_PRIVATE_RELEASE_URL}" ]]; then
+            echo 'BLOCKED_Q13_PRIVATE_RELEASE_URL_NOT_CONFIGURED'
+            exit 2
+          fi
+          mkdir -p "$RUNNER_TEMP/q13_private"
+          curl --fail --silent --show-error --location \
+            --max-time 300 --retry 2 --connect-timeout 15 \
+            --output "$RUNNER_TEMP/q13_private/frozen_q7_release.zip" \
+            "$Q13_PRIVATE_RELEASE_URL"
+          test -s "$RUNNER_TEMP/q13_private/frozen_q7_release.zip"
+
+      - name: SHA-check private immutable release and prove 31 real Node cases with zero skip
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/q13_private_fixture_gate.py \
+            --release-zip "$RUNNER_TEMP/q13_private/frozen_q7_release.zip" \
+            --checkout-root "$GITHUB_WORKSPACE"
+
+      - name: Destroy private archive even when a check fails
+        if: always()
+        shell: bash
+        run: |
+          rm -rf -- "$RUNNER_TEMP/q13_private"
+
+# No artifact upload steps. No public fixture retention.
+# A green Q13 job is historical Node coverage, NOT release acceptance.

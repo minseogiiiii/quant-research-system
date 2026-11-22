@@ -94,6 +94,19 @@ class DurableForensicSafety(unittest.TestCase):
         q.unlink();q.symlink_to(self.root/'manifest.json')
         with self.assertRaises(DurableRejected):audit(self.root,self.pin)
 
+    def test_hardlinked_chunk_is_rejected(self):
+        original=self.root/'chunks/chunk_00010_conn_000.jsonl'
+        external=Path(self.tmp.name)/'external-source-hardlink'
+        os.link(original,external)
+        with self.assertRaisesRegex(DurableRejected,'UNSAFE_LINKED'):
+            audit(self.root,self.pin)
+
+    def test_hardlinked_manifest_is_rejected(self):
+        external=Path(self.tmp.name)/'external-manifest-hardlink'
+        os.link(self.root/'manifest.json',external)
+        with self.assertRaisesRegex(DurableRejected,'UNSAFE_LINKED'):
+            audit(self.root,self.pin)
+
     def test_partial_and_manifest_temp_can_never_promote(self):
         (self.root/'chunks/chunk_00520_conn_000.jsonl.partial').write_bytes(b'partial')
         (self.root/'manifest.json.tmp').write_bytes(b'uncommitted')

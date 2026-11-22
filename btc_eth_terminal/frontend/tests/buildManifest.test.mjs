@@ -32,7 +32,7 @@ test('CI-built frontend files must exactly match read-only v35 candidate manifes
  assert.ok(names.includes('index.html'));
  assert.equal(names.filter(x=>assetName.test(x)&&x.endsWith('.js')).length,1);
  assert.equal(names.filter(x=>assetName.test(x)&&x.endsWith('.css')).length,1);
- assert.deepEqual(await allFiles(join(root,'dist')),names);
+ assert.deepEqual(await allFiles(join(root,'dist_v35_1')),names);
  for(const name of names){
   assert.equal(name.startsWith('/')||name.includes('..'),false);
   const descriptor=manifest.files[name];
@@ -40,13 +40,13 @@ test('CI-built frontend files must exactly match read-only v35 candidate manifes
   assert.deepEqual(Object.keys(descriptor).sort(),['bytes','sha256']);
   assert.match(descriptor.sha256,hex64);
   assert.ok(Number.isSafeInteger(descriptor.bytes)&&descriptor.bytes>0);
-  const file=join(root,'dist',name);
+  const file=join(root,'dist_v35_1',name);
   assert.ok((await lstat(file)).isFile());
   const bytes=await readFile(file);
   assert.equal(bytes.length,descriptor.bytes,name);
   assert.equal(createHash('sha256').update(bytes).digest('hex'),descriptor.sha256,name);
  }
- const html=await readFile(join(root,'dist','index.html'),'utf8');
+ const html=await readFile(join(root,'dist_v35_1','index.html'),'utf8');
  const refs=[...html.matchAll(/\/assets\/index-[A-Za-z0-9_-]+\.(?:js|css)/g)].map(x=>x[0].slice(1)).sort();
  assert.deepEqual(refs,names.filter(x=>x!=='index.html'));
 });

@@ -1,0 +1,160 @@
+name: Q7 genuine Coinbase React DOM and Funnest datafeed gate
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths: [.github/workflows/q7_real_react_dom_qualification.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-react-dom:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check pinned immutable Q7 source
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,pathlib,subprocess
+          m=json.loads(pathlib.Path('.github/release-evidence/q7_q8_source_git_blobs.json').read_bytes())
+          for name in ('btc_eth_terminal/frontend/src/main.tsx','btc_eth_terminal/frontend/src/LiveTerminal.tsx',
+                       'btc_eth_terminal/frontend/src/marketStateIntegrity.ts',
+                       'btc_eth_terminal/frontend/src/v36_1_completed_candle_feed.ts',
+                       'btc_eth_terminal/frontend/v37_dist_integrity.json',
+                       'btc_eth_terminal/scripts/v36_1_live_browser_e2e.py',
+                       'btc_eth_terminal/scripts/v36_observe_existing_collector.py',
+                       'btc_eth_terminal/backend/v36_live_gateway.py'):
+              if subprocess.check_output(['git','hash-object',name],text=True).strip()!=m['paths'][name]:
+                  raise SystemExit('Q7_SOURCE_MISMATCH:'+name)
+          print('PASS_Q7_SOURCE_PINS')
+          PY
+      - name: Compile exactly Q7 pinned JS, preview it with genuine same-origin API proxy
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-cache-dir playwright==1.55.0
+          command -v google-chrome
+          cd btc_eth_terminal/frontend
+          npm ci --ignore-scripts --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit
+          ./node_modules/.bin/vite build --outDir .dist_q7_live_dom_candidate
+          python - <<'PY'
+          import hashlib,json,pathlib
+          root=pathlib.Path('.dist_q7_live_dom_candidate')
+          m=json.loads(pathlib.Path('v37_dist_integrity.json').read_bytes())
+          assert m['trading_enabled'] is False
+          assert sorted(p.as_posix() for p in (x.relative_to(root) for x in root.rglob('*') if x.is_file()))==sorted(m['files'])
+          for n,entry in m['files'].items():
+              b=(root/n).read_bytes()
+              assert len(b)==entry['bytes'] and hashlib.sha256(b).hexdigest()==entry['sha256'],n
+          print('PASS_Q7_PINNED_BUILT_JS_CSS_HTML')
+          PY
+          cat > vite.q7dom.config.ts <<'TS'
+          import { defineConfig } from 'vite';
+          import react from '@vitejs/plugin-react';
+          export default defineConfig({plugins:[react()],preview:{host:'127.0.0.1',port:5173,strictPort:true,proxy:{'/api':'http://127.0.0.1:8765'}}});
+          TS
+      - name: Live Coinbase to Q7 compiled React DOM, 10-level book and Funnest real getBars
+        shell: bash
+        timeout-minutes: 7
+        run: |
+          set +e
+          PRIVATE="$RUNNER_TEMP/q7_dom_private_$GITHUB_RUN_ID"
+          PUBLIC="$RUNNER_TEMP/q7_dom_public"
+          mkdir -p "$PUBLIC"
+          export PUBLIC
+          (cd btc_eth_terminal/frontend && ./node_modules/.bin/vite preview --config vite.q7dom.config.ts --outDir .dist_q7_live_dom_candidate --host 127.0.0.1 --port 5173 --strictPort) > "$PUBLIC/preview.log" 2>&1 &
+          VITE_PID=$!
+          python -u btc_eth_terminal/scripts/v36_observe_existing_collector.py \
+            --execute-public-capture --duration 255 --port 8765 --workdir "$PRIVATE" \
+            --raw-budget-bytes 1000000000 --archive-budget-bytes 2000000000 \
+            --disk-reserve-bytes 4294967296 > "$PUBLIC/observer.jsonl" 2> "$PUBLIC/observer_stderr.log" &
+          OBSERVER_PID=$!
+          python - <<'PY' > "$PUBLIC/startup.log" 2>&1
+          from urllib.request import urlopen
+          import time,json
+          deadline=time.monotonic()+55
+          while time.monotonic()<deadline:
+              try:
+                  with urlopen('http://127.0.0.1:5173/api/v36/health',timeout=2) as r:h=json.load(r)
+                  with urlopen('http://127.0.0.1:5173/research/v36',timeout=2) as r:html=r.read()
+                  if (h.get('mode')=='LIVE_SOURCE' and h.get('status')=='HEALTHY'
+                      and h.get('trading_enabled') is False and h.get('live_feed') is True
+                      and set(h.get('snapshots',[]))=={'BTC-USD','ETH-USD'}
+                      and b'/assets/index-' in html):
+                      print('PASS_REAL_PREVIEW_AND_SOURCE_ADMISSION');break
+              except (OSError,ValueError,TimeoutError):pass
+              time.sleep(.5)
+          else:raise SystemExit('BLOCKED_PREVIEW_OR_COINBASE_SOURCE')
+          PY
+          READY_RC=$?
+          BROWSER_RC=2
+          if [ "$READY_RC" -eq 0 ]; then
+            python -u btc_eth_terminal/scripts/v36_1_live_browser_e2e.py \
+              --port 5173 --browser-executable "$(command -v google-chrome)" \
+              --seconds 170 --min-versions-per-product 8 --min-bars-per-product 1 \
+              --report "$PRIVATE/browser_private.json" > "$PUBLIC/browser.log" 2>&1
+            BROWSER_RC=$?
+            if [ -f "$PRIVATE/browser_private.json" ]; then
+              python - "$PRIVATE/browser_private.json" "$PUBLIC/browser_summary.json" <<'PY'
+          import json,sys,pathlib
+          d=json.loads(pathlib.Path(sys.argv[1]).read_bytes())
+          out={k:v for k,v in d.items() if k not in ('source_sessions','products')}
+          out['products']={p:{k:v for k,v in s.items() if k!='versions'} for p,s in d.get('products',{}).items()}
+          out['bundle']='EXACT_Q7_PINNED_V37_PRODUCTION_CANDIDATE_EPHEMERAL_PREVIEW'
+          out['frozen_shipped_v36_bundle']='NOT_TESTED'
+          pathlib.Path(sys.argv[2]).write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          PY
+            fi
+          fi
+          wait "$OBSERVER_PID"
+          CAPTURE_RC=$?
+          kill "$VITE_PID" 2>/dev/null || :
+          wait "$VITE_PID" 2>/dev/null || :
+          REPLAY_RC=2
+          GATE_RC=2
+          if [ -f "$PRIVATE/V36_OBSERVER_EVIDENCE.json" ]; then
+            python -u btc_eth_terminal/scripts/v36_verify_live_capture.py \
+              --evidence "$PRIVATE/V36_OBSERVER_EVIDENCE.json" > "$PUBLIC/replay.log" 2>&1
+            REPLAY_RC=$?
+            python - "$PRIVATE/V36_OBSERVER_EVIDENCE.json" > "$PUBLIC/archive_gate.log" 2>&1 <<'PY'
+          import json,sys,subprocess,pathlib
+          e=json.loads(pathlib.Path(sys.argv[1]).read_bytes())
+          if e.get('observer_source_complete') is not True:raise SystemExit('SOURCE_GAP_NOT_ACCEPTABLE')
+          raise SystemExit(subprocess.call([sys.executable,'btc_eth_terminal/scripts/v36_3_durable_archive_gate.py',
+              '--capture',e['captured_dir'],'--manifest-sha256',e['captured_manifest_sha256']]))
+          PY
+            GATE_RC=$?
+          fi
+          export READY_RC BROWSER_RC CAPTURE_RC REPLAY_RC GATE_RC
+          python - <<'PY'
+          import json,os,pathlib
+          data={'mode':'REAL_PUBLIC_COINBASE','release':'Q7_Q8_STAGING_READ_ONLY',
+                'browser_bundle':'Q7_V37_PINNED_COMPILED_ARTIFACT_IN_TEST_PREVIEW',
+                'shipped_frozen_v36_bundle_certified':False,'canvas_pixel_equality':'NOT_VERIFIED',
+                'orders_enabled':False,'long_term_durable_linux_verified':False,
+                **{k.lower():int(os.environ[k]) for k in ('READY_RC','BROWSER_RC','CAPTURE_RC','REPLAY_RC','GATE_RC')}}
+          pathlib.Path(os.environ['PUBLIC'],'result.json').write_text(json.dumps(data,indent=2,sort_keys=True)+'\n')
+          PY
+          echo "REAL_Q7_REACT_DOM ready=$READY_RC browser=$BROWSER_RC collector=$CAPTURE_RC replay=$REPLAY_RC archive=$GATE_RC"
+          if [ "$READY_RC" -ne 0 ] || [ "$BROWSER_RC" -ne 0 ] || [ "$CAPTURE_RC" -ne 0 ] || \
+             [ "$REPLAY_RC" -ne 0 ] || [ "$GATE_RC" -ne 0 ]; then
+            exit 2
+          fi
+          echo PASS_Q7_REACT_DOM_10_LEVELS_AND_REAL_FUNNEST_GETBARS
+      - name: Upload reports only, never raw Coinbase records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q7-q8-real-react-dom-qualification
+          path: ${{ runner.temp }}/q7_dom_public/
+          retention-days: 7
+          if-no-files-found: warn

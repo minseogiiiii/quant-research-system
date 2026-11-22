@@ -192,4 +192,4 @@ function App() {
     <footer>BTC and ETH only. Coinbase BTC-USD / ETH-USD spot are NOT Binance BTCUSDT / ETHUSDT. Market charting does not prove a strategy is profitable. No live orders, account credentials or future labels are connected.</footer>
   </main>;
 }
-createRoot(document.getElementById('root')!).render(<React.StrictMode>{window.location.pathname==='/research/v36' ? <LiveTerminal/> : <App/>}</React.StrictMode>);
+createRoot(document.getElementById('root')!).render(<React.StrictMode>{(window.location.pathname==='/research/v36') ? <LiveTerminal/> : <App/>}</React.StrictMode>);

@@ -56,13 +56,18 @@ class VerifiedProfessionalBuild(unittest.TestCase):
             self.assertEqual(b['book']['microprice'],f['microprice'])
             self.assertFalse(b['live_feed']);self.assertFalse(b['trading_enabled'])
     def test_tsx_renders_provenance_bound_components(self):
-        src=(ROOT/'frontend/src/unified.tsx').read_text()
+        # Legacy v33 textual UI claims must be checked against the actually served,
+        # SHA-pinned v33 bundle, not the evolving v36 TypeScript worktree.
+        served,_=pin.verify_build()
+        js=next(data.decode('utf-8') for name,data in served.items() if name.endswith('.js'))
         for phrase in ('HISTORICAL MARKET REPLAY','No completed 5-minute receiver-time candles',
                        'Order book · L1','OFI · five-minute rolling','Microprice deviation',
                        'Liquidity recovery','Recorded trade tape','Data quality & admission',
                        'Research results','Evidence fingerprint','NO CONFIRMED EXECUTABLE ALPHA',
                        'NO ADDITIONAL L2 LEVELS IN PROJECTION'):
-            self.assertIn(phrase,src)
+            self.assertIn(phrase,js)
+        # Retain independent causal availability checks on the current source.
+        src=(ROOT/'frontend/src/unified.tsx').read_text()
         self.assertIn('const asof=cutoff;',src)
         self.assertIn('loadedProduct===product?features:[]',src)
         self.assertIn('c.available_at<=asof',src)

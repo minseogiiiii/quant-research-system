@@ -30,6 +30,24 @@ class LiveHandler(UnifiedHandler):
             self._reply(414,{'error':'REQUEST_TARGET_TOO_LONG','trading_enabled':False})
             return
         parsed=urlsplit(self.path)
+        # Q7 uses the same React/Funnest app but a separate, reviewed SHA-pinned
+        # distribution. All historical and v36 asset paths remain untouched.
+        from v37_frontend_integrity import V37_JS, V37_CSS
+        if parsed.path in ('/research/v37','/research/v37/index.html',V37_JS,V37_CSS):
+            try:
+                if parsed.query:raise ValueError('NO_ASSET_QUERY_PARAMETERS')
+                from v37_frontend_integrity import v37_asset
+                body,content_type=v37_asset(parsed.path)
+                self.send_response(200)
+                for key,val in [('Content-Type',content_type+'; charset=utf-8'),
+                     ('Content-Length',str(len(body))),('Cache-Control','no-store'),
+                     ('X-Content-Type-Options','nosniff'),('X-Frame-Options','DENY'),
+                     ('Content-Security-Policy',"default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'")]:
+                    self.send_header(key,val)
+                self.end_headers();self.wfile.write(body)
+            except (ValueError,OSError,KeyError,TypeError):
+                self.send_obj(503,{'error':'V37_FRONTEND_INTEGRITY_FAILURE','live_feed':False})
+            return
         from v36_frontend_integrity import LIVE_JS, LIVE_CSS
         if parsed.path in ('/research/v36','/research/v36/index.html',LIVE_JS,LIVE_CSS):
             try:

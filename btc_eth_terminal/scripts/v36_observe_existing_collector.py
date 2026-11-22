@@ -28,6 +28,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'backend'))
 from v36_live_engine import LiveMarketEngine, MAX_LINE
 from v36_live_gateway import server_for_live
+from v36_operator_monitor import server_for_operator
 from v35_replay_service import StateRejected
 
 COLLECTOR=ROOT/'scripts/btc_eth_multiday_v20.mjs'
@@ -142,6 +143,26 @@ def durable_policy_valid(duration: int, raw: int, archive: int, reserve: int) ->
             and type(reserve) is int and reserve>=DURABLE_MIN_DISK_RESERVE_BYTES)
 
 
+def durable_disk_capacity_sufficient(capture_parent: Path, archive: int, reserve: int) -> bool:
+    """Fail closed before creating a 24h capture on an undersized filesystem.
+
+    This is a conservative *preflight*, not proof that disk space remains
+    free during the run. The Node collector still enforces each write's
+    reserve and archive bounds. The operator must provision extra margin.
+    """
+    if (type(archive) is not int or type(reserve) is not int or
+            archive < DURABLE_MIN_ARCHIVE_BYTES or reserve < DURABLE_MIN_DISK_RESERVE_BYTES):
+        return False
+    parent=Path(capture_parent)
+    if not parent.is_dir() or parent.is_symlink():
+        return False
+    try:
+        free=shutil.disk_usage(parent).free
+    except OSError:
+        return False
+    return free >= archive + reserve
+
+
 def main(argv=None)->int:
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--workdir',required=True,type=Path)
@@ -175,6 +196,9 @@ def main(argv=None)->int:
         args.disk_reserve_bytes<4*1024**3):
         ap.error('Storage budgets must preserve raw<=archive and >=4GiB disk reserve')
     work=args.workdir
+    if args.durable_operator_mode and not durable_disk_capacity_sufficient(
+            work.parent, args.archive_budget_bytes, args.disk_reserve_bytes):
+        ap.error('INSUFFICIENT_DURABLE_DISK_CAPACITY: 55GB archive budget plus 10GiB reserve must be free before startup')
     if work.exists() or work.is_symlink():
         ap.error('Workdir MUST NOT exist (no preexisting raw evidence can be reused)')
     if not shutil.which('node'):
@@ -193,6 +217,12 @@ def main(argv=None)->int:
     server=server_for_live(engine,port=args.port)
     gateway_thread=Thread(target=server.serve_forever,daemon=True)
     gateway_thread.start()
+    # Operator health/metrics must remain reachable even when eight SSE
+    # subscriptions plus two slow HTTP headers occupy every browser slot.
+    operator_path=work/'v36_monitor.sock'
+    operator_server=server_for_operator(engine,server,operator_path)
+    operator_thread=Thread(target=operator_server.serve_forever,daemon=True)
+    operator_thread.start()
     env={'PATH':os.environ.get('PATH','/usr/bin:/bin'),
          'SOAK_DURATION_SECONDS':str(args.duration),
          'SOAK_RAW_BUDGET_BYTES':str(args.raw_budget_bytes),
@@ -279,6 +309,9 @@ def main(argv=None)->int:
             proc.terminate()
             try:proc.wait(timeout=3)
             except subprocess.TimeoutExpired:proc.kill();proc.wait()
+        operator_server.shutdown();operator_server.server_close();operator_thread.join(timeout=3)
+        try:operator_path.unlink()
+        except FileNotFoundError:pass
         server.shutdown();server.server_close();gateway_thread.join(timeout=3)
         listener.close()
         try:tap_path.unlink()

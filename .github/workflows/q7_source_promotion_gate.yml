@@ -1,0 +1,102 @@
+name: Q7 promotion gate - exact source and versioned browser build
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths: [.github/workflows/q7_source_promotion_gate.yml, 'btc_eth_terminal/**']
+  pull_request:
+    branches: [integration/btc-eth-unified-terminal]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  q7-source-and-funnest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require exact Q7 reviewable source, not the R5-only branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object btc_eth_terminal/backend/v37_factor_lab.py)" = "13e14f89e6668f88ee03726f4ef2875df6bdf9af"
+          test "$(git hash-object btc_eth_terminal/backend/v37_frontend_integrity.py)" = "b7cb343a4f921b9a2db110feff2090aa67294f3b"
+          test "$(git hash-object btc_eth_terminal/backend/v36_live_gateway.py)" = "8c7496dc9bcde5ce5d8f84f96ea3fc404bdf5ab9"
+          test "$(git hash-object btc_eth_terminal/backend/bridge.py)" = "75aefb57564c1dfaeadac11b1d929e7bfbbfffcc"
+          test "$(git hash-object btc_eth_terminal/frontend/src/FactorLabPanel.tsx)" = "4e2c9347dd90f2e9748eec52602ee250d228a261"
+          test "$(git hash-object btc_eth_terminal/frontend/src/main.tsx)" = "b060ebd0e1340eaceec2ea667c6fbadeed1e0b19"
+          test "$(git hash-object btc_eth_terminal/frontend/src/unified.tsx)" = "8465ff6f97d0ddae4a63c1f88db2f0bc17481b63"
+          test "$(git hash-object btc_eth_terminal/frontend/src/style.css)" = "283a48be4a188fad484bac9d3ca9cebc61c289f5"
+          test "$(git hash-object btc_eth_terminal/frontend/v37_dist_integrity.json)" = "e4b28a72ef15f772271236f7e047af4757fcc303"
+          test "$(git hash-object btc_eth_terminal/frontend/package-lock.json)" = "f7e3d5cdc727a3c7f91f7b254cab90dafd7817b5"
+      - name: Prevent raw source data, historical binaries or private credential files in changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only 64aa85081cab73c917333249eb8e200c8d4044fa..HEAD > /tmp/q7_paths.txt
+          if grep -E '(^|/)(node_modules|__pycache__|data|dist|dist_v[0-9.]+|.env)(/|$)|\\.(jsonl|gz|key|pem|sqlite|db|zip)$' /tmp/q7_paths.txt; then
+            echo 'BLOCKED_PRIVATE_SOURCE_OR_PREBUILT_ASSET_IN_PUBLIC_GIT'
+            exit 2
+          fi
+      - name: Install pinned React and Funnest dependencies
+        working-directory: btc_eth_terminal/frontend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Rebuild Q7 browser only into isolated candidate directory
+        working-directory: btc_eth_terminal/frontend
+        shell: bash
+        run: |
+          ./node_modules/.bin/tsc --noEmit
+          ./node_modules/.bin/vite build --outDir .dist_v37_candidate
+          python - <<'PY'
+          import hashlib,json,pathlib
+          root=pathlib.Path('.dist_v37_candidate')
+          manifest=json.loads(pathlib.Path('v37_dist_integrity.json').read_bytes())
+          for name,info in manifest['files'].items():
+              data=(root/name).read_bytes()
+              assert len(data)==info['bytes'],name
+              assert hashlib.sha256(data).hexdigest()==info['sha256'],name
+          assert manifest['trading_enabled'] is False
+          print('PASS_Q7_VERSIONED_FRONTEND_HASH_PINS')
+          PY
+      - name: Restore reviewed immutable v35.1 frontend from its pinned historical run
+        uses: actions/download-artifact@v4
+        with:
+          name: v35-1-unpinned-candidate-dist
+          run-id: 43993998279
+          github-token: ${{ github.token }}
+          path: btc_eth_terminal/frontend/dist_v35_1
+      - name: Validate restored v35.1 files before invoking historical Node tests
+        working-directory: btc_eth_terminal/frontend
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json
+          folder=Path('dist_v35_1')
+          m=json.loads(Path('v35_1_dist_integrity.json').read_bytes())
+          actual={p.relative_to(folder).as_posix() for p in folder.rglob('*') if p.is_file()}
+          expected=set(m['files'])
+          if actual != expected: raise SystemExit('HISTORICAL_BUILD_FILE_SET_MISMATCH')
+          for name, info in m['files'].items():
+              p=folder/name
+              if p.is_symlink(): raise SystemExit('HISTORICAL_BUILD_SYMLINK')
+              data=p.read_bytes()
+              if len(data)!=info['bytes'] or hashlib.sha256(data).hexdigest()!=info['sha256']:
+                  raise SystemExit('HISTORICAL_BUILD_SHA256_MISMATCH:'+name)
+          print('PASS_HISTORICAL_V35_1_FROZEN_ASSETS_3_OF_3')
+          PY
+      - name: Run Node contracts with explicit fixture coverage
+        working-directory: btc_eth_terminal/frontend
+        shell: bash
+        run: |
+          set -o pipefail
+          node --experimental-strip-types --test tests/*.test.mjs | tee /tmp/q7_node_contract.log
+          grep -q '# fail 0' /tmp/q7_node_contract.log
+          grep -q '# skipped 0' /tmp/q7_node_contract.log

@@ -70,3 +70,12 @@ test('malformed, duplicate, non-finite, zero, negative or excessive bars are ref
  assert.equal(validateCompletedCandles([candle(0),candle(0)],start+70000),false);
  assert.equal(validateCompletedCandles(Array(121).fill(candle(0)),start+70000),false);
 });
+
+// v36.3 R5-Q3: A zero countBack must not leak all existing bars via slice(-0).
+test('zero countBack returns no bars, never unbounded history',async()=>{
+ const f=createCompletedCandleFeed('BTC-USD');
+ f.publish([candle(0),candle(1)],start+120500);
+ const res=await f.datafeed.getBars(symbol,'1',{from:0,to:start+180000,countBack:0});
+ assert.deepEqual(res.bars,[]);
+ f.dispose();
+});
