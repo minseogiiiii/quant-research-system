@@ -60,7 +60,7 @@ def run():
     if changed_data:
         raise ValueError("Original market evidence changed: " + repr(changed_data[:3]))
     removed = {p: sha(parent[p]) for p in parent if p not in current}
-    changed = {
+    _ = {
         p: sha(raw) for p, raw in current.items() if p not in parent or parent[p] != raw
     }
     manifest = {
