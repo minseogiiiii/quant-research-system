@@ -309,7 +309,7 @@ def audit(directory: Path) -> dict:
     hb_last_counter = {}
     hb_max_gap_seconds = {}
     updates_per_conn = {i: Counter() for i in conn_by_id}
-    for i, chunk in enumerate(chunks):
+    for _, chunk in enumerate(chunks):
         file = root / chunk["file"]
         _file(file, root, MAX_CHUNK)
         c_id = chunk.get("connection_id")
