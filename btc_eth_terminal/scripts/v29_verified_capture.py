@@ -17,6 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "scripts"))
+
+
 def _q14_load_after_path_setup_0():
     from v25_capture_admission import load_json
     from v25_capture_operator import exclusive_write
@@ -24,9 +26,27 @@ def _q14_load_after_path_setup_0():
     from v26_capture_operator import run as operator_run
     from v29_capture_verdict import evaluate, sha
     from v29_ready_window import verify_ready_window
-    return load_json, exclusive_write, crosscheck, operator_run, evaluate, sha, verify_ready_window
 
-load_json, exclusive_write, crosscheck, operator_run, evaluate, sha, verify_ready_window = _q14_load_after_path_setup_0()
+    return (
+        load_json,
+        exclusive_write,
+        crosscheck,
+        operator_run,
+        evaluate,
+        sha,
+        verify_ready_window,
+    )
+
+
+(
+    load_json,
+    exclusive_write,
+    crosscheck,
+    operator_run,
+    evaluate,
+    sha,
+    verify_ready_window,
+) = _q14_load_after_path_setup_0()
 del _q14_load_after_path_setup_0
 
 

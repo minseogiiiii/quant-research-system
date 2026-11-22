@@ -17,10 +17,14 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+
+
 def _q14_load_after_path_setup_0():
     from v35_replay_service import replay_capture
     from v35_unified_gateway import server_for
+
     return replay_capture, server_for
+
 
 replay_capture, server_for = _q14_load_after_path_setup_0()
 del _q14_load_after_path_setup_0

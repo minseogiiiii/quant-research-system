@@ -13,13 +13,35 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "tests"))
+
+
 def _q14_load_after_path_setup_0():
     from post_quote_markout import IndexedBook, MarkoutError, MarkoutPolicy, inspect
     from taker_quote_envelope import Assumptions, Book, EnvelopeError
     from test_v10_soak import create_archive
-    return IndexedBook, MarkoutError, MarkoutPolicy, inspect, Assumptions, Book, EnvelopeError, create_archive
 
-IndexedBook, MarkoutError, MarkoutPolicy, inspect, Assumptions, Book, EnvelopeError, create_archive = _q14_load_after_path_setup_0()
+    return (
+        IndexedBook,
+        MarkoutError,
+        MarkoutPolicy,
+        inspect,
+        Assumptions,
+        Book,
+        EnvelopeError,
+        create_archive,
+    )
+
+
+(
+    IndexedBook,
+    MarkoutError,
+    MarkoutPolicy,
+    inspect,
+    Assumptions,
+    Book,
+    EnvelopeError,
+    create_archive,
+) = _q14_load_after_path_setup_0()
 del _q14_load_after_path_setup_0
 
 

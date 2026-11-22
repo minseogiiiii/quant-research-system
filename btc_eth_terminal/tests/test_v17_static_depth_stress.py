@@ -12,13 +12,26 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "tests"))
+
+
 def _q14_load_after_path_setup_0():
     from static_depth_stress import DepthPolicy, DepthStressError, diagnose
     from taker_quote_envelope import Assumptions, EnvelopeError
     from test_v10_soak import create_archive
-    return DepthPolicy, DepthStressError, diagnose, Assumptions, EnvelopeError, create_archive
 
-DepthPolicy, DepthStressError, diagnose, Assumptions, EnvelopeError, create_archive = _q14_load_after_path_setup_0()
+    return (
+        DepthPolicy,
+        DepthStressError,
+        diagnose,
+        Assumptions,
+        EnvelopeError,
+        create_archive,
+    )
+
+
+DepthPolicy, DepthStressError, diagnose, Assumptions, EnvelopeError, create_archive = (
+    _q14_load_after_path_setup_0()
+)
 del _q14_load_after_path_setup_0
 
 

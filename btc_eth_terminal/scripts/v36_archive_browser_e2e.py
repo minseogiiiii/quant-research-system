@@ -18,13 +18,19 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+
+
 def _q14_load_after_path_setup_0():
     from v36_live_engine import LiveMarketEngine
     from v36_live_gateway import server_for_live
     from v36_play_verified_archive import admitted_verified_chunks
+
     return LiveMarketEngine, server_for_live, admitted_verified_chunks
 
-LiveMarketEngine, server_for_live, admitted_verified_chunks = _q14_load_after_path_setup_0()
+
+LiveMarketEngine, server_for_live, admitted_verified_chunks = (
+    _q14_load_after_path_setup_0()
+)
 del _q14_load_after_path_setup_0
 
 DEFAULT = ROOT / "backend/data/live_v14_clean_120s/coinbase_btc_eth_soak_wsgXRy"

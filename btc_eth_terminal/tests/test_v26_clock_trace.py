@@ -14,13 +14,35 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+
+
 def _q14_load_after_path_setup_0():
     from v25_capture_admission import evaluate_operator_observation
     from v26_capture_crosscheck import CrosscheckError, crosscheck
     from v26_clock_trace import ZERO, ClockTraceError, canonical, inspect_trace, record
-    return evaluate_operator_observation, CrosscheckError, crosscheck, ZERO, ClockTraceError, canonical, inspect_trace, record
 
-evaluate_operator_observation, CrosscheckError, crosscheck, ZERO, ClockTraceError, canonical, inspect_trace, record = _q14_load_after_path_setup_0()
+    return (
+        evaluate_operator_observation,
+        CrosscheckError,
+        crosscheck,
+        ZERO,
+        ClockTraceError,
+        canonical,
+        inspect_trace,
+        record,
+    )
+
+
+(
+    evaluate_operator_observation,
+    CrosscheckError,
+    crosscheck,
+    ZERO,
+    ClockTraceError,
+    canonical,
+    inspect_trace,
+    record,
+) = _q14_load_after_path_setup_0()
 del _q14_load_after_path_setup_0
 
 

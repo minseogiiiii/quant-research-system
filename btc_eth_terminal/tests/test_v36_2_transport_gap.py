@@ -24,18 +24,26 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+
+
 def _q14_load_after_path_setup_0():
     from v36_live_engine import LiveMarketEngine
     from v36_live_gateway import server_for_live
+
     return LiveMarketEngine, server_for_live
+
 
 LiveMarketEngine, server_for_live = _q14_load_after_path_setup_0()
 del _q14_load_after_path_setup_0
 
 sys.path.insert(0, str(ROOT / "scripts"))
+
+
 def _q14_load_after_path_setup_1():
     from v36_observe_existing_collector import read_tap
+
     return read_tap
+
 
 read_tap = _q14_load_after_path_setup_1()
 del _q14_load_after_path_setup_1

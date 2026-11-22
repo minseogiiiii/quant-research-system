@@ -20,14 +20,20 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+
+
 def _q14_load_after_path_setup_0():
     from v35_replay_service import StateRejected
     from v36_live_engine import LiveMarketEngine
     from v36_live_gateway import server_for_live
     from v36_play_verified_archive import admitted_verified_chunks
+
     return StateRejected, LiveMarketEngine, server_for_live, admitted_verified_chunks
 
-StateRejected, LiveMarketEngine, server_for_live, admitted_verified_chunks = _q14_load_after_path_setup_0()
+
+StateRejected, LiveMarketEngine, server_for_live, admitted_verified_chunks = (
+    _q14_load_after_path_setup_0()
+)
 del _q14_load_after_path_setup_0
 
 PRODUCTS = ("BTC-USD", "ETH-USD")

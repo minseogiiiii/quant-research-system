@@ -52,8 +52,7 @@ class Q6FrontendIsolation(unittest.TestCase):
         historical_checks = [
             node
             for node in calls
-            if isinstance(node.func, ast.Name)
-            and node.func.id == "verify_historical"
+            if isinstance(node.func, ast.Name) and node.func.id == "verify_historical"
         ]
         self.assertEqual(len(historical_checks), 1)
 

@@ -13,14 +13,20 @@ from zipfile import ZipFile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "tests"))
+
+
 def _q14_load_after_path_setup_0():
     from original_pair_audit_v20 import ProvenanceError, audit
     from test_v20_pair_audit import SourceAuditTests, fhash
     from v21_evidence_inventory import inventory
     from v21_source_evidence import asof_rows
+
     return ProvenanceError, audit, SourceAuditTests, fhash, inventory, asof_rows
 
-ProvenanceError, audit, SourceAuditTests, fhash, inventory, asof_rows = _q14_load_after_path_setup_0()
+
+ProvenanceError, audit, SourceAuditTests, fhash, inventory, asof_rows = (
+    _q14_load_after_path_setup_0()
+)
 del _q14_load_after_path_setup_0
 
 

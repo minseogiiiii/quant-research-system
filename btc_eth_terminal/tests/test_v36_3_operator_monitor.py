@@ -20,6 +20,8 @@ from urllib.request import urlopen
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "tests"))
+
+
 def _q14_load_after_path_setup_0():
     from test_v36_ci_synthetic_admission import boot
     from v36_live_gateway import server_for_live
@@ -28,9 +30,23 @@ def _q14_load_after_path_setup_0():
         OPERATOR_HEADER_DEADLINE_SECONDS,
         server_for_operator,
     )
-    return boot, server_for_live, MAX_OPERATOR_WORKERS, OPERATOR_HEADER_DEADLINE_SECONDS, server_for_operator
 
-boot, server_for_live, MAX_OPERATOR_WORKERS, OPERATOR_HEADER_DEADLINE_SECONDS, server_for_operator = _q14_load_after_path_setup_0()
+    return (
+        boot,
+        server_for_live,
+        MAX_OPERATOR_WORKERS,
+        OPERATOR_HEADER_DEADLINE_SECONDS,
+        server_for_operator,
+    )
+
+
+(
+    boot,
+    server_for_live,
+    MAX_OPERATOR_WORKERS,
+    OPERATOR_HEADER_DEADLINE_SECONDS,
+    server_for_operator,
+) = _q14_load_after_path_setup_0()
 del _q14_load_after_path_setup_0
 
 

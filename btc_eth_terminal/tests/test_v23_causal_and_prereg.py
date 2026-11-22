@@ -11,6 +11,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+
+
 def _q14_load_after_path_setup_0():
     from v23_causal_microstructure import (
         FeatureReject,
@@ -27,9 +29,35 @@ def _q14_load_after_path_setup_0():
         validate_protocol,
         verify_lock,
     )
-    return FeatureReject, create_report, features_from_events, ofi_delta, ProtocolReject, evaluate_structural_rows, lock_draft_once, read_json, utc_ms, validate_protocol, verify_lock
 
-FeatureReject, create_report, features_from_events, ofi_delta, ProtocolReject, evaluate_structural_rows, lock_draft_once, read_json, utc_ms, validate_protocol, verify_lock = _q14_load_after_path_setup_0()
+    return (
+        FeatureReject,
+        create_report,
+        features_from_events,
+        ofi_delta,
+        ProtocolReject,
+        evaluate_structural_rows,
+        lock_draft_once,
+        read_json,
+        utc_ms,
+        validate_protocol,
+        verify_lock,
+    )
+
+
+(
+    FeatureReject,
+    create_report,
+    features_from_events,
+    ofi_delta,
+    ProtocolReject,
+    evaluate_structural_rows,
+    lock_draft_once,
+    read_json,
+    utc_ms,
+    validate_protocol,
+    verify_lock,
+) = _q14_load_after_path_setup_0()
 del _q14_load_after_path_setup_0
 
 T = 1_800_000_000_000

@@ -18,11 +18,15 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+
+
 def _q14_load_after_path_setup_0():
     import bridge
     import v30_unified_api as api
     from v30_unified_projection import PRODS, SCHEMA
+
     return bridge, api, PRODS, SCHEMA
+
 
 bridge, api, PRODS, SCHEMA = _q14_load_after_path_setup_0()
 del _q14_load_after_path_setup_0

@@ -16,13 +16,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+
+
 def _q14_load_after_path_setup_0():
     from independent_soak_replay import replay as independent_replay
     from v35_archive_ingress import verify_capture
     from v35_replay_service import StateRejected, replay_capture
+
     return independent_replay, verify_capture, StateRejected, replay_capture
 
-independent_replay, verify_capture, StateRejected, replay_capture = _q14_load_after_path_setup_0()
+
+independent_replay, verify_capture, StateRejected, replay_capture = (
+    _q14_load_after_path_setup_0()
+)
 del _q14_load_after_path_setup_0
 
 

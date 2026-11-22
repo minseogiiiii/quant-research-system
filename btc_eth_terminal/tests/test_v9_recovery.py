@@ -10,12 +10,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+
+
 def _q14_load_after_path_setup_0():
     from audit_l2_reconnect import StrictL2Error, audit_reconnect
     from l2_recovery_gate import BookAdmissionGate, RecoveryRequired
+
     return StrictL2Error, audit_reconnect, BookAdmissionGate, RecoveryRequired
 
-StrictL2Error, audit_reconnect, BookAdmissionGate, RecoveryRequired = _q14_load_after_path_setup_0()
+
+StrictL2Error, audit_reconnect, BookAdmissionGate, RecoveryRequired = (
+    _q14_load_after_path_setup_0()
+)
 del _q14_load_after_path_setup_0
 
 REAL = ROOT / "backend" / "data" / "reconnect_evidence"

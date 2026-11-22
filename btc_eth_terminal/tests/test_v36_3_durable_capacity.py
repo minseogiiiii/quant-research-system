@@ -9,9 +9,13 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+
+
 def _q14_load_after_path_setup_0():
     from v36_observe_existing_collector import durable_disk_capacity_sufficient
+
     return durable_disk_capacity_sufficient
+
 
 durable_disk_capacity_sufficient = _q14_load_after_path_setup_0()
 del _q14_load_after_path_setup_0

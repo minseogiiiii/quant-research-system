@@ -23,10 +23,14 @@ OUT = Path(
 OUT.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "scripts"))
+
+
 def _q14_load_after_path_setup_0():
     from v36_live_engine import LiveMarketEngine
     from v36_play_verified_archive import admitted_verified_chunks
+
     return LiveMarketEngine, admitted_verified_chunks
+
 
 LiveMarketEngine, admitted_verified_chunks = _q14_load_after_path_setup_0()
 del _q14_load_after_path_setup_0
