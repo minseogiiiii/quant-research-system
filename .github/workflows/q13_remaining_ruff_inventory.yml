@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/q13_remaining_ruff_inventory.yml'
       - '.github/scripts/q7_partial_source_provenance.py'
+      - '.github/scripts/test_q13_q6_ast_isolation_mutations.py'
+      - 'btc_eth_terminal/tests/test_v36_3_q6_frontend_isolation.py'
   workflow_dispatch:
 
 permissions:
@@ -25,6 +27,8 @@ jobs:
         run: |
           python -m py_compile .github/scripts/q7_partial_source_provenance.py
           ruff check .github/scripts/q7_partial_source_provenance.py --select E501
+          ruff check .github/scripts/test_q13_q6_ast_isolation_mutations.py \
+            btc_eth_terminal/tests/test_v36_3_q6_frontend_isolation.py
       - name: Capture real residual Ruff diagnostics without modifying any source
         shell: bash
         run: |
