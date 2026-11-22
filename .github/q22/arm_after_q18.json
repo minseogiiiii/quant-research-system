@@ -1,0 +1,11 @@
+{
+  "schema": "q22_explicit_single_use_5h_arm_v1",
+  "q18_run_id": 45001633746,
+  "q18_head_sha": "d832110e8e3484e82fafa2533270a6d38bee0865",
+  "preflight_commit": "88702df5b85508f988d6e847a2a300d3d0a51096",
+  "preflight_success_run_id": 45005210501,
+  "validation_success_run_id": 45005212112,
+  "approval": "CI_ONLY_NO_ORDERS",
+  "real_orders_enabled": false,
+  "purpose": "Launch one Q18-and-preflight-gated 18,000s live Coinbase engineering soak, no release or execution authorization"
+}
