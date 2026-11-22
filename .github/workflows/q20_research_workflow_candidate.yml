@@ -1,0 +1,114 @@
+name: Q20 source-bound research workflow candidate (READ ONLY)
+on:
+  push:
+    branches: [feature/q20-research-workflow-20261122]
+    paths:
+      - '.github/workflows/q20_research_workflow_candidate.yml'
+      - 'btc_eth_terminal/frontend/src/researchWorkflow.ts'
+      - 'btc_eth_terminal/frontend/src/ResearchWorkflowPanel.tsx'
+      - 'btc_eth_terminal/frontend/src/unified.tsx'
+      - 'btc_eth_terminal/frontend/src/style.css'
+      - 'btc_eth_terminal/frontend/tests/researchWorkflow.test.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: q20-workflow-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  q20-source-bound-research:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Protect original Q14 market engines and frozen v36/v37 release
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e cb496e4589533c7f459a18518e623e9b00a0cf29^{commit}
+          git diff --quiet cb496e4589533c7f459a18518e623e9b00a0cf29 HEAD -- \
+            btc_eth_terminal/backend btc_eth_terminal/scripts \
+            btc_eth_terminal/frontend/v37_dist_integrity.json \
+            btc_eth_terminal/frontend/package-lock.json \
+            btc_eth_terminal/frontend/dist_v36 btc_eth_terminal/frontend/dist_v37
+          python - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          p=Path('btc_eth_terminal/frontend/v37_dist_integrity.json')
+          obj=json.loads(p.read_text())
+          assert obj['trading_enabled'] is False
+          assert obj['release']=='v37_factor_lab_engineering_candidate_read_only'
+          assert len(obj['files'])==3
+          changed=set(subprocess.check_output(['git','diff','--name-only',
+              'cb496e4589533c7f459a18518e623e9b00a0cf29','HEAD'],text=True).splitlines())
+          permitted={
+              '.github/workflows/q18_live_30m_integrated_gate.yml',
+              '.github/workflows/q19_q14_real_live_chromium_dom.yml',
+              '.github/workflows/q20_research_workflow_candidate.yml',
+              'btc_eth_terminal/frontend/src/researchWorkflow.ts',
+              'btc_eth_terminal/frontend/src/ResearchWorkflowPanel.tsx',
+              'btc_eth_terminal/frontend/src/unified.tsx',
+              'btc_eth_terminal/frontend/src/style.css',
+              'btc_eth_terminal/frontend/tests/researchWorkflow.test.mjs',
+              'docs/Q20_RESEARCH_WORKFLOW_CANDIDATE.md',
+          }
+          assert changed<=permitted, f'UNREVIEWED_SOURCE_DELTA:{sorted(changed-permitted)}'
+          print('PASS_Q20_FROZEN_MARKET_SOURCE_AND_ASSETS_UNTOUCHED')
+          PY
+      - name: Test lineage safety, causal timestamp changes and no fake alpha
+        working-directory: btc_eth_terminal/frontend
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types --test tests/researchWorkflow.test.mjs
+      - name: Install exact reviewed chart dependencies
+        working-directory: btc_eth_terminal/frontend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Type-check and compile isolated Q20 research preview, not v37 release
+        working-directory: btc_eth_terminal/frontend
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/tsc --noEmit
+          ./node_modules/.bin/vite build --outDir .dist_q20_candidate
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('.dist_q20_candidate')
+          files={p.relative_to(root).as_posix():{
+              'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+              'bytes':p.stat().st_size,
+          } for p in root.rglob('*') if p.is_file()}
+          assert 'index.html' in files
+          assert any(x.endswith('.js') for x in files)
+          assert any(x.endswith('.css') for x in files)
+          assert len(files)==3, 'Q20_UNEXPECTED_BUNDLE_FILESET'
+          assert not Path('dist_v37').exists(), 'Q20_MUST_NOT_REWRITE_FROZEN_V37'
+          report={
+              'schema':'q20_readonly_ui_build_candidate_v1',
+              'source_cohort':'PREVIOUSLY_EXPLORED_ARCHIVE_ONLY',
+              'browser_shipped':False,'validated_live_market':False,
+              'blind_oos_confirmed':False,'real_orders_enabled':False,
+              'release_approved':False,
+              'files':files,
+          }
+          Path('q20_build_candidate_evidence.json').write_text(
+              json.dumps(report,sort_keys=True,indent=2)+'\n')
+          print('PASS_Q20_ISOLATED_READONLY_FRONTEND_CANDIDATE_BUILD',len(files))
+          PY
+      - name: Upload public source-only preview evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: q20-readonly-research-workflow-preview-only
+          path: |
+            btc_eth_terminal/frontend/q20_build_candidate_evidence.json
+            btc_eth_terminal/frontend/.dist_q20_candidate/
+          if-no-files-found: error
+          retention-days: 7
+# No historical market data, API keys, order adapters or frozen assets published.
