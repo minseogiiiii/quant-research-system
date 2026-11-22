@@ -75,7 +75,9 @@ class Q6FrontendIsolation(unittest.TestCase):
         vite_call = output_calls[0]
         self.assertLess(historical_checks[0].lineno, vite_call.lineno)
         tokens = vite_call.args[0].elts
-        self.assertTrue(any(isinstance(x, ast.Constant) and x.value == "build" for x in tokens))
+        self.assertTrue(
+            any(isinstance(x, ast.Constant) and x.value == "build" for x in tokens)
+        )
         index = next(
             index
             for index, token in enumerate(tokens)
