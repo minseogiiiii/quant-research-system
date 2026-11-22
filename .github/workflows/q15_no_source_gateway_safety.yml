@@ -1,0 +1,34 @@
+name: Q15 genuine gateway no-source fail-closed safety (NO PRIVATE DATA)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths:
+      - '.github/workflows/q15_no_source_gateway_safety.yml'
+      - '.github/scripts/test_q15_no_source_gateway.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  no-source-safe-http:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check safety tests and full Ruff, no lint ignores
+        run: |
+          set -euo pipefail
+          python -m pip install 'ruff==0.15.22'
+          ruff check .
+          python -m py_compile .github/scripts/test_q15_no_source_gateway.py
+      - name: Check real HTTP 503 for BTC ETH, disabled orders, bounded source
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s .github/scripts -p 'test_q15_no_source_gateway.py' -v
+          echo 'PASS_Q15_NO_SOURCE_HTTP_NOT_A_BROWSER_OR_LIVE_ACCEPTANCE'
+# No Coinbase private fixture, live orders, credential, or public archive upload.
