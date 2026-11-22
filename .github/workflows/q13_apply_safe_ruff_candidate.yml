@@ -1,0 +1,80 @@
+name: Q13 isolated Ruff safe-autofix candidate (NOT RELEASE)
+on:
+  push:
+    branches: [remediation/q13-ruff-safe-autofix-20261121]
+    paths:
+      - '.github/workflows/q13_apply_safe_ruff_candidate.yml'
+permissions:
+  contents: write
+jobs:
+  isolated-autofix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout candidate branch, never the Q7 staging branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - name: Pin Ruff version exactly to root validation
+        run: python -m pip install 'ruff==0.15.22'
+      - name: Apply only safe Ruff fixes and canonical formatting in isolated branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q13-ruff-safe-autofix-20261121"
+          test "$(git rev-parse HEAD^)" = "203520030c8fd3df2b4cd3829ee7b84e548b754f"
+          python - <<'PY'
+          import collections
+          import json
+          import subprocess
+          def check():
+              x=subprocess.run(['ruff','check','.','--output-format','json'],capture_output=True,text=True)
+              if x.returncode not in (0,1): raise RuntimeError(x.stderr[:200])
+              return json.loads(x.stdout)
+          before=check()
+          fix=subprocess.run(['ruff','check','.','--fix'],capture_output=True,text=True)
+          if fix.returncode not in (0,1): raise RuntimeError(fix.stderr[:200])
+          fmt=subprocess.run(['ruff','format','.'],capture_output=True,text=True)
+          if fmt.returncode: raise RuntimeError(fmt.stderr[:200])
+          after=check()
+          if len(after) >= len(before): raise RuntimeError('RUFF_NO_IMPROVEMENT')
+          changes=subprocess.check_output(['git','diff','--name-only'],text=True).splitlines()
+          if not changes or any(not p.endswith('.py') for p in changes):
+              raise RuntimeError('UNEXPECTED_AUTOFIX_PATHS')
+          print('Q13_ISOLATED_AUTOFIX',json.dumps({
+             'before':len(before),'after':len(after),'fixed':len(before)-len(after),
+             'changed_python_files':len(changes),
+             'still_failing_root_ruff':bool(after),
+             'release_manifest_invalidated_by_candidate':True
+          },sort_keys=True))
+          PY
+      - name: Verify Python syntax on candidate source
+        run: python -m compileall -q .github/scripts btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests src tests
+      - name: Run source-independent cost and integrity regressions
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s .github/scripts -p 'test_q13_private_fixture_gate.py' -v
+          python -m unittest discover -s .github/scripts -p 'test_q12_ruff_compare.py' -v
+          python .github/scripts/q7_static_cost_regression.py
+      - name: Install pinned root dependencies and run root Python regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Commit tested candidate only, never touch Q7 staging/main/integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q13-ruff-safe-autofix-20261121"
+          git diff --name-only | python -c 'import sys; s=[x.strip() for x in sys.stdin if x.strip()]; assert s and all(x.endswith(".py") for x in s)'
+          git add -u
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Q13: safe Ruff autofix and format candidate (pinned release invalidated, no promotion)'
+          git push origin HEAD:refs/heads/remediation/q13-ruff-safe-autofix-20261121
