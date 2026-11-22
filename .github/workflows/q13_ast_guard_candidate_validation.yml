@@ -1,0 +1,50 @@
+name: Q13 AST guard and mutation regression (ISOLATED CANDIDATE)
+on:
+  push:
+    branches: [remediation/q13-ruff-safe-autofix-20261121]
+    paths:
+      - '.github/workflows/q13_ast_guard_candidate_validation.yml'
+      - '.github/scripts/test_q13_q6_ast_isolation_mutations.py'
+      - 'btc_eth_terminal/tests/test_v36_3_q6_frontend_isolation.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ast-and-root-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - name: Run strict lint on regression and its six mutation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install 'ruff==0.15.22'
+          ruff check btc_eth_terminal/tests/test_v36_3_q6_frontend_isolation.py \
+            .github/scripts/test_q13_q6_ast_isolation_mutations.py
+      - name: Reverify Q6 AST isolation contract and six negative mutations
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s .github/scripts \
+            -p 'test_q13_q6_ast_isolation_mutations.py' -v
+      - name: Re-run 534 root regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Assert full Ruff and historical qualification are still blocked
+        run: |
+          echo 'NOT_RELEASE_APPROVED: residual Ruff errors and changed Q7 source pins remain.'
+          echo 'PRIVATE_FULL_992_REGRESSION_REQUIRES_TRUSTED_NONPUBLIC_FIXTURES.'
