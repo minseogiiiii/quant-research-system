@@ -236,7 +236,7 @@ class V10SoakTests(unittest.TestCase):
 
     def test_sequence_gap_even_when_all_hashes_recomputed(self):
         p = self.root / "chunks" / "chunk_00001_conn_000.jsonl"
-        rows = [json.loads(l) for l in p.read_text().splitlines()]
+        rows = [json.loads(line) for line in p.read_text().splitlines()]
         msg = json.loads(rows[0]["raw_text"])
         msg["sequence_num"] += 5
         rows[0]["raw_text"] = json.dumps(msg)
@@ -247,7 +247,7 @@ class V10SoakTests(unittest.TestCase):
 
     def test_absent_l2_snapshot_fails(self):
         p = self.root / "chunks" / "chunk_00000_conn_000.jsonl"
-        rows = [json.loads(l) for l in p.read_text().splitlines()]
+        rows = [json.loads(line) for line in p.read_text().splitlines()]
         msg = json.loads(rows[1]["raw_text"])
         msg["events"][0]["type"] = "update"
         rows[1]["raw_text"] = json.dumps(msg)
@@ -258,7 +258,7 @@ class V10SoakTests(unittest.TestCase):
 
     def test_negative_quantity_even_when_rehashed_fails(self):
         p = self.root / "chunks" / "chunk_00001_conn_000.jsonl"
-        rows = [json.loads(l) for l in p.read_text().splitlines()]
+        rows = [json.loads(line) for line in p.read_text().splitlines()]
         msg = json.loads(rows[0]["raw_text"])
         msg["events"][0]["updates"][0]["new_quantity"] = "-8"
         rows[0]["raw_text"] = json.dumps(msg)
@@ -306,7 +306,7 @@ class V10SoakTests(unittest.TestCase):
 
     def test_locked_and_crossed_book_rejected(self):
         p = self.root / "chunks" / "chunk_00001_conn_000.jsonl"
-        rows = [json.loads(l) for l in p.read_text().splitlines()]
+        rows = [json.loads(line) for line in p.read_text().splitlines()]
         msg = json.loads(rows[0]["raw_text"])
         msg["events"][0]["updates"][0]["price_level"] = "102"
         rows[0]["raw_text"] = json.dumps(msg)
