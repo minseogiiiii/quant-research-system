@@ -45,7 +45,7 @@ def read_stream(url, client, stop, result):
     events = 0
     messages = 0
     disconnected = False
-    start_cursor = None
+    _ = None
     deadline = time.monotonic() + 250
     headers = {}
     try:
