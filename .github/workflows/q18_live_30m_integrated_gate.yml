@@ -158,7 +158,7 @@ jobs:
                           out.write(json.dumps({'after_window':int(sys.argv[1]),
                               'sse_slots_released':True,
                               'drain_seconds':round(time.monotonic()-start,3)},
-                              sort_keys=True)+'\\n')
+                              sort_keys=True)+'\n')
                       print('PASS_Q18_SSE_SLOTS_DRAINED',sys.argv[1],flush=True)
                       break
               except (OSError,ValueError,TimeoutError):
