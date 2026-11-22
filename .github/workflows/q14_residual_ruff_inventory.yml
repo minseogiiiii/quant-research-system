@@ -1,0 +1,54 @@
+name: Q14 final Ruff residual after explicit exception chaining (DIAGNOSTIC)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_residual_ruff_inventory.yml']
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'ruff==0.15.22'
+      - name: Collect exact diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import collections
+          import json
+          import os
+          import pathlib
+          import subprocess
+          result=subprocess.run(
+             ['ruff','check','.','--output-format','json'],
+             capture_output=True,text=True)
+          if result.returncode not in (0,1):
+             raise SystemExit('UNEXPECTED_RUFF_EXIT')
+          items=json.loads(result.stdout)
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])
+          (out/'q14_all_issues.json').write_text(json.dumps(items,indent=2)+'\n')
+          stats={
+             'schema':'q14_exact_remaining_ruff_v1',
+             'head_sha':os.environ['GITHUB_SHA'],
+             'total':len(items),
+             'by_rule':dict(sorted(collections.Counter(x['code'] for x in items).items())),
+             'private_data_included':False,
+             'release_approval':False,
+          }
+          (out/'q14_ruff_summary.json').write_text(json.dumps(stats,indent=2)+'\n')
+          print('Q14_RUFF_RESIDUAL',json.dumps(stats,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: q14-public-ruff-diagnostics
+          path: |
+            ${{ runner.temp }}/q14_all_issues.json
+            ${{ runner.temp }}/q14_ruff_summary.json
+          retention-days: 7
+          if-no-files-found: error

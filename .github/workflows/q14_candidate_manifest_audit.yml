@@ -1,0 +1,77 @@
+name: Q14 candidate manifest reproducibility and release blockers (NO APPROVAL)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths:
+      - '.github/workflows/q14_candidate_manifest_audit.yml'
+      - '.github/release-evidence/q14_candidate_source_git_blobs.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  manifest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Independent source identities and immutable original release manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          a=Path('.github/release-evidence/q7_q8_source_git_blobs.json')
+          b=Path('.github/release-evidence/q14_candidate_source_git_blobs.json')
+          old=json.loads(a.read_text())
+          new=json.loads(b.read_text())
+          assert old['count']==len(old['paths'])==278
+          assert hashlib.sha256(a.read_bytes()).hexdigest()==new['original_manifest_sha256']
+          assert new['source_files']==len(new['source_git_blobs'])==278
+          assert set(old['paths'])==set(new['source_git_blobs'])
+          assert new['release_approved'] is False
+          assert new['merge_approved'] is False
+          assert new['real_orders_enabled'] is False
+          assert new['candidate_verification']['private_node_github_zero_skip']!='PASS'
+          prior=new['source_tree_commit']
+          subprocess.run(['git','merge-base','--is-ancestor',prior,'HEAD'],check=True)
+          changed=0
+          for path in sorted(old['paths']):
+              fp=Path(path)
+              assert fp.is_file() and not fp.is_symlink(),path
+              current=subprocess.check_output(['git','hash-object',path],text=True).strip()
+              in_pinned=subprocess.check_output(['git','rev-parse',f'{prior}:{path}'],text=True).strip()
+              assert current==new['source_git_blobs'][path]==in_pinned,path
+              if current!=old['paths'][path]:
+                  changed+=1
+          assert changed==new['modified_vs_frozen']==227
+          assert 278-changed==new['unchanged_vs_frozen']==51
+          report={
+             'schema':'q14_candidate_manifest_independent_audit_v1',
+             'head':os.environ['GITHUB_SHA'],
+             'source_snapshot_commit':prior,
+             'source_files_verified':278,
+             'changed':changed,
+             'unchanged':278-changed,
+             'runnable_full_validation':'SUCCESS_44986988899',
+             'github_private_node_zero_skip':'BLOCKED_UNCONFIGURED_PRIVATE_RELEASE_URL',
+             'candidate_manifest_sha256':hashlib.sha256(b.read_bytes()).hexdigest(),
+             'release_approved':False,
+             'real_orders_enabled':False
+          }
+          path=Path(os.environ['RUNNER_TEMP'])/'q14_candidate_manifest_audit.json'
+          path.write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+          print('PASS_Q14_CANDIDATE_BLOB_IDENTITY_278_OF_278')
+          print('BLOCKED_Q14_RELEASE_APPROVAL_PRIVATE_NODE_AND_OPERATIONAL_GATES')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: q14-candidate-manifest-audit-no-release
+          path: ${{ runner.temp }}/q14_candidate_manifest_audit.json
+          retention-days: 7
+          if-no-files-found: error

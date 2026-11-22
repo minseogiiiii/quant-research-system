@@ -42,9 +42,7 @@ def test_source_has_no_network_or_submission_capability() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                assert not any(
-                    alias.name in forbidden_imports for alias in node.names
-                )
+                assert not any(alias.name in forbidden_imports for alias in node.names)
             if isinstance(node, ast.ImportFrom) and node.module is not None:
                 assert node.module not in forbidden_imports
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):

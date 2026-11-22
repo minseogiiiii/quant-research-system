@@ -1,0 +1,90 @@
+name: Q14 advanced AST-identical E501 experiment (ISOLATED)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_advanced_ast_linewrap.yml']
+permissions:
+  contents: write
+jobs:
+  q14-ast-only-wrap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - run: python -m pip install 'ruff==0.15.22' 'autopep8==2.3.2'
+      - name: Attempt advanced E501 fixes, restoring any AST-changing file immediately
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q14-import-order-20261122"
+          python - <<'PY'
+          import ast
+          import collections
+          import json
+          import pathlib
+          import subprocess
+          def cmd(*args):
+              r=subprocess.run(args,capture_output=True,text=True)
+              if r.returncode:raise RuntimeError(repr(args)+':'+r.stderr[:600])
+          def scan():
+              r=subprocess.run(['ruff','check','.','--output-format','json'],capture_output=True,text=True)
+              if r.returncode not in (0,1):raise RuntimeError('RUFF_FAILED')
+              return json.loads(r.stdout)
+          old=scan()
+          paths=[pathlib.Path(x) for x in subprocess.check_output(
+              ['git','ls-files','--','btc_eth_terminal'],text=True).splitlines()
+              if x.endswith('.py')]
+          if len(paths)<200:raise RuntimeError('INCOMPLETE_TRACKED_SOURCE')
+          before={str(p):(p.read_bytes(),
+                 ast.dump(ast.parse(p.read_text()),include_attributes=False))
+                 for p in paths}
+          cmd('autopep8','--aggressive','--aggressive','--select','E501',
+              '--max-line-length','88','--in-place','--recursive','btc_eth_terminal')
+          cmd('ruff','format','btc_eth_terminal')
+          reverted=[]
+          for p in paths:
+              source,tree=before[str(p)]
+              if ast.dump(ast.parse(p.read_text()),include_attributes=False)!=tree:
+                  p.write_bytes(source)
+                  reverted.append(str(p))
+          after=scan()
+          old_count=len(old)
+          new_count=len(after)
+          print('Q14_AGGRESSIVE_AST_IDENTICAL',json.dumps({
+               'before':old_count,'after':new_count,'reduction':old_count-new_count,
+               'reverted_ast_changing_files':len(reverted),
+               'reverted_examples':reverted[:15],
+               'no_lint_suppression':True,
+               'ast_identical_for_every_changed_product_file':True,
+          },sort_keys=True))
+          if new_count >= old_count: raise RuntimeError('NO_SAFE_FIX_BENEFIT')
+          PY
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+      - name: Verify candidate with root and read-only safety contracts
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python .github/scripts/q7_static_cost_regression.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_transport_gap.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_durable_archive_gate.py' -q
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Publish only tested AST-preserving fixes to isolated branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only | python -c 'import sys; a=[x.strip() for x in sys.stdin if x.strip()]; assert a and all(x.startswith("btc_eth_terminal/") and x.endswith(".py") for x in a)'
+          git add -u -- btc_eth_terminal
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Q14: advanced E501 formatting with AST-changing files excluded'
+          git push origin HEAD:refs/heads/remediation/q14-import-order-20261122

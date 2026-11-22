@@ -67,9 +67,7 @@ class DeterministicPaperReconciler:
                     "Internal and broker cash currencies differ.",
                 )
             )
-        cash_difference = abs(
-            internal.cash.settled_cash - broker.cash.settled_cash
-        )
+        cash_difference = abs(internal.cash.settled_cash - broker.cash.settled_cash)
         if cash_difference > policy.cash_reconciliation_tolerance:
             discrepancies.append(
                 _critical(

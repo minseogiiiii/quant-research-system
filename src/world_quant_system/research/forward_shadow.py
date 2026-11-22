@@ -147,9 +147,7 @@ class DeterministicForwardShadowRunner:
             raise ForwardShadowIntegrityError(
                 "State dataset digest does not match the evidence manifest."
             )
-        current_event_ids = frozenset(
-            item.event_id for item in self._manifest.events
-        )
+        current_event_ids = frozenset(item.event_id for item in self._manifest.events)
         if not set(state.manifest_event_ids).issubset(current_event_ids):
             raise ForwardShadowIntegrityError(
                 "Current evidence manifest removed or changed prior events."
@@ -234,10 +232,7 @@ class DeterministicForwardShadowRunner:
             cash_weight = pending.cash_weight
             turnover = pending.one_way_turnover
             execution_cost = (
-                equity_before
-                * turnover
-                * self._policy.transaction_cost_bps
-                / _BPS
+                equity_before * turnover * self._policy.transaction_cost_bps / _BPS
             )
             pending = None
             _append_journal(
@@ -290,10 +285,7 @@ class DeterministicForwardShadowRunner:
                 observation_id=observation.observation_id,
             )
 
-        if (
-            drawdown <= self._policy.maximum_drawdown_before_halt
-            and not risk_halted
-        ):
+        if drawdown <= self._policy.maximum_drawdown_before_halt and not risk_halted:
             risk_halted = True
             pending = None
             active_weights = {}
@@ -327,9 +319,7 @@ class DeterministicForwardShadowRunner:
         if (
             not risk_halted
             and not feed_stale
-            and observation.sequence
-            % self._policy.rebalance_every_observations
-            == 0
+            and observation.sequence % self._policy.rebalance_every_observations == 0
         ):
             pending = self._schedule_allocation(
                 observations,
@@ -378,9 +368,7 @@ class DeterministicForwardShadowRunner:
                     "Observation times must increase strictly."
                 )
             if observation.received_at < previous.received_at:
-                raise ForwardShadowIntegrityError(
-                    "Receipt times cannot move backward."
-                )
+                raise ForwardShadowIntegrityError("Receipt times cannot move backward.")
         now = self._clock.now_utc().astimezone(UTC)
         future_limit = now + timedelta(
             seconds=self._policy.maximum_future_clock_skew_seconds
@@ -416,8 +404,7 @@ class DeterministicForwardShadowRunner:
                 timestamp=observation.received_at,
                 event_type=ForwardShadowJournalEventType.EVIDENCE_VISIBLE,
                 reason=(
-                    f"{visible.state.value} evidence became visible: "
-                    f"{visible.reason}"
+                    f"{visible.state.value} evidence became visible: {visible.reason}"
                 ),
                 observation_id=observation.observation_id,
                 candidate_id=candidate_id,
@@ -462,9 +449,7 @@ class DeterministicForwardShadowRunner:
             _append_journal(
                 journal,
                 timestamp=observation.received_at,
-                event_type=(
-                    ForwardShadowJournalEventType.NO_ELIGIBLE_CANDIDATES
-                ),
+                event_type=(ForwardShadowJournalEventType.NO_ELIGIBLE_CANDIDATES),
                 reason="visible evidence did not satisfy the active-candidate policy",
                 observation_id=observation.observation_id,
             )
@@ -487,8 +472,7 @@ class DeterministicForwardShadowRunner:
             return None
         scheduled = PendingForwardAllocation(
             execute_sequence=(
-                observation.sequence
-                + self._policy.execution_delay_observations
+                observation.sequence + self._policy.execution_delay_observations
             ),
             weights=_weight_tuple(target_weights),
             cash_weight=target_cash,
@@ -535,8 +519,7 @@ class DeterministicForwardShadowRunner:
         scores: dict[str, Decimal] = {}
         for candidate_id in eligible:
             values = tuple(
-                float(item.returns_by_candidate[candidate_id])
-                for item in history
+                float(item.returns_by_candidate[candidate_id]) for item in history
             )
             deviation = statistics.stdev(values) if len(values) >= 2 else 0.0
             scores[candidate_id] = (
@@ -580,9 +563,7 @@ def decimal_argument(value: str, field_name: str) -> Decimal:
             f"{field_name} must be a valid decimal."
         ) from error
     if not parsed.is_finite():
-        raise ForwardShadowConfigurationError(
-            f"{field_name} must be finite."
-        )
+        raise ForwardShadowConfigurationError(f"{field_name} must be finite.")
     return parsed
 
 
@@ -655,8 +636,7 @@ def _capped_weights(
             proposed = {item: equal for item in uncapped}
         else:
             proposed = {
-                item: remaining * scores[item] / score_total
-                for item in uncapped
+                item: remaining * scores[item] / score_total for item in uncapped
             }
         capped = {
             item

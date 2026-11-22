@@ -1,0 +1,74 @@
+name: Q14 UP034 AST-identity cleanup second pass (ISOLATED)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_up034_ast_cleanup.yml']
+permissions:
+  contents: write
+jobs:
+  q14-up034:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - run: python -m pip install 'ruff==0.15.22'
+      - name: Correct only UP034 and require exact AST equality
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          import json
+          import pathlib
+          import subprocess
+          def get():
+              p=subprocess.run(['ruff','check','.','--output-format','json'],capture_output=True,text=True)
+              assert p.returncode in (0,1)
+              return json.loads(p.stdout)
+          before=get()
+          paths=[pathlib.Path(p) for p in subprocess.check_output(
+              ['git','ls-files','btc_eth_terminal'],text=True).splitlines()
+              if p.endswith('.py')]
+          old={str(p):ast.dump(ast.parse(p.read_text()),include_attributes=False) for p in paths}
+          fix=subprocess.run(['ruff','check','btc_eth_terminal','--select','UP034',
+              '--fix'],capture_output=True,text=True)
+          if fix.returncode not in (0,1):raise RuntimeError(fix.stderr[:300])
+          after=get()
+          mismatch=[str(p) for p in paths if
+                 ast.dump(ast.parse(p.read_text()),include_attributes=False)!=old[str(p)]]
+          if mismatch:raise RuntimeError('UP034_NONIDENTICAL_AST:'+repr(mismatch[:8]))
+          if any(x['code']=='UP034' for x in after):
+              raise RuntimeError('UP034_STILL_PRESENT')
+          print('Q14_UP034_FULL_AST_IDENTITY',json.dumps({
+              'before':len(before),'after':len(after),'resolved':len(before)-len(after),
+              'all_file_AST_identical':True,'noqa_added':False},sort_keys=True))
+          if len(after)>=len(before):raise RuntimeError('NO_RUFF_IMPROVEMENT')
+          PY
+      - name: Full root and read-only safety tests
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python .github/scripts/q7_static_cost_regression.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_transport_gap.py' -q
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Commit only AST-identical candidate changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q14-import-order-20261122"
+          git diff --name-only | python -c 'import sys; a=[x.strip() for x in sys.stdin if x.strip()]; assert a and all(x.startswith("btc_eth_terminal/") and x.endswith(".py") for x in a)'
+          git add -u -- btc_eth_terminal
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Q14: remove redundant literal parentheses with AST identity proof'
+          git push origin HEAD:refs/heads/remediation/q14-import-order-20261122

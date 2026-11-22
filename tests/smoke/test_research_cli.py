@@ -44,9 +44,7 @@ def register_arguments(root: Path) -> list[str]:
 
 def _experiment_id(output: str) -> str:
     line = next(
-        line
-        for line in output.splitlines()
-        if line.startswith("Experiment ID:")
+        line for line in output.splitlines() if line.startswith("Experiment ID:")
     )
     return line.split()[-1]
 

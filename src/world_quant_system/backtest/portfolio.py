@@ -96,9 +96,7 @@ class LongOnlyPortfolioLedger:
         if not isinstance(fill, Fill):
             raise BacktestConfigurationError("Portfolio can apply only Fill values.")
         if fill.symbol != self._symbol:
-            raise BacktestInvariantError(
-                "Fill symbol does not match portfolio symbol."
-            )
+            raise BacktestInvariantError("Fill symbol does not match portfolio symbol.")
         if fill.fill_id in self._seen_fill_ids:
             raise BacktestInvariantError("The same fill cannot be applied twice.")
         if fill.order_id in self._seen_order_ids:
@@ -243,9 +241,7 @@ class LongOnlyPortfolioLedger:
                 "Long-only portfolio equity cannot be negative."
             )
         average_cost = (
-            _ZERO
-            if self._quantity == 0
-            else self._position_cost_basis / self._quantity
+            _ZERO if self._quantity == 0 else self._position_cost_basis / self._quantity
         )
         unrealized_pnl = market_value - self._position_cost_basis
         exposure = _ZERO if total_equity == _ZERO else market_value / total_equity
@@ -324,9 +320,7 @@ class LongOnlyPortfolioLedger:
             return _ZERO
         ratio = Decimal(action.ratio_numerator) / Decimal(action.ratio_denominator)
         exact_quantity = Decimal(self._quantity) * ratio
-        whole_quantity = int(
-            exact_quantity.to_integral_value(rounding=ROUND_FLOOR)
-        )
+        whole_quantity = int(exact_quantity.to_integral_value(rounding=ROUND_FLOOR))
         fractional_quantity = exact_quantity - whole_quantity
         cash_in_lieu = _ZERO
         if fractional_quantity != _ZERO:
@@ -512,9 +506,7 @@ class LongOnlyPortfolioLedger:
 
     def _assert_internal_invariants(self) -> None:
         if self._cash < _ZERO:
-            raise BacktestInvariantError(
-                "Long-only portfolio cash cannot be negative."
-            )
+            raise BacktestInvariantError("Long-only portfolio cash cannot be negative.")
         if self._quantity < 0:
             raise BacktestInvariantError(
                 "Long-only portfolio quantity cannot be negative."

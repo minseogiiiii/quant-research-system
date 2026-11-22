@@ -72,9 +72,9 @@ def main() -> None:
             )
             print(_format_report(report))
             if arguments.json_output is not None:
-                AtomicJsonAdapterCertificationReportWriter(
-                    arguments.json_output
-                ).write(report)
+                AtomicJsonAdapterCertificationReportWriter(arguments.json_output).write(
+                    report
+                )
             if report.status is CertificationStatus.FAIL:
                 raise SystemExit(2)
             return

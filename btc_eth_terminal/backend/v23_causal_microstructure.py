@@ -5,14 +5,15 @@ preregistered 5-minute snapshots of top-of-book microprice, imbalance and a
 rolling 5-minute L1 OFI. OFI is an *engineering definition*, not executable
 alpha and is not a claim about an exchange-atomic order-event sequence.
 """
+
 from __future__ import annotations
 
 import argparse
+import heapq
+import json
 from collections import deque
 from decimal import Decimal
 from hashlib import sha256
-import heapq
-import json
 from pathlib import Path
 
 from audit_soak import audit as admit_source
@@ -89,7 +90,11 @@ def ofi_delta(old, new):
 
 def features_from_events(events, decisions, max_age_ms=STALENESS_MS):
     """Accept *already audited* source order. Never fetch future events early."""
-    if not decisions or any(type(t) is not int for t in decisions) or decisions != sorted(set(decisions)):
+    if (
+        not decisions
+        or any(type(t) is not int for t in decisions)
+        or decisions != sorted(set(decisions))
+    ):
         raise FeatureReject("Invalid strictly increasing decision grid")
     if any(t < 1_500_000_000_000 for t in decisions):
         raise FeatureReject("Invalid UTC millisecond clock")
@@ -134,22 +139,31 @@ def features_from_events(events, decisions, max_age_ms=STALENESS_MS):
                 denom = qb + qa
                 if denom <= 0:
                     raise FeatureReject("No displayed liquidity")
-                row.update({
-                    "best_bid": str(bid), "best_ask": str(ask),
-                    "best_bid_qty": str(qb), "best_ask_qty": str(qa),
-                    "microprice": str((ask * qb + bid * qa) / denom),
-                    "best_imbalance": str((qb - qa) / denom),
-                    "ofi_rolling_5m_base": str(rolling[product]),
-                    "l2_update_events_rolling_5m": len(entries),
-                })
+                row.update(
+                    {
+                        "best_bid": str(bid),
+                        "best_ask": str(ask),
+                        "best_bid_qty": str(qb),
+                        "best_ask_qty": str(qa),
+                        "microprice": str((ask * qb + bid * qa) / denom),
+                        "best_imbalance": str((qb - qa) / denom),
+                        "ofi_rolling_5m_base": str(rolling[product]),
+                        "l2_update_events_rolling_5m": len(entries),
+                    }
+                )
             output.append(row)
 
     for received, seq, product, kind, updates in events:
-        if (type(received) is not int or type(seq) is not int or
-            product not in books or
-            (last_ts is not None and received < last_ts) or
-            (prev_seq is not None and (seq < prev_seq or
-             (seq == prev_seq and received != last_ts)))):
+        if (
+            type(received) is not int
+            or type(seq) is not int
+            or product not in books
+            or (last_ts is not None and received < last_ts)
+            or (
+                prev_seq is not None
+                and (seq < prev_seq or (seq == prev_seq and received != last_ts))
+            )
+        ):
             raise FeatureReject("Invalid event chronology")
         while decision is not None and decision < received:
             emit(decision)
@@ -197,7 +211,10 @@ def read_l2(root, chunks):
 def create_report(root: Path, v21_reference: dict):
     root = Path(root)
     admitted = admit_source(root)
-    if admitted["status"] != "INTERNALLY_REPLAYED_NO_KNOWN_GAP" or admitted["connection_count"] != 1:
+    if (
+        admitted["status"] != "INTERNALLY_REPLAYED_NO_KNOWN_GAP"
+        or admitted["connection_count"] != 1
+    ):
         raise FeatureReject("Unadmitted source or disconnected collection")
     manifest_bytes = (root / "manifest.json").read_bytes()
     digest = sha256(manifest_bytes).hexdigest()
@@ -211,18 +228,25 @@ def create_report(root: Path, v21_reference: dict):
     expected = v21_reference["rows"]
     if len(expected) != len(rows):
         raise FeatureReject("v21 fixed decisions not preserved")
-    for r, b in zip(rows, expected):
-        if (r["instrument"] != b["instrument"] or
-            r["decision_receive_utc_ms"] != b["decision_receive_utc_ms"] or
-            r["source_message_sequence"] != b["source_message_sequence"] or
-            r["feature_max_received_utc_ms"] != b["last_l2_received_utc_ms"] or
-            ((r["status"] == "DIAGNOSTIC_CAUSAL_L1") !=
-             (b["status"] == "RECEIVER_ASOF_L2_QUOTE"))):
+    for r, b in zip(rows, expected, strict=False):
+        if (
+            r["instrument"] != b["instrument"]
+            or r["decision_receive_utc_ms"] != b["decision_receive_utc_ms"]
+            or r["source_message_sequence"] != b["source_message_sequence"]
+            or r["feature_max_received_utc_ms"] != b["last_l2_received_utc_ms"]
+            or (
+                (r["status"] == "DIAGNOSTIC_CAUSAL_L1")
+                != (b["status"] == "RECEIVER_ASOF_L2_QUOTE")
+            )
+        ):
             raise FeatureReject("Independent v21 receiver decision mismatch")
         if r["status"] == "DIAGNOSTIC_CAUSAL_L1":
-            for a, c in (("best_bid", "best_bid"), ("best_ask", "best_ask"),
-                         ("best_bid_qty", "displayed_best_bid_qty"),
-                         ("best_ask_qty", "displayed_best_ask_qty")):
+            for a, c in (
+                ("best_bid", "best_bid"),
+                ("best_ask", "best_ask"),
+                ("best_bid_qty", "displayed_best_bid_qty"),
+                ("best_ask_qty", "displayed_best_ask_qty"),
+            ):
                 if Decimal(r[a]) != Decimal(b[c]):
                     raise FeatureReject("v21 quote/quantity parity failure")
     if (root / "manifest.json").read_bytes() != manifest_bytes:
@@ -233,7 +257,11 @@ def create_report(root: Path, v21_reference: dict):
         "source_message_count": admitted["message_count"],
         "input_reference": "V21_SOURCE_EVIDENCE_REPORT.json",
         "sample_grid": "UTC five-minute receiver-asof, 5min rolling OFI, no lookahead",
-        "ofi_definition": "L1 bid/ask price-change signed displayed-size delta; snapshot not counted",
+        "ofi_definition": (
+            'L1 bid/ask price-change sign'
+            'ed displayed-size delta; sna'
+            'pshot not counted'
+        ),
         "original_user_feature_label_pair_verified": False,
         "eligible_for_oos_or_execution": False,
         "results": rows,

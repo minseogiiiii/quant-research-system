@@ -89,9 +89,7 @@ def run_statistical_validation_simulation() -> StatisticalValidationSimulationRe
         probability_backtest_overfitting=(
             first.probability_backtest_overfitting.probability_backtest_overfitting
         ),
-        deflated_sharpe_probability=(
-            first.deflated_sharpe.deflated_sharpe_probability
-        ),
+        deflated_sharpe_probability=(first.deflated_sharpe.deflated_sharpe_probability),
         deterministic_digest_match=(
             first.report_digest == second.report_digest
             and first.report_id == second.report_id
@@ -104,10 +102,7 @@ def main() -> None:
     print(f"Statistical observations: {result.observation_count}")
     print(f"Successful trials: {result.successful_trial_count}")
     print(f"Failed trials retained: {result.failed_trial_count}")
-    print(
-        "Deflated Sharpe probability: "
-        f"{result.deflated_sharpe_probability:.4%}"
-    )
+    print(f"Deflated Sharpe probability: {result.deflated_sharpe_probability:.4%}")
     print(
         "Probability of backtest overfitting: "
         f"{result.probability_backtest_overfitting:.4%}"

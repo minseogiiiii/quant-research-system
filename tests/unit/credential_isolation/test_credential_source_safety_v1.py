@@ -34,9 +34,7 @@ def test_package_has_no_network_or_process_transport() -> None:
 
 
 def test_report_model_does_not_serialize_raw_secret_fields() -> None:
-    source = (
-        PACKAGE / "models.py"
-    ).read_text(encoding="utf-8")
+    source = (PACKAGE / "models.py").read_text(encoding="utf-8")
 
     assert '"client_secret"' not in source
     assert '"access_token"' not in source

@@ -40,9 +40,7 @@ def calculate_performance_metrics(
             "Annualization periods must be a positive integer."
         )
 
-    final_equity = (
-        initial_equity if not equity_curve else equity_curve[-1].total_equity
-    )
+    final_equity = initial_equity if not equity_curve else equity_curve[-1].total_equity
     total_return = final_equity / initial_equity - _ONE
     maximum_drawdown = _maximum_drawdown(equity_curve)
     returns = _period_returns(equity_curve)
@@ -77,12 +75,9 @@ def calculate_performance_metrics(
     average_exposure = (
         _ZERO
         if not equity_curve
-        else sum((point.exposure for point in equity_curve), _ZERO)
-        / len(equity_curve)
+        else sum((point.exposure for point in equity_curve), _ZERO) / len(equity_curve)
     )
-    commission_cost = (
-        _ZERO if not equity_curve else equity_curve[-1].total_commission
-    )
+    commission_cost = _ZERO if not equity_curve else equity_curve[-1].total_commission
     slippage_cost = _ZERO if not equity_curve else equity_curve[-1].total_slippage
     benchmark_return = _benchmark_return(
         benchmark_start_price,

@@ -108,9 +108,7 @@ def test_semantically_identical_timezones_and_json_produce_same_digest() -> None
         ),
     )
     second = spec(
-        parameters_json=canonical_json_object(
-            {"short_window": 20, "long_window": 100}
-        ),
+        parameters_json=canonical_json_object({"short_window": 20, "long_window": 100}),
         split=shifted,
     )
 

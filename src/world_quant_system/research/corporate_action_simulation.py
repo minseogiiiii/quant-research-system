@@ -271,10 +271,7 @@ def _actions() -> tuple[CorporateActionRecord, ...]:
 def _records() -> tuple[NormalizedCandleRecord, ...]:
     values = tuple(("OLD", day, "10" if day < 2 else "5") for day in range(6))
     values += (("NEW", 6, "5"),)
-    return tuple(
-        _record(symbol, day, Decimal(price))
-        for symbol, day, price in values
-    )
+    return tuple(_record(symbol, day, Decimal(price)) for symbol, day, price in values)
 
 
 def _record(
@@ -339,10 +336,7 @@ def main() -> None:
         f"{'yes' if result.split_equity_preserved else 'no'}"
     )
     print(f"Net cash dividends: {result.dividend_net}")
-    print(
-        "Delisting loss applied: "
-        f"{'yes' if result.delisting_loss_applied else 'no'}"
-    )
+    print(f"Delisting loss applied: {'yes' if result.delisting_loss_applied else 'no'}")
     print(f"Final equity after zero-value delisting: {result.final_equity}")
     print("Live trading and broker orders: disabled")
     if not all(

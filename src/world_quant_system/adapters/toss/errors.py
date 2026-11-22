@@ -24,28 +24,18 @@ class TossAdapterError(Exception):
         details: list[str] = []
 
         if self.status_code is not None:
-            details.append(
-                f"status_code={self.status_code}"
-            )
+            details.append(f"status_code={self.status_code}")
 
         if self.request_id is not None:
-            details.append(
-                f"request_id={self.request_id}"
-            )
+            details.append(f"request_id={self.request_id}")
 
         if self.retry_after_seconds is not None:
-            details.append(
-                "retry_after_seconds="
-                f"{self.retry_after_seconds}"
-            )
+            details.append(f"retry_after_seconds={self.retry_after_seconds}")
 
         if not details:
             return self.message
 
-        return (
-            f"{self.message} "
-            f"({', '.join(details)})"
-        )
+        return f"{self.message} ({', '.join(details)})"
 
 
 class TossConfigurationError(TossAdapterError):

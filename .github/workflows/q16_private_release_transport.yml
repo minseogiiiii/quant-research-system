@@ -1,0 +1,35 @@
+name: Q16 private GitHub Release transport contract (NO SECRETS)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths:
+      - '.github/workflows/q16_private_release_transport.yml'
+      - '.github/scripts/q16_secure_private_archive_download.py'
+      - '.github/scripts/test_q16_private_archive_transport.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  token-isolation-and-archive-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require full source Ruff and syntax
+        run: |
+          set -euo pipefail
+          python -m pip install 'ruff==0.15.22'
+          ruff check .
+          python -m py_compile \
+            .github/scripts/q16_secure_private_archive_download.py \
+            .github/scripts/test_q16_private_archive_transport.py
+      - name: Test 9 strict HTTPS, GitHub API and digest rules offline
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.github/scripts python -m unittest discover \
+            -s .github/scripts -p 'test_q16_private_archive_transport.py' -v
+          echo 'PASS_Q16_GITHUB_READONLY_TOKEN_ISOLATION_NO_HTTP'
+# No secret reads, fixture downloads, live market traffic or order execution.

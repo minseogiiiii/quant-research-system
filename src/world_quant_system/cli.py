@@ -602,9 +602,7 @@ def main(argv: list[str] | None = None) -> None:
                 AtomicJsonRobustnessReportWriter(arguments.json_output).write(report)
             return
         if arguments.command == "statistical-validation":
-            statistical_report = asyncio.run(
-                _run_statistical_validation(arguments)
-            )
+            statistical_report = asyncio.run(_run_statistical_validation(arguments))
             print(_format_statistical_validation_report(statistical_report))
             if arguments.json_output is not None:
                 AtomicJsonStatisticalValidationReportWriter(
@@ -822,16 +820,12 @@ async def _build_point_in_time_symbol_contexts(
             segment_start = action.effective_at
         elif action.action_type is CorporateActionType.DELISTING:
             if segment_start < action.effective_at:
-                segments.append(
-                    (current_symbol, segment_start, action.effective_at)
-                )
+                segments.append((current_symbol, segment_start, action.effective_at))
             segment_start = end
             break
     if segment_start < end:
         segments.append((current_symbol, segment_start, end))
-    if tuple(symbol for symbol, _, _ in segments) != (
-        corporate_action_context.symbols
-    ):
+    if tuple(symbol for symbol, _, _ in segments) != (corporate_action_context.symbols):
         raise BacktestConfigurationError(
             "Point-in-time segments do not match the corporate-action symbol path."
         )
@@ -927,9 +921,7 @@ async def _run_statistical_validation(
 def _failed_statistical_trial(value: str) -> FailedStatisticalTrial:
     trial_id, separator, reason = value.partition("=")
     if not separator:
-        raise ResearchError(
-            "Failed trials must use trial_id=failure_reason form."
-        )
+        raise ResearchError("Failed trials must use trial_id=failure_reason form.")
     return FailedStatisticalTrial(
         trial_id=trial_id.strip(),
         failure_reason=reason.strip(),
@@ -1056,9 +1048,7 @@ async def _run_dataset(arguments: argparse.Namespace) -> str:
             currency=arguments.currency.upper(),
             code_commit=arguments.code_commit,
             point_in_time_context_digest=arguments.point_in_time_context_digest,
-            corporate_action_context_digest=(
-                arguments.corporate_action_context_digest
-            ),
+            corporate_action_context_digest=(arguments.corporate_action_context_digest),
             policy=HistoricalDatasetPolicy(
                 timezone=arguments.timezone,
                 missing_session_policy=MissingSessionPolicy(
@@ -1077,9 +1067,7 @@ async def _run_dataset(arguments: argparse.Namespace) -> str:
     if command == "freeze":
         return _format_dataset_snapshot(await store.freeze(arguments.dataset_id))
     if command == "inspect":
-        return _format_dataset_snapshot(
-            await store.get_snapshot(arguments.dataset_id)
-        )
+        return _format_dataset_snapshot(await store.get_snapshot(arguments.dataset_id))
     if command == "link-benchmark":
         link = await store.link_benchmark(
             arguments.dataset_id,
@@ -1143,9 +1131,7 @@ async def _run_corporate_actions(arguments: argparse.Namespace) -> str:
         )
         return _format_corporate_action(await store.save_action(action))
     if command == "inspect":
-        return _format_corporate_action(
-            await store.get_action(arguments.action_id)
-        )
+        return _format_corporate_action(await store.get_action(arguments.action_id))
     if command == "list":
         actions = await store.list_actions(
             exchange=arguments.exchange,
@@ -1221,9 +1207,7 @@ async def _run_research(arguments: argparse.Namespace) -> str:
             ),
             parent_experiment_id=arguments.parent_experiment_id,
             change_reason=arguments.change_reason,
-            point_in_time_context_digest=(
-                arguments.point_in_time_context_digest
-            ),
+            point_in_time_context_digest=(arguments.point_in_time_context_digest),
             point_in_time_policy_json=(
                 None
                 if arguments.point_in_time_policy_json is None
@@ -1232,9 +1216,7 @@ async def _run_research(arguments: argparse.Namespace) -> str:
                     "point-in-time policy",
                 )
             ),
-            corporate_action_context_digest=(
-                arguments.corporate_action_context_digest
-            ),
+            corporate_action_context_digest=(arguments.corporate_action_context_digest),
             corporate_action_policy_json=(
                 None
                 if arguments.corporate_action_policy_json is None
@@ -1318,9 +1300,7 @@ async def _run_point_in_time(arguments: argparse.Namespace) -> str:
         delisting = DelistingRecord(
             exchange=arguments.exchange,
             symbol=arguments.symbol,
-            last_tradable_at=_parse_research_boundary(
-                arguments.last_tradable_at
-            ),
+            last_tradable_at=_parse_research_boundary(arguments.last_tradable_at),
             delisted_at=_parse_research_boundary(arguments.delisted_at),
             available_at=_parse_research_boundary(arguments.available_at),
             reason=DelistingReason(arguments.reason),
@@ -1449,15 +1429,9 @@ def _format_research_registration(record: ExperimentRecord) -> str:
 
 def _format_research_snapshot(snapshot: ExperimentSnapshot) -> str:
     outcome = (
-        "not_recorded"
-        if snapshot.outcome is None
-        else snapshot.outcome.status.value
+        "not_recorded" if snapshot.outcome is None else snapshot.outcome.status.value
     )
-    holdout = (
-        "UNTOUCHED"
-        if snapshot.holdout_consumption is None
-        else "CONSUMED"
-    )
+    holdout = "UNTOUCHED" if snapshot.holdout_consumption is None else "CONSUMED"
     lines = [
         "Execution mode: RESEARCH_REGISTRY",
         "Network access: DISABLED",
@@ -1473,18 +1447,11 @@ def _format_research_snapshot(snapshot: ExperimentSnapshot) -> str:
         f"Holdout state:       {holdout}",
     ]
     if snapshot.outcome is not None:
-        lines.append(
-            "Result digest:       "
-            f"{snapshot.outcome.result_digest or 'N/A'}"
-        )
-        lines.append(
-            "Failure reason:      "
-            f"{snapshot.outcome.failure_reason or 'N/A'}"
-        )
+        lines.append(f"Result digest:       {snapshot.outcome.result_digest or 'N/A'}")
+        lines.append(f"Failure reason:      {snapshot.outcome.failure_reason or 'N/A'}")
     if snapshot.holdout_consumption is not None:
         lines.append(
-            "Holdout digest:      "
-            f"{snapshot.holdout_consumption.result_digest}"
+            f"Holdout digest:      {snapshot.holdout_consumption.result_digest}"
         )
         lines.append(
             "Holdout consumed:    "
@@ -1551,10 +1518,8 @@ def _format_statistical_validation_report(
             f"Raw annual Sharpe:   {selected.annualized_sharpe_ratio:.6f}",
             "Deflated Sharpe prob:"
             f" {report.deflated_sharpe.deflated_sharpe_probability:.2%}",
-            "PBO:                 "
-            f"{pbo.probability_backtest_overfitting:.2%}",
-            "OOS loss probability:"
-            f" {pbo.probability_out_of_sample_loss:.2%}",
+            f"PBO:                 {pbo.probability_backtest_overfitting:.2%}",
+            f"OOS loss probability: {pbo.probability_out_of_sample_loss:.2%}",
             "Rank correlation:    "
             f"{report.rank_stability.spearman_rank_correlation:.6f}",
             f"Policy result:       {'PASS' if report.passed else 'FAIL'}",
@@ -1576,8 +1541,7 @@ def _format_robustness_report(report: RobustnessReport) -> str:
             f"Robustness cases:    {len(report.cases)}",
             f"Median test return:  {report.median_test_return:.4%}",
             f"Worst test return:   {report.worst_test_return:.4%}",
-            "Median OOS change:   "
-            f"{report.median_return_degradation:.4%}",
+            f"Median OOS change:   {report.median_return_degradation:.4%}",
             f"Worst drawdown:      {report.worst_maximum_drawdown:.4%}",
             f"Pass rate:           {report.pass_rate:.2%}",
             f"Policy result:       {'PASS' if report.passed else 'FAIL'}",
@@ -1598,8 +1562,7 @@ def _format_security_lifecycle(lifecycle: SecurityLifecycle) -> str:
             f"Lifecycle ID:        {lifecycle.lifecycle_id}",
             f"Listed at:           {lifecycle.listed_at.isoformat()}",
             f"Tradable from:       {lifecycle.tradable_from.isoformat()}",
-            "Tradable until:      "
-            f"{_optional_iso_output(lifecycle.tradable_until)}",
+            f"Tradable until:      {_optional_iso_output(lifecycle.tradable_until)}",
             f"Delisted at:         {_optional_iso_output(lifecycle.delisted_at)}",
         )
     )
@@ -1617,8 +1580,7 @@ def _format_universe_membership(membership: UniverseMembership) -> str:
             f"Security:            {membership.exchange}:{membership.symbol}",
             f"Membership ID:       {membership.membership_id}",
             f"Effective from:      {membership.member_from.isoformat()}",
-            "Effective until:     "
-            f"{_optional_iso_output(membership.member_until)}",
+            f"Effective until:     {_optional_iso_output(membership.member_until)}",
             f"Available at:        {membership.available_at.isoformat()}",
         )
     )
@@ -1846,9 +1808,7 @@ def _decimal(value: str, field_name: str) -> Decimal:
             f"Invalid decimal value for {field_name}: {value}"
         ) from error
     if not parsed.is_finite():
-        raise BacktestConfigurationError(
-            f"{field_name.capitalize()} must be finite."
-        )
+        raise BacktestConfigurationError(f"{field_name.capitalize()} must be finite.")
     return parsed
 
 
@@ -1874,9 +1834,7 @@ def _format_result(result: BacktestRunResult) -> str:
     )
     final_snapshot = None if not result.equity_curve else result.equity_curve[-1]
     final_quantity = 0 if final_snapshot is None else final_snapshot.quantity
-    filled_orders = sum(
-        record.status is OrderStatus.FILLED for record in result.orders
-    )
+    filled_orders = sum(record.status is OrderStatus.FILLED for record in result.orders)
     partial_orders = sum(
         record.status is OrderStatus.PARTIALLY_FILLED for record in result.orders
     )
@@ -1887,24 +1845,16 @@ def _format_result(result: BacktestRunResult) -> str:
         record.status is OrderStatus.EXPIRED for record in result.orders
     )
     dividend_gross = (
-        Decimal("0")
-        if final_snapshot is None
-        else final_snapshot.total_dividend_gross
+        Decimal("0") if final_snapshot is None else final_snapshot.total_dividend_gross
     )
     dividend_tax = (
-        Decimal("0")
-        if final_snapshot is None
-        else final_snapshot.total_dividend_tax
+        Decimal("0") if final_snapshot is None else final_snapshot.total_dividend_tax
     )
     dividend_net = (
-        Decimal("0")
-        if final_snapshot is None
-        else final_snapshot.total_dividend_net
+        Decimal("0") if final_snapshot is None else final_snapshot.total_dividend_net
     )
     cash_in_lieu = (
-        Decimal("0")
-        if final_snapshot is None
-        else final_snapshot.total_cash_in_lieu
+        Decimal("0") if final_snapshot is None else final_snapshot.total_cash_in_lieu
     )
     lines = [
         "Execution mode: REPLAY",
@@ -1952,8 +1902,7 @@ def _format_result(result: BacktestRunResult) -> str:
         f"Dividend net:        {dividend_net:,.2f}",
         f"Cash in lieu:        {cash_in_lieu:,.2f}",
         f"Replay digest:       {result.replay_result.event_digest}",
-        "Data context:        "
-        f"{result.config.data_context_digest or 'NOT_VALIDATED'}",
+        f"Data context:        {result.config.data_context_digest or 'NOT_VALIDATED'}",
         "Corporate context:   "
         f"{result.config.corporate_action_context_digest or 'NOT_APPLIED'}",
         "Dividend tax model:  "

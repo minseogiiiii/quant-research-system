@@ -1,0 +1,57 @@
+name: Q14 historical real-fixture 31 of 31 gate (PRIVATE SOURCE REQUIRED)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_private_real_fixture_gate.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-archive-zero-skip:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit-test fail-closed fixture verifier
+        run: python -m unittest discover -s .github/scripts -p 'test_q13_private_fixture_gate.py' -v
+      - name: Unit-test strict HTTPS and GitHub-release token confinement
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.github/scripts python -m unittest discover \
+            -s .github/scripts -p 'test_q16_private_archive_transport.py' -v
+      - name: Fetch authorized immutable private Q7 release with digest protection
+        env:
+          Q13_PRIVATE_RELEASE_URL: ${{ secrets.Q13_PRIVATE_RELEASE_URL }}
+          Q13_GITHUB_ARCHIVE_TOKEN: ${{ secrets.Q13_GITHUB_ARCHIVE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/q14_immutable"
+          python .github/scripts/q16_secure_private_archive_download.py \
+            --output "$RUNNER_TEMP/q14_immutable/q7_frozen.zip"
+      - name: Independently verify archive SHA, source parity and Node 31 with SKIP 0
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/q13_private_fixture_gate.py \
+            --release-zip "$RUNNER_TEMP/q14_immutable/q7_frozen.zip" \
+            --checkout-root "$GITHUB_WORKSPACE"
+          echo 'PASS_Q14_PRIVATE_REAL_NODE_31_31_NO_SKIP'
+      - name: Destroy raw archive on all outcomes
+        if: always()
+        shell: bash
+        run: rm -rf -- "$RUNNER_TEMP/q14_immutable"
+# No raw market data in public Git, actions logs or upload artifacts.
+# Passing this gate alone does not authorize release promotion or order execution.
+
+# Q17 revalidation: immutable authenticated Q7 archive and actual 31/31, zero skips.

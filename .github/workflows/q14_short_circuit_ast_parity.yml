@@ -1,0 +1,99 @@
+name: Q14 Python short-circuit AST normalization and targeted regression
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_short_circuit_ast_parity.yml']
+permissions:
+  contents: read
+jobs:
+  q14-short-circuit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - run: python -m pip install 'ruff==0.15.22'
+      - name: Normalize chained short-circuit If AST and compare against prior source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          import pathlib
+          import subprocess
+          class FuseEquivalentIf(ast.NodeTransformer):
+              def visit_BoolOp(self,node):
+                  self.generic_visit(node)
+                  if isinstance(node.op,ast.And):
+                      flat=[]
+                      for value in node.values:
+                          if isinstance(value,ast.BoolOp) and isinstance(value.op,ast.And):
+                              flat.extend(value.values)
+                          else:
+                              flat.append(value)
+                      node.values=flat
+                  return node
+              def visit_If(self,node):
+                  self.generic_visit(node)
+                  while (
+                      not node.orelse
+                      and len(node.body)==1
+                      and isinstance(node.body[0],ast.If)
+                      and not node.body[0].orelse
+                  ):
+                      inner=node.body[0]
+                      node.test=self.visit_BoolOp(
+                          ast.BoolOp(op=ast.And(), values=[node.test,inner.test])
+                      )
+                      node.body=inner.body
+                  return node
+          previous='a702f6add2044826f301b91535ffa9dc166f6a3f'
+          paths=[
+              'btc_eth_terminal/backend/audit_l2_pilot.py',
+              'btc_eth_terminal/backend/audit_soak.py',
+              'btc_eth_terminal/backend/fetch_coinbase_5m.py',
+              'btc_eth_terminal/backend/static_depth_stress.py'
+          ]
+          for name in paths:
+              old=subprocess.check_output(['git','show',previous+':'+name],text=True)
+              current=pathlib.Path(name).read_text()
+              a=ast.dump(FuseEquivalentIf().visit(ast.parse(old)),include_attributes=False)
+              b=ast.dump(FuseEquivalentIf().visit(ast.parse(current)),include_attributes=False)
+              if a!=b:
+                  raise SystemExit('Q14_SHORT_CIRCUIT_SEMANTICS_DIVERGED:'+name)
+          print('PASS_Q14_FOUR_GUARDS_AST_SHORT_CIRCUIT_EQUIVALENCE')
+          PY
+          ruff check btc_eth_terminal/backend --select SIM102
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+      - name: Run full fixture-free source guards and root unit suite
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v10_soak.py' -q
+          echo 'V17_REAL_ARCHIVE_TEST_REQUIRES_PRIVATE_FIXTURE_NOT_RUN_IN_THIS_WORKFLOW'
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_durable_archive_gate.py' -q
+          python .github/scripts/q7_static_cost_regression.py
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Print real residual lint count, no release acceptance
+        run: |
+          python - <<'PY'
+          import json,collections,subprocess
+          r=subprocess.run(['ruff','check','.','--output-format','json'],capture_output=True,text=True)
+          assert r.returncode in (0,1)
+          data=json.loads(r.stdout)
+          print('Q14_RUFF_AFTER_AST_GUARDS',json.dumps({
+              'total':len(data),
+              'by_rule':dict(sorted(collections.Counter(x['code'] for x in data).items())),
+              'release_approved':False},sort_keys=True))
+          PY
+# Correct-by-construction AST-delta proof, not an operational or release gate.

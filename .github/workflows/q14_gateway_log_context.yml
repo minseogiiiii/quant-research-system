@@ -1,0 +1,132 @@
+name: Q14 gateway log context ownership retry after source lease refresh
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_gateway_log_context.yml']
+permissions:
+  contents: write
+jobs:
+  q14-log-ownership:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - run: python -m pip install 'ruff==0.15.22' 'autopep8==2.3.2'
+      - name: Preserve all existing log operations and add guaranteed context ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          import pathlib
+          import subprocess
+
+          path=pathlib.Path('btc_eth_terminal/scripts/v35_3_sse_soak.py')
+          old=path.read_text()
+          lines=old.splitlines(keepends=True)
+          tree=ast.parse(old)
+          function=next(x for x in tree.body if isinstance(x,ast.FunctionDef) and x.name=='soak')
+          assign=next(x for x in function.body
+                     if isinstance(x,ast.Assign)
+                     and len(x.targets)==1
+                     and isinstance(x.targets[0],ast.Name)
+                     and x.targets[0].id=='log')
+          ret=function.body[-1]
+          if not isinstance(ret,ast.Return) or not isinstance(ret.value,ast.Name) or ret.value.id!='result':
+              raise SystemExit('Q14_UNEXPECTED_SOAK_RETURN_SHAPE')
+          line=lines[assign.lineno-1]
+          if not line.startswith('    log = open(') or not line.rstrip().endswith(')'):
+              raise SystemExit('Q14_UNEXPECTED_LOG_OPEN_SHAPE')
+          if not any(x.strip()=='log.close()' for x in lines[assign.lineno:ret.lineno-1]):
+              raise SystemExit('Q14_EXPLICIT_LOG_CLOSE_MISSING')
+          updated=(
+              ''.join(lines[:assign.lineno-1])
+              +'    with '+line[len('    log = '):].rstrip('\n')+' as log:\n'
+              +''.join(('    '+x if x.strip() else x)
+                       for x in lines[assign.lineno:ret.lineno-1])
+              +''.join(lines[ret.lineno-1:])
+          )
+          # Keep the existing gateway request bytes exact after scope indentation.
+          segments=updated.splitlines(keepends=True)
+          reflow=[]
+          broken=0
+          for source_line in segments:
+              if (
+                  'b"GET /api/v35/health HTTP/1.1' in source_line
+                  and 'Host: localhost' in source_line
+                  and 'X-Pending:' in source_line
+              ):
+                  whitespace=source_line[:len(source_line)-len(source_line.lstrip())]
+                  prefix,suffix=source_line.strip().split('Host: localhost',1)
+                  reflow.append(whitespace+prefix+'"\n')
+                  reflow.append(whitespace+'b"Host: localhost'+suffix+'\n')
+                  broken+=1
+              else:
+                  reflow.append(source_line)
+          if broken!=1:
+              raise SystemExit('Q14_EXPECTED_GATEWAY_REQUEST_LITERAL_MISSING')
+          updated=''.join(reflow)
+          class FlattenLogWith(ast.NodeTransformer):
+              def visit_FunctionDef(self,node):
+                  self.generic_visit(node)
+                  if node.name!='soak':return node
+                  for i,statement in enumerate(node.body):
+                      if not isinstance(statement,ast.With) or len(statement.items)!=1:continue
+                      item=statement.items[0]
+                      if (isinstance(item.optional_vars,ast.Name)
+                          and item.optional_vars.id=='log'
+                          and isinstance(item.context_expr,ast.Call)
+                          and isinstance(item.context_expr.func,ast.Name)
+                          and item.context_expr.func.id=='open'):
+                          node.body[i:i+1]=[
+                             ast.Assign(targets=[ast.Name(id='log',ctx=ast.Store())],
+                                        value=item.context_expr),
+                             *statement.body
+                          ]
+                          return node
+                  return node
+          def canonical(source):
+              return ast.dump(FlattenLogWith().visit(ast.parse(source)),
+                              include_attributes=False)
+          if canonical(updated)!=canonical(old):
+              raise SystemExit('Q14_LOG_SCOPE_NOT_AST_EQUIVALENT')
+          path.write_text(updated)
+          subprocess.run(['autopep8','--in-place','--select','E501',
+              '--max-line-length','88',str(path)],check=True)
+          subprocess.run(['ruff','format',str(path)],check=True)
+          candidate=path.read_text()
+          if canonical(candidate)!=canonical(old):
+              raise SystemExit('Q14_LOG_AUTOFORMAT_CHANGED_SOURCE_AST')
+          compile(candidate,str(path),'exec')
+          print('PASS_Q14_SOAK_LOG_CLOSE_ORDER_AND_AST_EQUIVALENCE')
+          PY
+          ruff check btc_eth_terminal/scripts/v35_3_sse_soak.py --select SIM115,E501
+      - name: Reverify source safety and root regression
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python .github/scripts/q7_static_cost_regression.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_transport_gap.py' -q
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Commit only independently verified candidate log ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q14-import-order-20261122"
+          test "$(git diff --name-only)" = "btc_eth_terminal/scripts/v35_3_sse_soak.py"
+          git add -u -- btc_eth_terminal/scripts/v35_3_sse_soak.py
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Q14: guarantee gateway log lifecycle with AST-equivalent context ownership'
+          git push origin HEAD:refs/heads/remediation/q14-import-order-20261122
+# Historical source and Q7 release manifests remain frozen and unmerged.

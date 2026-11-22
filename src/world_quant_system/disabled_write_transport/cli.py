@@ -130,9 +130,7 @@ async def _certify_fixture(
     )
     dry_run = DeterministicTossOrderWriteDryRunCertifier().certify(
         intent=load_order_intent(arguments.intent),
-        certification=load_read_only_certification(
-            arguments.read_only_certification
-        ),
+        certification=load_read_only_certification(arguments.read_only_certification),
         account=load_account_state(arguments.account),
         market=load_market_state(arguments.market),
         policy=load_order_policy(arguments.order_policy),

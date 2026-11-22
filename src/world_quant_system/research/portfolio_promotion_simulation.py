@@ -107,9 +107,14 @@ def _simulation_inputs() -> tuple[
             declared_turnover=Decimal("8"),
             declared_cost_to_gross_profit_ratio=Decimal("0.15"),
         )
-        for candidate_id, hex_character, robustness_character,
-        robustness_digest_character, statistical_character,
-        statistical_digest_character in (
+        for (
+            candidate_id,
+            hex_character,
+            robustness_character,
+            robustness_digest_character,
+            statistical_character,
+            statistical_digest_character,
+        ) in (
             ("alpha-a", "1", "4", "7", "a", "d"),
             ("alpha-b", "2", "5", "8", "b", "e"),
             ("alpha-c", "3", "6", "9", "c", "f"),

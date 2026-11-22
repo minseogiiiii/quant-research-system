@@ -1,0 +1,117 @@
+name: Q14 embedded JavaScript AST parity via TypeScript compiler (ISOLATED)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_embedded_js_semantic_parity.yml']
+permissions:
+  contents: read
+jobs:
+  javascript-ast-parity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - name: Install exact pinned JS parser toolchain
+        working-directory: btc_eth_terminal/frontend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify Python source difference confined to embedded JS string
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          import pathlib
+          import subprocess
+
+          parent='15c45d2041d375fecf03067b0d493a2b21967574'
+          paths=[
+              'btc_eth_terminal/scripts/v36_3_offline_archive_dom_parity.py',
+              'btc_eth_terminal/scripts/v36_3_q6_archive_browser_gate.py'
+          ]
+          out=pathlib.Path('/tmp/q14_js_ast')
+          out.mkdir(parents=True,exist_ok=True)
+          class NormalizeScript(ast.NodeTransformer):
+              def __init__(self):
+                  self.scripts=[]
+              def visit_Constant(self,node):
+                  if isinstance(node.value,str) and (
+                      node.value.startswith('<script>\n')
+                      and 'window.__responses=PAYLOAD_LITERAL' in node.value
+                  ):
+                      self.scripts.append(node.value)
+                      return ast.copy_location(ast.Constant(value='PINNED_EMBEDDED_JS'),node)
+                  return node
+          for index,name in enumerate(paths):
+              original=subprocess.check_output(['git','show',parent+':'+name],text=True)
+              changed=pathlib.Path(name).read_text(encoding='utf-8')
+              trees=[]
+              for label,source in (('old',original),('new',changed)):
+                  norm=NormalizeScript()
+                  tree=norm.visit(ast.parse(source))
+                  if len(norm.scripts)!=1:
+                      raise SystemExit('Q14_EMBEDDED_JS_LOCATOR_MISMATCH')
+                  raw=norm.scripts[0]
+                  if not raw.startswith('<script>') or not raw.endswith('</script>'):
+                      raise SystemExit('Q14_SCRIPT_BOUNDARY_INVALID')
+                  (out/(str(index)+'_'+label+'.js')).write_text(
+                      raw[len('<script>'):-len('</script>')],
+                      encoding='utf-8'
+                  )
+                  trees.append(ast.dump(tree,include_attributes=False))
+              if trees[0]!=trees[1]:
+                  raise SystemExit('Q14_PYTHON_AST_OUTSIDE_JS_CHANGED:'+name)
+          print('PASS_Q14_PYTHON_AST_ONLY_JS_LITERAL_CHANGED_2_FILES')
+          PY
+          python -m compileall -q btc_eth_terminal/scripts
+      - name: Prove exact JavaScript syntax trees are unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const ts=require('./btc_eth_terminal/frontend/node_modules/typescript');
+          function canonical(node){
+            const obj={kind:node.kind};
+            if(node.kind!==ts.SyntaxKind.SourceFile && typeof node.text==='string') obj.text=node.text;
+            if(typeof node.escapedText==='string') obj.name=node.escapedText;
+            const children=[];
+            node.forEachChild(c=>{children.push(canonical(c));});
+            obj.children=children;
+            return obj;
+          }
+          for(let i=0;i<2;i++){
+            let pair=[];
+            for(const label of ['old','new']){
+              const file='/tmp/q14_js_ast/'+i+'_'+label+'.js';
+              const tree=ts.createSourceFile(file,fs.readFileSync(file,'utf8'),ts.ScriptTarget.ES2022,true,ts.ScriptKind.JS);
+              if(tree.parseDiagnostics.length){
+                throw Error('JS_SYNTAX_INVALID_'+label+':'+tree.parseDiagnostics[0].messageText);
+              }
+              pair.push(JSON.stringify(canonical(tree)));
+            }
+            if(pair[0]!==pair[1]) throw Error('Q14_JAVASCRIPT_AST_CHANGED_FOR_FILE_'+i);
+          }
+          console.log('PASS_Q14_2_OF_2_EXACT_JAVASCRIPT_SYNTAX_TREES');
+          NODE
+      - name: Check new JS layout is Ruff E501 clean and root tests pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install 'ruff==0.15.22'
+          ruff check btc_eth_terminal/scripts/v36_3_offline_archive_dom_parity.py \
+            btc_eth_terminal/scripts/v36_3_q6_archive_browser_gate.py --select E501
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Keep historical real Chromium E2E blocking until pinned assets restored
+        run: echo 'HISTORICAL_CHROMIUM_E2E_NOT_EXECUTED_NO_PRIVATE_BUNDLE'

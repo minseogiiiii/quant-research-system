@@ -67,9 +67,7 @@ class PointInTimeEvidenceResolver:
         self._events_by_candidate: dict[str, tuple[ShadowEvidenceEvent, ...]] = {}
         for candidate_id in manifest.candidate_ids:
             self._events_by_candidate[candidate_id] = tuple(
-                item
-                for item in manifest.events
-                if item.candidate_id == candidate_id
+                item for item in manifest.events if item.candidate_id == candidate_id
             )
 
     def visible_event(
@@ -272,9 +270,7 @@ class DeterministicHistoricalShadowRunner:
             execution_cost = _ZERO
             executed_turnover = _ZERO
             if pending is not None and pending.execute_index == index:
-                execution_cost = (
-                    equity * pending.turnover * transaction_cost_bps / _BPS
-                )
+                execution_cost = equity * pending.turnover * transaction_cost_bps / _BPS
                 if execution_cost >= equity:
                     raise HistoricalShadowIntegrityError(
                         "Transaction cost would exhaust shadow equity."
@@ -295,8 +291,7 @@ class DeterministicHistoricalShadowRunner:
             equity_before = equity
             gross_period_return = sum(
                 (
-                    weight
-                    * self._matrix.series_for(candidate_id)[index]
+                    weight * self._matrix.series_for(candidate_id)[index]
                     for candidate_id, weight in active_weights.items()
                 ),
                 _ZERO,
@@ -314,9 +309,7 @@ class DeterministicHistoricalShadowRunner:
             )
             if halt_triggered:
                 risk_halted = True
-            net_period_return = equity / (
-                equity_before + execution_cost
-            ) - _ONE
+            net_period_return = equity / (equity_before + execution_cost) - _ONE
             ledger.append(
                 ShadowLedgerSnapshot(
                     timestamp=normalized_timestamp,
@@ -396,9 +389,7 @@ class DeterministicHistoricalShadowRunner:
                     _append_journal(
                         journal,
                         timestamp=normalized_timestamp,
-                        event_type=(
-                            ShadowJournalEventType.NO_ELIGIBLE_CANDIDATES
-                        ),
+                        event_type=(ShadowJournalEventType.NO_ELIGIBLE_CANDIDATES),
                         candidate_id=None,
                         reason=(
                             "point-in-time evidence did not satisfy the minimum "
@@ -644,9 +635,7 @@ def _capped_weights(
             if score_total <= _ZERO
             else {item: scores[item] for item in active}
         )
-        score_total = (
-            Decimal(len(active)) if score_total <= _ZERO else score_total
-        )
+        score_total = Decimal(len(active)) if score_total <= _ZERO else score_total
         allocated = _ZERO
         saturated: set[str] = set()
         for candidate_id in sorted(active):
@@ -712,9 +701,7 @@ def _metrics(
     standard_deviation = (
         statistics.stdev(float_returns) if len(float_returns) >= 2 else 0.0
     )
-    annualized_volatility = standard_deviation * math.sqrt(
-        policy.annualization_periods
-    )
+    annualized_volatility = standard_deviation * math.sqrt(policy.annualization_periods)
     sharpe_ratio = (
         statistics.fmean(float_returns)
         / standard_deviation
@@ -723,9 +710,7 @@ def _metrics(
         else None
     )
     downside = tuple(min(0.0, item) for item in float_returns)
-    downside_deviation = math.sqrt(
-        statistics.fmean(item * item for item in downside)
-    )
+    downside_deviation = math.sqrt(statistics.fmean(item * item for item in downside))
     sortino_ratio = (
         statistics.fmean(float_returns)
         / downside_deviation
@@ -735,9 +720,7 @@ def _metrics(
     )
     tail_count = max(
         1,
-        math.ceil(
-            len(periodic_returns) * float(policy.expected_shortfall_fraction)
-        ),
+        math.ceil(len(periodic_returns) * float(policy.expected_shortfall_fraction)),
     )
     expected_shortfall = sum(
         sorted(periodic_returns)[:tail_count],
@@ -747,9 +730,7 @@ def _metrics(
         (item.cash_weight for item in ledger),
         _ZERO,
     ) / Decimal(len(ledger))
-    effective_counts = tuple(
-        _effective_strategy_count(item.weights) for item in ledger
-    )
+    effective_counts = tuple(_effective_strategy_count(item.weights) for item in ledger)
     return ShadowMetrics(
         observation_count=len(ledger),
         initial_equity=initial_equity,
@@ -789,15 +770,11 @@ def _scenario_result(
     reasons: list[str] = []
     if (
         scenario is ShadowScenarioName.BASE
-        and result.metrics.cumulative_return
-        < policy.minimum_base_cumulative_return
+        and result.metrics.cumulative_return < policy.minimum_base_cumulative_return
     ):
         reasons.append("base cumulative return below policy minimum")
     elif scenario is not ShadowScenarioName.EQUAL_WEIGHT_BASELINE:
-        if (
-            result.metrics.cumulative_return
-            < policy.minimum_stress_cumulative_return
-        ):
+        if result.metrics.cumulative_return < policy.minimum_stress_cumulative_return:
             reasons.append("stress cumulative return below policy minimum")
         if result.metrics.maximum_drawdown < policy.maximum_stress_drawdown:
             reasons.append("stress drawdown exceeds policy maximum")
@@ -855,7 +832,5 @@ def decimal_argument(value: str, field_name: str) -> Decimal:
             f"{field_name} must be a valid decimal."
         ) from error
     if not parsed.is_finite():
-        raise HistoricalShadowConfigurationError(
-            f"{field_name} must be finite."
-        )
+        raise HistoricalShadowConfigurationError(f"{field_name} must be finite.")
     return parsed

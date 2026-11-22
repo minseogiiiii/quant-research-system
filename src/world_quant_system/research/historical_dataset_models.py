@@ -213,9 +213,7 @@ class HistoricalDatasetImportSpec:
             "currency": self.currency,
             "code_commit": self.code_commit,
             "point_in_time_context_digest": self.point_in_time_context_digest,
-            "corporate_action_context_digest": (
-                self.corporate_action_context_digest
-            ),
+            "corporate_action_context_digest": (self.corporate_action_context_digest),
             "policy": self.policy.to_document(),
             "source_format": self.source_format.value,
             "source_sha256": source_sha256,
@@ -261,9 +259,7 @@ class HistoricalDatasetManifest:
         if not isinstance(self.provider, str) or not _PROVIDER_PATTERN.fullmatch(
             self.provider
         ):
-            raise HistoricalDatasetConfigurationError(
-                "Stored provider is invalid."
-            )
+            raise HistoricalDatasetConfigurationError("Stored provider is invalid.")
         _require_code(self.exchange, "Exchange")
         if (
             not isinstance(self.symbols, tuple)
@@ -276,9 +272,7 @@ class HistoricalDatasetManifest:
         for symbol in self.symbols:
             _require_code(symbol, "Dataset symbol")
         if not isinstance(self.interval, CandleInterval):
-            raise HistoricalDatasetConfigurationError(
-                "Stored interval is invalid."
-            )
+            raise HistoricalDatasetConfigurationError("Stored interval is invalid.")
         _validate_timezone(self.timezone)
         _validate_currency(self.currency)
         _require_aware(self.start, "Dataset start")
@@ -324,19 +318,16 @@ class HistoricalDatasetManifest:
             raise HistoricalDatasetEligibilityError(
                 "Quarantined data cannot be stored as a historical dataset."
             )
-        if (
-            not isinstance(self.normalizer_version, str)
-            or not _SEMVER_PATTERN.fullmatch(self.normalizer_version)
-        ):
+        if not isinstance(
+            self.normalizer_version, str
+        ) or not _SEMVER_PATTERN.fullmatch(self.normalizer_version):
             raise HistoricalDatasetConfigurationError(
                 "Normalizer version must use semantic x.y.z form."
             )
         if not isinstance(self.code_commit, str) or not _GIT_COMMIT_PATTERN.fullmatch(
             self.code_commit
         ):
-            raise HistoricalDatasetConfigurationError(
-                "Stored code commit is invalid."
-            )
+            raise HistoricalDatasetConfigurationError("Stored code commit is invalid.")
         if not isinstance(self.policy, HistoricalDatasetPolicy):
             raise HistoricalDatasetConfigurationError(
                 "Stored historical dataset policy is invalid."
@@ -363,9 +354,7 @@ class HistoricalDatasetManifest:
             currency=self.currency,
             code_commit=self.code_commit,
             point_in_time_context_digest=self.point_in_time_context_digest,
-            corporate_action_context_digest=(
-                self.corporate_action_context_digest
-            ),
+            corporate_action_context_digest=(self.corporate_action_context_digest),
             policy=self.policy,
             source_format=self.source_format,
         ).dataset_id(self.source_sha256)
@@ -399,9 +388,7 @@ class HistoricalDatasetManifest:
                 "quality_policy_digest": self.quality_policy_digest,
                 "normalizer_version": self.normalizer_version,
                 "normalized_digest": self.normalized_digest,
-                "point_in_time_context_digest": (
-                    self.point_in_time_context_digest
-                ),
+                "point_in_time_context_digest": (self.point_in_time_context_digest),
                 "corporate_action_context_digest": (
                     self.corporate_action_context_digest
                 ),
@@ -436,9 +423,7 @@ class HistoricalDatasetManifest:
             "normalizer_version": self.normalizer_version,
             "normalized_digest": self.normalized_digest,
             "point_in_time_context_digest": self.point_in_time_context_digest,
-            "corporate_action_context_digest": (
-                self.corporate_action_context_digest
-            ),
+            "corporate_action_context_digest": (self.corporate_action_context_digest),
             "code_commit": self.code_commit,
             "policy": self.policy.to_document(),
             "issues": [issue.to_document() for issue in self.issues],
@@ -569,8 +554,7 @@ def historical_dataset_manifest_from_document(
             ),
         )
         issues = tuple(
-            _issue_from_document(item)
-            for item in _required_list(value, "issues")
+            _issue_from_document(item) for item in _required_list(value, "issues")
         )
         return HistoricalDatasetManifest(
             dataset_id=_required_str(value, "dataset_id"),
@@ -608,9 +592,7 @@ def historical_dataset_manifest_from_document(
             code_commit=_required_str(value, "code_commit"),
             policy=policy,
             issues=issues,
-            schema_version=_required_int(
-                value.get("schema_version"), "Schema version"
-            ),
+            schema_version=_required_int(value.get("schema_version"), "Schema version"),
         )
     except (KeyError, TypeError, ValueError) as error:
         raise HistoricalDatasetIntegrityError(

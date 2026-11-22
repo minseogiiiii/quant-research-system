@@ -173,9 +173,7 @@ class ShadowEvidenceManifest:
         object.__setattr__(
             self,
             "manifest_digest",
-            hashlib.sha256(
-                canonical_json_bytes(self.identity_document())
-            ).hexdigest(),
+            hashlib.sha256(canonical_json_bytes(self.identity_document())).hexdigest(),
         )
 
     @property
@@ -293,12 +291,8 @@ class HistoricalShadowPolicy:
             "execution_delay_periods": self.execution_delay_periods,
             "minimum_active_candidates": self.minimum_active_candidates,
             "minimum_cash_weight": _decimal_text(self.minimum_cash_weight),
-            "maximum_candidate_weight": _decimal_text(
-                self.maximum_candidate_weight
-            ),
-            "maximum_one_way_turnover": _decimal_text(
-                self.maximum_one_way_turnover
-            ),
+            "maximum_candidate_weight": _decimal_text(self.maximum_candidate_weight),
+            "maximum_one_way_turnover": _decimal_text(self.maximum_one_way_turnover),
             "transaction_cost_bps": _decimal_text(self.transaction_cost_bps),
             "maximum_evidence_age_days": self.maximum_evidence_age_days,
             "maximum_drawdown_before_halt": _decimal_text(
@@ -311,9 +305,7 @@ class HistoricalShadowPolicy:
             "minimum_stress_cumulative_return": _decimal_text(
                 self.minimum_stress_cumulative_return
             ),
-            "maximum_stress_drawdown": _decimal_text(
-                self.maximum_stress_drawdown
-            ),
+            "maximum_stress_drawdown": _decimal_text(self.maximum_stress_drawdown),
             "expected_shortfall_fraction": _decimal_text(
                 self.expected_shortfall_fraction
             ),
@@ -407,9 +399,7 @@ class ShadowLedgerSnapshot:
         _require_positive_decimal(self.equity_after, "Equity after")
         _require_finite_decimal(self.drawdown, "Drawdown")
         if self.drawdown > _ZERO:
-            raise HistoricalShadowConfigurationError(
-                "Drawdown cannot be positive."
-            )
+            raise HistoricalShadowConfigurationError("Drawdown cannot be positive.")
         if tuple(item.candidate_id for item in self.weights) != tuple(
             sorted(item.candidate_id for item in self.weights)
         ):
@@ -508,9 +498,7 @@ class ShadowMetrics:
             "total_turnover": _decimal_text(self.total_turnover),
             "total_cost": _decimal_text(self.total_cost),
             "average_cash_weight": _decimal_text(self.average_cash_weight),
-            "average_effective_strategy_count": (
-                self.average_effective_strategy_count
-            ),
+            "average_effective_strategy_count": (self.average_effective_strategy_count),
             "risk_halt_count": self.risk_halt_count,
         }
 
@@ -616,16 +604,14 @@ class HistoricalShadowReport:
                 "Decision reasons must be nonblank."
             )
         if (
-            self.decision
-            is ShadowRunDecision.READY_FOR_FORWARD_SHADOW_RESEARCH
+            self.decision is ShadowRunDecision.READY_FOR_FORWARD_SHADOW_RESEARCH
             and self.decision_reasons
         ):
             raise HistoricalShadowConfigurationError(
                 "Ready reports cannot contain rejection reasons."
             )
         if (
-            self.decision
-            is not ShadowRunDecision.READY_FOR_FORWARD_SHADOW_RESEARCH
+            self.decision is not ShadowRunDecision.READY_FOR_FORWARD_SHADOW_RESEARCH
             and not self.decision_reasons
         ):
             raise HistoricalShadowConfigurationError(
@@ -743,17 +729,13 @@ def _require_finite_decimal(value: Decimal, field_name: str) -> None:
 def _require_positive_decimal(value: Decimal, field_name: str) -> None:
     _require_finite_decimal(value, field_name)
     if value <= _ZERO:
-        raise HistoricalShadowConfigurationError(
-            f"{field_name} must be positive."
-        )
+        raise HistoricalShadowConfigurationError(f"{field_name} must be positive.")
 
 
 def _require_nonnegative_decimal(value: Decimal, field_name: str) -> None:
     _require_finite_decimal(value, field_name)
     if value < _ZERO:
-        raise HistoricalShadowConfigurationError(
-            f"{field_name} must be nonnegative."
-        )
+        raise HistoricalShadowConfigurationError(f"{field_name} must be nonnegative.")
 
 
 def _require_unit_decimal(value: Decimal, field_name: str) -> None:

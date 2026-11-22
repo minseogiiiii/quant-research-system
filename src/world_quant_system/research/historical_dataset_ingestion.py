@@ -130,9 +130,7 @@ class HistoricalDatasetImporter:
                 "CSV data was quarantined by the market-data quality gate."
             )
 
-        normalized_store = SQLiteNormalizedMarketDataStore(
-            dataset_root / "normalized"
-        )
+        normalized_store = SQLiteNormalizedMarketDataStore(dataset_root / "normalized")
         normalizer = MarketDataNormalizer(
             normalized_store,
             clock=_FixedClock(normalized_at),
@@ -171,9 +169,7 @@ class HistoricalDatasetImporter:
             normalizer_version=normalizer.VERSION,
             normalized_digest=normalized_digest,
             point_in_time_context_digest=spec.point_in_time_context_digest,
-            corporate_action_context_digest=(
-                spec.corporate_action_context_digest
-            ),
+            corporate_action_context_digest=(spec.corporate_action_context_digest),
             code_commit=spec.code_commit,
             policy=spec.policy,
             issues=parsed.issues,
@@ -194,9 +190,7 @@ def parse_historical_csv(
             "Historical CSV file could not be read."
         ) from error
     if not source_bytes:
-        raise HistoricalDatasetEligibilityError(
-            "Historical CSV file cannot be empty."
-        )
+        raise HistoricalDatasetEligibilityError("Historical CSV file cannot be empty.")
     if len(source_bytes) > _MAX_SOURCE_BYTES:
         raise HistoricalDatasetEligibilityError(
             "Historical CSV exceeds the 8 MiB import limit."
@@ -215,8 +209,7 @@ def parse_historical_csv(
     reader = csv.DictReader(io.StringIO(source_text, newline=""))
     if reader.fieldnames is None or tuple(reader.fieldnames) != _EXPECTED_HEADERS:
         raise HistoricalDatasetEligibilityError(
-            "Historical CSV header must be exactly: "
-            + ",".join(_EXPECTED_HEADERS)
+            "Historical CSV header must be exactly: " + ",".join(_EXPECTED_HEADERS)
         )
 
     zone = ZoneInfo(spec.policy.timezone)
@@ -341,8 +334,7 @@ def _parse_timestamp(value: str | None, zone: ZoneInfo, row_number: int) -> date
     expected_offset = parsed.astimezone(zone).utcoffset()
     if parsed.utcoffset() != expected_offset:
         raise HistoricalDatasetEligibilityError(
-            f"CSV row {row_number} timestamp offset does not match "
-            f"{zone.key}."
+            f"CSV row {row_number} timestamp offset does not match {zone.key}."
         )
     return parsed.astimezone(UTC)
 

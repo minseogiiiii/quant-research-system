@@ -203,9 +203,7 @@ def _required_text(
 ) -> str:
     value = _first_present(record, keys)
     if not isinstance(value, str) or not value.strip():
-        raise BrokerAdapterConfigurationError(
-            f"{field_name} must be nonblank text."
-        )
+        raise BrokerAdapterConfigurationError(f"{field_name} must be nonblank text.")
     return value.strip()
 
 

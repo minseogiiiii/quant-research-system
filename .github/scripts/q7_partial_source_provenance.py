@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Verify eight staged Q7 source blobs without implying release readiness."""
+
 from __future__ import annotations
 
 import ast
@@ -38,7 +39,9 @@ def require(condition: bool, code: str) -> None:
 
 def git(*args: str) -> str:
     proc = subprocess.run(
-        ["git", *args], check=True, text=True,
+        ["git", *args],
+        check=True,
+        text=True,
         capture_output=True,
     )
     return proc.stdout.strip()
@@ -54,9 +57,7 @@ def verify(root: Path) -> dict:
     require(branch == BRANCH, "WRONG_BRANCH")
     repository = os.environ.get("GITHUB_REPOSITORY")
     if repository:
-        require(
-            repository == "minseogiiiii/quant-research-system", "WRONG_REPO"
-        )
+        require(repository == "minseogiiiii/quant-research-system", "WRONG_REPO")
     ancestor = subprocess.run(
         ["git", "merge-base", "--is-ancestor", BASE, "HEAD"], check=False
     )
@@ -98,11 +99,22 @@ def verify(root: Path) -> dict:
 
     changed = git("diff", "--name-only", BASE + "..HEAD").splitlines()
     banned_parts = {
-        "data", "dist", "dist_v36", "dist_v37", "node_modules",
-        "__pycache__", ".env",
+        "data",
+        "dist",
+        "dist_v36",
+        "dist_v37",
+        "node_modules",
+        "__pycache__",
+        ".env",
     }
     banned_extensions = {
-        ".jsonl", ".gz", ".zip", ".key", ".pem", ".sqlite", ".db",
+        ".jsonl",
+        ".gz",
+        ".zip",
+        ".key",
+        ".pem",
+        ".sqlite",
+        ".db",
     }
     for path in changed:
         source_path = Path(path)

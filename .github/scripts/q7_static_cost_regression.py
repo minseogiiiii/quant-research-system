@@ -24,23 +24,27 @@ def exact_cost_functions(text: str):
     """Compile the real function bodies without absent historical imports/data."""
     module = ast.parse(text, filename=str(SOURCE))
     required = ("dec", "static_walk")
-    selected = [node for node in module.body
-                if isinstance(node, ast.FunctionDef) and node.name in required]
+    selected = [
+        node
+        for node in module.body
+        if isinstance(node, ast.FunctionDef) and node.name in required
+    ]
     if tuple(node.name for node in selected) != required:
         raise ValueError("MISSING_OR_REORDERED_PINNED_COST_FUNCTIONS")
     isolated = ast.fix_missing_locations(ast.Module(body=selected, type_ignores=[]))
-    env = {"Decimal": Decimal, "InvalidOperation": InvalidOperation,
-           "FactorLabReject": FactorLabReject}
+    env = {
+        "Decimal": Decimal,
+        "InvalidOperation": InvalidOperation,
+        "FactorLabReject": FactorLabReject,
+    }
     exec(compile(isolated, str(SOURCE), "exec"), env)  # reviewed, pinned local source
     return env["static_walk"]
 
 
 def book():
     return {
-        "bids": [{"price": "100", "quantity": "2"},
-                 {"price": "99", "quantity": "3"}],
-        "asks": [{"price": "101", "quantity": "1"},
-                 {"price": "102", "quantity": "4"}],
+        "bids": [{"price": "100", "quantity": "2"}, {"price": "99", "quantity": "3"}],
+        "asks": [{"price": "101", "quantity": "1"}, {"price": "102", "quantity": "4"}],
     }
 
 
@@ -51,9 +55,13 @@ class StaticCostSafetyTests(unittest.TestCase):
         cls.walk = staticmethod(exact_cost_functions(cls.source))
 
     def test_negative_fee_and_slippage_always_rejected(self):
-        for fee, slip in (("-10", "0"), ("0", "-100"),
-                          ("-0.0000001", "0"), ("0", "-0.0000001"),
-                          ("-10", "-200")):
+        for fee, slip in (
+            ("-10", "0"),
+            ("0", "-100"),
+            ("-0.0000001", "0"),
+            ("0", "-0.0000001"),
+            ("-10", "-200"),
+        ):
             with self.subTest(fee=fee, slip=slip), self.assertRaises(FactorLabReject):
                 self.walk(book(), "BUY", "1", fee, slip)
 

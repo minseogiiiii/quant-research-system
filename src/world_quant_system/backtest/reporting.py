@@ -86,9 +86,7 @@ def backtest_summary_document(result: BacktestRunResult) -> dict[str, object]:
         "warning_count": result.replay_result.warning_count,
         "order_count": len(result.orders),
         "order_status_counts": {
-            status.value: sum(
-                record.status is status for record in result.orders
-            )
+            status.value: sum(record.status is status for record in result.orders)
             for status in OrderStatus
         },
         "order_reject_reason_counts": {
@@ -108,8 +106,7 @@ def backtest_summary_document(result: BacktestRunResult) -> dict[str, object]:
             for action_type in CorporateActionType
         },
         "corporate_actions": [
-            application.to_document()
-            for application in result.corporate_actions
+            application.to_document() for application in result.corporate_actions
         ],
         "metrics": metrics_document(result.metrics),
     }

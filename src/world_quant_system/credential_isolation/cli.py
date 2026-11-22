@@ -103,9 +103,9 @@ def main() -> None:
             )
             print(_format_report(report))
             if arguments.json_output is not None:
-                AtomicJsonCredentialIsolationReportWriter(
-                    arguments.json_output
-                ).write(report)
+                AtomicJsonCredentialIsolationReportWriter(arguments.json_output).write(
+                    report
+                )
             if report.decision is not CredentialCertificationDecision.PASSED:
                 raise SystemExit(2)
             return
@@ -144,10 +144,8 @@ def _format_report(report: CredentialIsolationReport) -> str:
         f"Decision:                 {report.decision.value.upper()}",
         f"Secret source:            {report.credential.source.value.upper()}",
         f"Purpose:                  {report.purpose.value}",
-        "Account fingerprint:      "
-        f"{report.credential.account_fingerprint}",
-        "Client ID fingerprint:    "
-        f"{report.credential.client_id_fingerprint}",
+        f"Account fingerprint:      {report.credential.account_fingerprint}",
+        f"Client ID fingerprint:    {report.credential.client_id_fingerprint}",
         f"Lease state:              {report.lease.state.value.upper()}",
         "Source secrets destroyed: YES",
         "Token secret destroyed:   YES",

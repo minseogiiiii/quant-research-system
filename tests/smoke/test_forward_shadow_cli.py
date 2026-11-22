@@ -28,8 +28,7 @@ def test_forward_shadow_cli_writes_checkpoint(
                     "observed_at": item.observed_at.isoformat(),
                     "received_at": item.received_at.isoformat(),
                     "returns": {
-                        value.candidate_id: str(value.value)
-                        for value in item.returns
+                        value.candidate_id: str(value.value) for value in item.returns
                     },
                     "source_digest": item.source_digest,
                 }

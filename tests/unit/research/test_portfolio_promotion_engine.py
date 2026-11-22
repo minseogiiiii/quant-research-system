@@ -94,10 +94,13 @@ def test_failed_statistical_evidence_is_not_promoted() -> None:
         item for item in report.candidate_results if item.candidate_id == "alpha-a"
     )
     assert result.decision is CandidateDecision.REJECTED
-    assert sum(
-        item.decision is CandidateDecision.ELIGIBLE
-        for item in report.candidate_results
-    ) == 2
+    assert (
+        sum(
+            item.decision is CandidateDecision.ELIGIBLE
+            for item in report.candidate_results
+        )
+        == 2
+    )
 
 
 def test_weight_and_cluster_caps_are_respected() -> None:
@@ -174,9 +177,14 @@ def _evidence() -> tuple[CandidateEvidence, ...]:
             declared_turnover=Decimal("5"),
             declared_cost_to_gross_profit_ratio=Decimal("0.1"),
         )
-        for candidate_id, backtest_character, robustness_character,
-        robustness_digest_character, statistical_character,
-        statistical_digest_character in values
+        for (
+            candidate_id,
+            backtest_character,
+            robustness_character,
+            robustness_digest_character,
+            statistical_character,
+            statistical_digest_character,
+        ) in values
     )
 
 
@@ -184,16 +192,13 @@ def _matrix() -> CandidateReturnMatrix:
     start = datetime(2020, 1, 1, tzinfo=UTC)
     count = 120
     first = tuple(
-        Decimal("0.003") if index % 3 else Decimal("-0.001")
-        for index in range(count)
+        Decimal("0.003") if index % 3 else Decimal("-0.001") for index in range(count)
     )
     second = tuple(
-        Decimal("0.0025") if index % 4 else Decimal("-0.0012")
-        for index in range(count)
+        Decimal("0.0025") if index % 4 else Decimal("-0.0012") for index in range(count)
     )
     third = tuple(
-        Decimal("0.002") if index % 5 else Decimal("-0.0015")
-        for index in range(count)
+        Decimal("0.002") if index % 5 else Decimal("-0.0015") for index in range(count)
     )
     return CandidateReturnMatrix(
         timestamps=tuple(start + timedelta(days=index) for index in range(count)),

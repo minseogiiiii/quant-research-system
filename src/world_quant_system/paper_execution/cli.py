@@ -124,9 +124,7 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def _run_certify(arguments: argparse.Namespace) -> None:
-    account = parse_account_snapshot(
-        load_json_document(arguments.account_snapshot)
-    )
+    account = parse_account_snapshot(load_json_document(arguments.account_snapshot))
     policy = parse_policy(load_json_document(arguments.policy))
     evaluated_at = _optional_timestamp(arguments.evaluated_at)
     report = BrokerCertificationService().certify(
@@ -148,12 +146,8 @@ def _run_certify(arguments: argparse.Namespace) -> None:
 
 
 def _run_validate_intent(arguments: argparse.Namespace) -> None:
-    account = parse_account_snapshot(
-        load_json_document(arguments.account_snapshot)
-    )
-    market = parse_market_snapshot(
-        load_json_document(arguments.market_snapshot)
-    )
+    account = parse_account_snapshot(load_json_document(arguments.account_snapshot))
+    market = parse_market_snapshot(load_json_document(arguments.market_snapshot))
     intent = parse_order_intent(load_json_document(arguments.intent))
     policy = parse_policy(load_json_document(arguments.policy))
     store = SQLitePaperExecutionStore(arguments.store)
@@ -179,12 +173,8 @@ def _run_validate_intent(arguments: argparse.Namespace) -> None:
 
 
 def _run_reconcile(arguments: argparse.Namespace) -> None:
-    internal = parse_internal_ledger(
-        load_json_document(arguments.internal_ledger)
-    )
-    account = parse_account_snapshot(
-        load_json_document(arguments.account_snapshot)
-    )
+    internal = parse_internal_ledger(load_json_document(arguments.internal_ledger))
+    account = parse_account_snapshot(load_json_document(arguments.account_snapshot))
     policy = parse_policy(load_json_document(arguments.policy))
     store = SQLitePaperExecutionStore(arguments.store)
     report = DeterministicPaperReconciler().reconcile_and_record(
@@ -197,10 +187,7 @@ def _run_reconcile(arguments: argparse.Namespace) -> None:
     _write_optional(arguments.json_output, report)
     print("Execution mode: PAPER_SAFETY_FOUNDATION")
     print(f"Reconciliation: {report.decision.value.upper()}")
-    print(
-        "Recommended kill switch: "
-        f"{report.recommended_kill_switch.value.upper()}"
-    )
+    print(f"Recommended kill switch: {report.recommended_kill_switch.value.upper()}")
     print(f"Discrepancies: {len(report.discrepancies)}")
     print("Automatic broker-state overwrite: DISABLED")
     print("Live trading: DISABLED")
@@ -230,9 +217,7 @@ def _run_inspect(arguments: argparse.Namespace) -> None:
 
 def _run_reset_kill_switch(arguments: argparse.Namespace) -> None:
     if arguments.expected_version < 0:
-        raise PaperExecutionConfigurationError(
-            "Expected version cannot be negative."
-        )
+        raise PaperExecutionConfigurationError("Expected version cannot be negative.")
     store = SQLitePaperExecutionStore(arguments.store)
     state = store.reset_kill_switch(
         reason=arguments.reason,

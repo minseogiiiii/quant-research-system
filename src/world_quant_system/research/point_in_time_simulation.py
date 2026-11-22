@@ -196,13 +196,9 @@ def main() -> None:
         f"{'match' if result.context_digest_match else 'mismatch'}"
     )
     print(
-        "Future-data access blocked: "
-        f"{'yes' if result.future_data_blocked else 'no'}"
+        f"Future-data access blocked: {'yes' if result.future_data_blocked else 'no'}"
     )
-    print(
-        "Membership overlap blocked: "
-        f"{'yes' if result.overlap_blocked else 'no'}"
-    )
+    print(f"Membership overlap blocked: {'yes' if result.overlap_blocked else 'no'}")
     print(
         "Delisted security retained: "
         f"{'yes' if result.delisted_security_retained else 'no'}"

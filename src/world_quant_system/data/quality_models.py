@@ -182,10 +182,7 @@ class DataQualityPolicy:
                 self.stale_quote_quarantine_after,
                 "Stale quote quarantine threshold",
             )
-            if (
-                self.stale_quote_quarantine_after
-                < self.stale_quote_warning_after
-            ):
+            if self.stale_quote_quarantine_after < self.stale_quote_warning_after:
                 raise DataQualityConfigurationError(
                     "Stale quote quarantine threshold cannot be earlier than "
                     "the warning threshold."
@@ -325,10 +322,9 @@ class DataQualityReport:
                 "Report status must be a QualityStatus value."
             )
         _require_aware_datetime(self.checked_at, "Quality check timestamp")
-        if (
-            not isinstance(self.validator_version, str)
-            or not _VERSION_PATTERN.fullmatch(self.validator_version)
-        ):
+        if not isinstance(
+            self.validator_version, str
+        ) or not _VERSION_PATTERN.fullmatch(self.validator_version):
             raise DataQualityConfigurationError(
                 "Validator version must use semantic x.y.z form."
             )
@@ -380,10 +376,7 @@ class DataQualityReportReader(Protocol):
 
 
 def status_from_issues(issues: Sequence[QualityIssue]) -> QualityStatus:
-    if any(
-        issue.severity is QualitySeverity.QUARANTINE
-        for issue in issues
-    ):
+    if any(issue.severity is QualitySeverity.QUARANTINE for issue in issues):
         return QualityStatus.QUARANTINE
     if issues:
         return QualityStatus.WARNING
@@ -468,9 +461,7 @@ def report_from_document(document: object) -> DataQualityReport:
                 _required_string(typed_document, "dataset_kind")
             ),
             status=QualityStatus(_required_string(typed_document, "status")),
-            checked_at=_parse_datetime(
-                _required_string(typed_document, "checked_at")
-            ),
+            checked_at=_parse_datetime(_required_string(typed_document, "checked_at")),
             validator_version=_required_string(
                 typed_document,
                 "validator_version",
@@ -495,9 +486,7 @@ def issue_to_document(issue: QualityIssue) -> dict[str, object]:
         "message": issue.message,
         "item_index": issue.item_index,
         "timestamp": (
-            _format_datetime(issue.timestamp)
-            if issue.timestamp is not None
-            else None
+            _format_datetime(issue.timestamp) if issue.timestamp is not None else None
         ),
         "details": dict(issue.details),
     }
@@ -525,9 +514,7 @@ def issue_from_document(document: object) -> QualityIssue:
     try:
         return QualityIssue(
             code=QualityIssueCode(_required_string(typed_document, "code")),
-            severity=QualitySeverity(
-                _required_string(typed_document, "severity")
-            ),
+            severity=QualitySeverity(_required_string(typed_document, "severity")),
             message=_required_string(typed_document, "message"),
             item_index=_optional_int(typed_document, "item_index"),
             timestamp=(
@@ -588,11 +575,7 @@ def _optional_int(document: Mapping[str, object], key: str) -> int | None:
 
 
 def _timedelta_microseconds(value: timedelta) -> int:
-    return (
-        value.days * 86_400_000_000
-        + value.seconds * 1_000_000
-        + value.microseconds
-    )
+    return value.days * 86_400_000_000 + value.seconds * 1_000_000 + value.microseconds
 
 
 def _require_nonnegative_timedelta(value: object, field_name: str) -> None:

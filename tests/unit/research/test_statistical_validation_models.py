@@ -56,12 +56,10 @@ def _matrix() -> StatisticalReturnsMatrix:
     start = datetime(2024, 1, 1, tzinfo=UTC)
     timestamps = tuple(start + timedelta(days=index) for index in range(16))
     first = tuple(
-        Decimal(format(0.001 + 0.002 * math.sin(index), ".12f"))
-        for index in range(16)
+        Decimal(format(0.001 + 0.002 * math.sin(index), ".12f")) for index in range(16)
     )
     second = tuple(
-        Decimal(format(0.0005 + 0.002 * math.cos(index), ".12f"))
-        for index in range(16)
+        Decimal(format(0.0005 + 0.002 * math.cos(index), ".12f")) for index in range(16)
     )
     return StatisticalReturnsMatrix(
         timestamps=timestamps,

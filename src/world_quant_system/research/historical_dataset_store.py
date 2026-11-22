@@ -140,9 +140,7 @@ class SQLiteHistoricalDatasetStore:
                 "Quality report does not match the dataset manifest."
             )
 
-        normalized_store = SQLiteNormalizedMarketDataStore(
-            dataset_root / "normalized"
-        )
+        normalized_store = SQLiteNormalizedMarketDataStore(dataset_root / "normalized")
         digest, count = await _normalized_digest(
             normalized_store,
             symbol=manifest.symbols[0],
@@ -307,9 +305,7 @@ class SQLiteHistoricalDatasetStore:
                 (dataset_id,),
             ).fetchone()
         if row is None:
-            raise HistoricalDatasetNotFoundError(
-                "Historical dataset does not exist."
-            )
+            raise HistoricalDatasetNotFoundError("Historical dataset does not exist.")
         return self._snapshot_from_row(row)
 
     def _freeze_sync(
@@ -385,9 +381,7 @@ class SQLiteHistoricalDatasetStore:
                 (dataset_id,),
             ).fetchone()
         if row is None:
-            raise HistoricalDatasetNotFoundError(
-                "Benchmark link does not exist."
-            )
+            raise HistoricalDatasetNotFoundError("Benchmark link does not exist.")
         return self._link_from_row(row)
 
     def _list_ids_sync(self, limit: int) -> tuple[str, ...]:

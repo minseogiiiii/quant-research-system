@@ -604,9 +604,7 @@ class RobustnessReport:
                 "Robustness report requires a walk-forward plan."
             )
         if not isinstance(self.policy, RobustnessPolicy):
-            raise RobustnessConfigurationError(
-                "Robustness report requires a policy."
-            )
+            raise RobustnessConfigurationError("Robustness report requires a policy.")
         if not isinstance(self.cases, tuple) or not self.cases:
             raise RobustnessConfigurationError(
                 "Robustness report requires a nonempty case tuple."
@@ -824,9 +822,7 @@ def _normalized_offsets(values: Iterable[int], field_name: str) -> tuple[int, ..
             raise RobustnessConfigurationError(f"{field_name} must be an integer.")
         normalized.add(value)
     if not normalized:
-        raise RobustnessConfigurationError(
-            f"{field_name} collection cannot be empty."
-        )
+        raise RobustnessConfigurationError(f"{field_name} collection cannot be empty.")
     return tuple(sorted(normalized))
 
 
@@ -881,9 +877,7 @@ def _require_unit_decimal(value: object, field_name: str) -> None:
 
 def _require_optional_finite_float(value: float | None, field_name: str) -> None:
     if value is not None and not math.isfinite(value):
-        raise RobustnessConfigurationError(
-            f"{field_name} must be finite when defined."
-        )
+        raise RobustnessConfigurationError(f"{field_name} must be finite when defined.")
 
 
 def _finite_nonnegative_float(value: object, field_name: str) -> float:

@@ -35,17 +35,13 @@ def _find_project_root() -> Path:
     for root in (Path.cwd(), *Path.cwd().parents):
         if all((root / relative_path).is_file() for relative_path in required):
             return root
-    raise FileNotFoundError(
-        "Unable to locate credential-isolation example fixtures."
-    )
+    raise FileNotFoundError("Unable to locate credential-isolation example fixtures.")
 
 
 def main() -> None:
     root = _find_project_root()
     evaluated_at = datetime(2026, 8, 3, 22, 30, tzinfo=UTC)
-    policy = load_policy(
-        root / "examples/credential_isolation_policy.example.json"
-    )
+    policy = load_policy(root / "examples/credential_isolation_policy.example.json")
     provider = load_fixture_provider(
         root / "examples/credential_isolation_fixture.example.json"
     )

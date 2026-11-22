@@ -98,15 +98,11 @@ class LongOnlyTargetPositionSizer:
             rate = commission_model.basis_points / _BPS_DENOMINATOR
             unit_cost = execution_price * (Decimal("1") + rate)
             return int(
-                (portfolio.cash / unit_cost).to_integral_value(
-                    rounding=ROUND_FLOOR
-                )
+                (portfolio.cash / unit_cost).to_integral_value(rounding=ROUND_FLOOR)
             )
 
         upper = int(
-            (portfolio.cash / execution_price).to_integral_value(
-                rounding=ROUND_FLOOR
-            )
+            (portfolio.cash / execution_price).to_integral_value(rounding=ROUND_FLOOR)
         )
         lower = 0
         while lower < upper:
@@ -159,12 +155,8 @@ class NextOpenExecutionModel:
                 "Orders must execute strictly after their signal timestamp."
             )
 
-        participating_volume = (
-            Decimal(candle.volume) * self._max_volume_participation
-        )
-        volume_limit = int(
-            participating_volume.to_integral_value(rounding=ROUND_FLOOR)
-        )
+        participating_volume = Decimal(candle.volume) * self._max_volume_participation
+        volume_limit = int(participating_volume.to_integral_value(rounding=ROUND_FLOOR))
         if volume_limit <= 0:
             return ExecutionDecision(
                 fill=None,

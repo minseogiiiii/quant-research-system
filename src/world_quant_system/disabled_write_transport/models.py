@@ -264,10 +264,7 @@ class AuthorizedWriteEnvelope:
             raise DisabledWriteTransportSafetyError(
                 "Compiled request cannot contain credentials."
             )
-        if (
-            self.approval_grant.request_digest
-            != self.compiled_request.request_digest
-        ):
+        if self.approval_grant.request_digest != self.compiled_request.request_digest:
             raise DisabledWriteTransportIntegrityError(
                 "Approval request digest does not match compiled request."
             )
@@ -382,9 +379,7 @@ class TransportBlockReceipt:
             (self.redirect_count, "Redirect count"),
         ):
             if count != 0:
-                raise DisabledWriteTransportSafetyError(
-                    f"{name} must remain zero."
-                )
+                raise DisabledWriteTransportSafetyError(f"{name} must remain zero.")
         identity = {
             "envelope_digest": self.envelope_digest,
             "request_digest": self.request_digest,
@@ -533,9 +528,7 @@ class DisabledWriteTransportReport:
             "envelope": (
                 None if self.envelope is None else self.envelope.to_document()
             ),
-            "receipt": (
-                None if self.receipt is None else self.receipt.to_document()
-            ),
+            "receipt": (None if self.receipt is None else self.receipt.to_document()),
             "external_network_enabled": False,
             "broker_writes_enabled": False,
             "submission_states_enabled": False,
@@ -572,9 +565,7 @@ def format_utc(value: datetime) -> str:
 
 def _require_nonblank(value: str, name: str) -> None:
     if not isinstance(value, str) or not value.strip():
-        raise DisabledWriteTransportConfigurationError(
-            f"{name} must be nonblank text."
-        )
+        raise DisabledWriteTransportConfigurationError(f"{name} must be nonblank text.")
 
 
 def _require_sha256(value: str, name: str) -> None:

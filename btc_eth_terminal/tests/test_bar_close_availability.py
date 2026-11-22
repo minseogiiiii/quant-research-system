@@ -1,4 +1,5 @@
 """Fail-closed 5-minute completed-candle availability regression tests."""
+
 from __future__ import annotations
 
 import gzip
@@ -34,13 +35,25 @@ class TestCompletedBarAvailability(unittest.TestCase):
 
     def manifest(self, relative: str) -> dict:
         payload = {
-            "scope": "BTC_ETH_SPOT_5M_RESEARCH_ONLY", "datasets": [{
-                "symbol": "BTC_TEST_SPOT", "name": "Synthetic test only",
-                "exchange": "TEST", "timezone": "UTC", "session": "24x7",
-                "type": "crypto", "resolution": "5", "file": relative,
-                "source_type": "synthetic", "evidence_status": "unverified",
-                "pricePrecision": 2, "tickSize": 0.01,
-            }], "research": [], "experiments": [],
+            "scope": "BTC_ETH_SPOT_5M_RESEARCH_ONLY",
+            "datasets": [
+                {
+                    "symbol": "BTC_TEST_SPOT",
+                    "name": "Synthetic test only",
+                    "exchange": "TEST",
+                    "timezone": "UTC",
+                    "session": "24x7",
+                    "type": "crypto",
+                    "resolution": "5",
+                    "file": relative,
+                    "source_type": "synthetic",
+                    "evidence_status": "unverified",
+                    "pricePrecision": 2,
+                    "tickSize": 0.01,
+                }
+            ],
+            "research": [],
+            "experiments": [],
         }
         location = self.root / "manifest.json"
         location.write_text(json.dumps(payload))
@@ -65,13 +78,17 @@ class TestCompletedBarAvailability(unittest.TestCase):
         doc = self.manifest("btc.csv")
         self.assertEqual(len(bridge.catalog(doc)["datasets"]), 1)
         self.assertEqual(
-            bridge.get_bars(doc, "BTC_TEST_SPOT", "5", T, 0, 10, asof=T + FIVE_MIN)["n_history_available"],
+            bridge.get_bars(doc, "BTC_TEST_SPOT", "5", T, 0, 10, asof=T + FIVE_MIN)[
+                "n_history_available"
+            ],
             1,
         )
         (self.data / "btc.csv").write_text(
-            "time,open,high,low,close,volume\n" f"{T},100,101,99,100,7\n"
+            f"time,open,high,low,close,volume\n{T},100,101,99,100,7\n"
         )
-        with self.assertRaisesRegex(bridge.InputError, "requires explicit available_at"):
+        with self.assertRaisesRegex(
+            bridge.InputError, "requires explicit available_at"
+        ):
             bridge.get_bars(doc, "BTC_TEST_SPOT", "5", T, 0, 10, asof=T + FIVE_MIN)
 
     def test_export_rejects_early_availability_without_partial_output(self):
@@ -80,8 +97,15 @@ class TestCompletedBarAvailability(unittest.TestCase):
             fp.write("time,open,high,low,close,volume,observed\n")
             fp.write(f"{T},100,101,99,100,7,{T + 1}\n")
         dst = self.data / "btc_exported.csv"
-        mapping = dict(time="time", open="open", high="high", low="low", close="close",
-                       volume="volume", available_at="observed")
+        mapping = dict(
+            time="time",
+            open="open",
+            high="high",
+            low="low",
+            close="close",
+            volume="volume",
+            available_at="observed",
+        )
         with self.assertRaisesRegex(bridge.InputError, "precedes the bar close"):
             export_ohlcv.convert(src=src, dst=dst, columns=mapping)
         self.assertFalse(dst.exists())
@@ -92,8 +116,15 @@ class TestCompletedBarAvailability(unittest.TestCase):
             fp.write("time,open,high,low,close,volume,observed\n")
             fp.write(f"{T},100,101,99,100,7,{T + FIVE_MIN}\n")
         dst = self.data / "btc_exported.csv"
-        mapping = dict(time="time", open="open", high="high", low="low", close="close",
-                       volume="volume", available_at="observed")
+        mapping = dict(
+            time="time",
+            open="open",
+            high="high",
+            low="low",
+            close="close",
+            volume="volume",
+            available_at="observed",
+        )
         result = export_ohlcv.convert(src=src, dst=dst, columns=mapping)
         self.assertTrue(result["asof_supported"])
         self.assertEqual(result["rows"], 1)

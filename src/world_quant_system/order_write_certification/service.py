@@ -73,10 +73,7 @@ class DeterministicTossOrderWriteDryRunCertifier:
         if failed_checks:
             decision = (
                 DryRunDecision.INSUFFICIENT_EVIDENCE
-                if any(
-                    check.code.startswith("EVIDENCE_")
-                    for check in failed_checks
-                )
+                if any(check.code.startswith("EVIDENCE_") for check in failed_checks)
                 else DryRunDecision.REJECTED
             )
             return OrderWriteDryRunReport(
@@ -158,8 +155,7 @@ class DeterministicTossOrderWriteDryRunCertifier:
         )
         add(
             "EVIDENCE_ACCOUNT_MATCH",
-            certification.account_fingerprint
-            == policy.expected_account_fingerprint,
+            certification.account_fingerprint == policy.expected_account_fingerprint,
             "Certification account fingerprint must match policy.",
         )
         add(
@@ -300,10 +296,7 @@ class DeterministicTossOrderWriteDryRunCertifier:
         current_quantity = 0 if current_position is None else current_position.quantity
         if intent.side is PaperOrderSide.BUY:
             projected_quantity = current_quantity + intent.quantity
-            reserve = (
-                account.settled_cash
-                * policy.minimum_cash_reserve_fraction
-            )
+            reserve = account.settled_cash * policy.minimum_cash_reserve_fraction
             cash_valid = account.settled_cash - intent.notional >= reserve
             reference_price = market.ask
             marketable = intent.limit_price >= market.ask

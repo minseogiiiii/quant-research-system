@@ -1,0 +1,94 @@
+name: Q14 full validation and candidate lineage (NO RELEASE APPROVAL)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths:
+      - '.github/workflows/q14_final_full_validation.yml'
+      - 'btc_eth_terminal/tests/test_v35_1_integration.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          version: latest-known
+      - name: Install locked Python
+        run: uv python install 3.12
+      - name: Full project 18-stage validation, includes Ruff, mypy and pytest
+        run: ./scripts/check.sh
+      - name: Independently enforce full Ruff ZERO against exact checked-out HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          .venv/bin/ruff check .
+          echo 'PASS_Q14_RUFF_ZERO_AT_EXACT_HEAD'
+      - name: Compile Q14 audit scripts and run non-market safety tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          .venv/bin/python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests .github/scripts
+          .venv/bin/python -m unittest discover -s .github/scripts -p 'test_q13_private_fixture_gate.py' -q
+          .venv/bin/python -m unittest discover -s .github/scripts -p 'test_q12_ruff_compare.py' -q
+          .venv/bin/python .github/scripts/q7_static_cost_regression.py
+      - name: Compare exact 278 historical source identities, emit candidate-only report
+        shell: bash
+        run: |
+          set -euo pipefail
+          .venv/bin/python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          old = Path('.github/release-evidence/q7_q8_source_git_blobs.json')
+          obj = json.loads(old.read_text())
+          assert obj['count'] == len(obj['paths']) == 278
+          candidate = {}
+          diff = {}
+          for path, previous in sorted(obj['paths'].items()):
+              fp = Path(path)
+              if not fp.is_file() or fp.is_symlink():
+                  raise SystemExit('Q14_REVIEWED_SOURCE_MISSING')
+              actual = subprocess.check_output(['git','hash-object',path], text=True).strip()
+              candidate[path] = actual
+              if previous != actual:
+                  diff[path] = {'original_blob': previous,'candidate_blob': actual}
+          report = {
+              'schema':'q14_candidate_source_lineage_v2',
+              'source_files':278,
+              'original_manifest_sha256': hashlib.sha256(old.read_bytes()).hexdigest(),
+              'candidate_head_sha': os.environ['GITHUB_SHA'],
+              'modified_source_count':len(diff),
+              'unchanged_source_count':278-len(diff),
+              'original_pins_preserved':True,
+              'candidate_blobs':candidate,
+              'changed_pins':diff,
+              'candidate_manifest_status':'UNAPPROVED_REVIEW_ONLY',
+              'private_fixture_node_zero_skip_proven':False,
+              'full_archive_regression_at_exact_head_proven':False,
+              'main_promoted':False,
+              'real_orders_enabled':False
+          }
+          output=Path(os.environ['RUNNER_TEMP'])/'q14_candidate_source_lineage.json'
+          output.write_text(json.dumps(report, sort_keys=True, indent=2)+'\n')
+          print('Q14_SOURCE_LINEAGE',json.dumps({
+              'modified':len(diff),
+              'unchanged':278-len(diff),
+              'approval':report['candidate_manifest_status']
+          }))
+          PY
+      - name: Upload hashes and aggregate diagnostics only, never market data
+        uses: actions/upload-artifact@v4
+        with:
+          name: q14-full-validation-and-candidate-source-lineage
+          path: ${{ runner.temp }}/q14_candidate_source_lineage.json
+          retention-days: 7
+          if-no-files-found: error

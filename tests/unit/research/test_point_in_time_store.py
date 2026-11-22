@@ -246,9 +246,7 @@ async def test_context_requires_continuous_known_membership_coverage(
             member_until=END,
         )
     )
-    await store.save_availability(
-        availability("candle-1", START + timedelta(days=1))
-    )
+    await store.save_availability(availability("candle-1", START + timedelta(days=1)))
 
     with pytest.raises(PointInTimeEligibilityError):
         await store.build_backtest_context(

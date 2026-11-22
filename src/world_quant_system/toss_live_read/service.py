@@ -350,6 +350,4 @@ def _append_header_int(
 
 def _require_aware(value: datetime) -> None:
     if value.tzinfo is None or value.utcoffset() is None:
-        raise TossLiveReadSafetyError(
-            "Certification timestamp must be timezone-aware."
-        )
+        raise TossLiveReadSafetyError("Certification timestamp must be timezone-aware.")

@@ -1,0 +1,96 @@
+name: Q14 AST-identical E501 repair (ISOLATED, NOT RELEASE)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_ast_identical_linewrap.yml']
+permissions:
+  contents: write
+jobs:
+  q14-linewrap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - name: Install pinned tools
+        run: python -m pip install 'ruff==0.15.22' 'autopep8==2.3.2'
+      - name: Reformat only with exact AST preservation, no rule suppressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q14-import-order-20261122"
+          python - <<'PY'
+          import ast
+          import collections
+          import json
+          import pathlib
+          import subprocess
+          def invoke(*args):
+              res=subprocess.run(args,capture_output=True,text=True)
+              if res.returncode: raise RuntimeError(str(args)+':'+res.stderr[:500])
+          def lint():
+              r=subprocess.run(['ruff','check','.','--output-format','json'],capture_output=True,text=True)
+              if r.returncode not in (0,1):raise RuntimeError('RUFF_UNEXPECTED')
+              return json.loads(r.stdout)
+          original=lint()
+          paths=[pathlib.Path(p) for p in subprocess.check_output(
+              ['git','ls-files','--','btc_eth_terminal/**/*.py'],text=True).splitlines()
+              if pathlib.Path(p).is_file()]
+          before={str(p):ast.dump(ast.parse(p.read_text(encoding='utf-8')),include_attributes=False)
+                  for p in paths}
+          invoke('autopep8','--in-place','--recursive','--select','E501',
+                 '--max-line-length','88','btc_eth_terminal')
+          invoke('ruff','format','btc_eth_terminal')
+          diff=[]
+          for p in paths:
+              after=ast.dump(ast.parse(p.read_text(encoding='utf-8')),include_attributes=False)
+              if before[str(p)]!=after:
+                  diff.append(str(p))
+          if diff:
+              raise RuntimeError('Q14_AST_CHANGED_ABORT:'+repr(diff[:15]))
+          revised=lint()
+          def count(rows):return dict(sorted(collections.Counter(x['code'] for x in rows).items()))
+          report={'before':len(original),'after':len(revised),
+                  'resolved':len(original)-len(revised),
+                  'ast_equal_all_tracked_product_python':True,
+                  'before_by_rule':count(original),'after_by_rule':count(revised)}
+          print('Q14_AST_IDENTICAL_LINEWRAP',json.dumps(report,sort_keys=True))
+          if len(revised)>=len(original):
+              raise RuntimeError('NO_RUFF_IMPROVEMENT')
+          PY
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+      - name: Run root and selected Q7 regressions
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python .github/scripts/q7_static_cost_regression.py
+          for f in \
+            test_v36_2_transport_gap.py \
+            test_v36_2_sse_backpressure.py \
+            test_v36_3_durable_archive_gate.py \
+            test_v36_3_operator_monitor.py; do
+            python -m unittest discover -s btc_eth_terminal/tests -p "$f" -q
+          done
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Commit only AST-identical product formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q14-import-order-20261122"
+          git diff --name-only | python -c 'import sys; paths=[p.strip() for p in sys.stdin if p.strip()]; assert paths and all(p.startswith("btc_eth_terminal/") and p.endswith(".py") for p in paths)'
+          git add -u -- btc_eth_terminal
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Q14: AST-identical E501 whitespace and comment reflow'
+          git push origin HEAD:refs/heads/remediation/q14-import-order-20261122
+
+# Never changes main, integration or frozen staging release hashes.

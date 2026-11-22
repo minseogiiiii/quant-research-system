@@ -135,10 +135,13 @@ def test_expired_revoked_and_halted_leases_are_unusable() -> None:
         kill_switch=NORMAL,
     )
 
-    assert vault.metadata(
-        lease.lease_id,
-        now=NOW + timedelta(seconds=30),
-    ).state is TokenLeaseState.EXPIRED
+    assert (
+        vault.metadata(
+            lease.lease_id,
+            now=NOW + timedelta(seconds=30),
+        ).state
+        is TokenLeaseState.EXPIRED
+    )
     with pytest.raises(CredentialIsolationSafetyError, match="expired"):
         vault.authorize(
             lease_id=lease.lease_id,

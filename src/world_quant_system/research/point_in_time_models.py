@@ -169,16 +169,14 @@ class SecurityLifecycle:
         _require_aware(value, "Listing evaluation timestamp")
         instant = value.astimezone(UTC)
         return self.listed_at.astimezone(UTC) <= instant and (
-            self.delisted_at is None
-            or instant < self.delisted_at.astimezone(UTC)
+            self.delisted_at is None or instant < self.delisted_at.astimezone(UTC)
         )
 
     def is_tradable_at(self, value: datetime) -> bool:
         _require_aware(value, "Tradability evaluation timestamp")
         instant = value.astimezone(UTC)
         return self.tradable_from.astimezone(UTC) <= instant and (
-            self.tradable_until is None
-            or instant < self.tradable_until.astimezone(UTC)
+            self.tradable_until is None or instant < self.tradable_until.astimezone(UTC)
         )
 
     def to_document(self) -> dict[str, object]:
@@ -192,9 +190,7 @@ class SecurityLifecycle:
                 None if self.delisted_at is None else format_utc(self.delisted_at)
             ),
             "tradable_until": (
-                None
-                if self.tradable_until is None
-                else format_utc(self.tradable_until)
+                None if self.tradable_until is None else format_utc(self.tradable_until)
             ),
             "source": self.source,
             "source_digest": self.source_digest,
@@ -238,8 +234,7 @@ class UniverseMembership:
         _require_aware(value, "Membership evaluation timestamp")
         instant = value.astimezone(UTC)
         return self.member_from.astimezone(UTC) <= instant and (
-            self.member_until is None
-            or instant < self.member_until.astimezone(UTC)
+            self.member_until is None or instant < self.member_until.astimezone(UTC)
         )
 
     def is_known_at(self, value: datetime) -> bool:
@@ -288,8 +283,7 @@ class DataAvailabilityRecord:
         _require_aware(self.effective_at, "Data effective-at timestamp")
         _require_aware(self.available_at, "Data available-at timestamp")
         if (
-            self.data_kind
-            in (PointInTimeDataKind.CANDLE, PointInTimeDataKind.QUOTE)
+            self.data_kind in (PointInTimeDataKind.CANDLE, PointInTimeDataKind.QUOTE)
             and self.available_at < self.effective_at
         ):
             raise PointInTimeConfigurationError(
@@ -629,9 +623,7 @@ def delisting_record_from_document(
     return DelistingRecord(
         exchange=_required_string(document, "exchange"),
         symbol=_required_string(document, "symbol"),
-        last_tradable_at=_parse_utc(
-            _required_string(document, "last_tradable_at")
-        ),
+        last_tradable_at=_parse_utc(_required_string(document, "last_tradable_at")),
         delisted_at=_parse_utc(_required_string(document, "delisted_at")),
         available_at=_parse_utc(_required_string(document, "available_at")),
         reason=DelistingReason(_required_string(document, "reason")),

@@ -18,9 +18,7 @@ class AtomicJsonTossLiveReadReportWriter:
 
     def write(self, report: TossLiveReadCertificationReport) -> None:
         if not isinstance(report, TossLiveReadCertificationReport):
-            raise TossLiveReadError(
-                "Live-read writer requires a certification report."
-            )
+            raise TossLiveReadError("Live-read writer requires a certification report.")
         parent = self._output_path.parent
         parent.mkdir(parents=True, exist_ok=True)
         payload = json.dumps(

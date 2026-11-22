@@ -213,10 +213,13 @@ class DeterministicStatisticalValidator:
                 strict=True,
             )
         )
-        selected_trial_id = self._selected_trial_id or max(
-            statistics_without_multiplicity,
-            key=lambda item: (item.period_sharpe_ratio, item.trial_id),
-        ).trial_id
+        selected_trial_id = (
+            self._selected_trial_id
+            or max(
+                statistics_without_multiplicity,
+                key=lambda item: (item.period_sharpe_ratio, item.trial_id),
+            ).trial_id
+        )
         p_values = {
             item.trial_id: item.one_sided_p_value
             for item in statistics_without_multiplicity
@@ -339,9 +342,7 @@ class DeterministicStatisticalValidator:
             raise StatisticalValidationEligibilityError(
                 "Observation count must be divisible by the CSCV partition count."
             )
-        partition_size = (
-            self._matrix.observation_count // self._policy.cscv_partitions
-        )
+        partition_size = self._matrix.observation_count // self._policy.cscv_partitions
         if partition_size < 4:
             raise StatisticalValidationEligibilityError(
                 "Every CSCV partition must contain at least four observations."
@@ -442,9 +443,7 @@ def _deflated_sharpe_result(
         expected_maximum_period_sharpe=expected_maximum,
         selected_period_sharpe=selected.period_sharpe_ratio,
         deflated_sharpe_probability=decimal_probability,
-        passed=(
-            decimal_probability >= policy.minimum_deflated_sharpe_probability
-        ),
+        passed=(decimal_probability >= policy.minimum_deflated_sharpe_probability),
     )
 
 
@@ -467,9 +466,7 @@ def _probability_backtest_overfitting(
     selected_oos_scores: list[float] = []
     all_partition_ids = set(range(partition_count))
     for split_number, in_partition_ids in enumerate(combinations, start=1):
-        out_partition_ids = tuple(
-            sorted(all_partition_ids - set(in_partition_ids))
-        )
+        out_partition_ids = tuple(sorted(all_partition_ids - set(in_partition_ids)))
         in_indexes = tuple(
             index
             for partition_id in in_partition_ids
@@ -545,9 +542,7 @@ def _rank_stability(
     matrix: StatisticalReturnsMatrix,
     policy: StatisticalValidationPolicy,
 ) -> RankStabilityResult:
-    split_index = int(
-        Decimal(matrix.observation_count) * policy.ranking_split_fraction
-    )
+    split_index = int(Decimal(matrix.observation_count) * policy.ranking_split_fraction)
     in_indexes = tuple(range(split_index))
     out_indexes = tuple(range(split_index, matrix.observation_count))
     in_scores = {
@@ -585,10 +580,7 @@ def _rank_stability(
         selected_out_of_sample_relative_rank=relative_rank,
         spearman_rank_correlation=correlation,
         rank_reversal=rank_reversal,
-        passed=(
-            not rank_reversal
-            and correlation >= policy.minimum_rank_correlation
-        ),
+        passed=(not rank_reversal and correlation >= policy.minimum_rank_correlation),
     )
 
 
@@ -631,9 +623,7 @@ def _probabilistic_sharpe_probability(
     kurtosis: float,
 ) -> float:
     denominator_squared = (
-        1.0
-        - skewness * sharpe_ratio
-        + ((kurtosis - 1.0) / 4.0) * sharpe_ratio**2
+        1.0 - skewness * sharpe_ratio + ((kurtosis - 1.0) / 4.0) * sharpe_ratio**2
     )
     if denominator_squared <= 0 or not math.isfinite(denominator_squared):
         raise StatisticalValidationEligibilityError(
@@ -659,8 +649,7 @@ def _expected_maximum_sharpe(
     first_quantile = _NORMAL.inv_cdf(1.0 - 1.0 / count)
     second_quantile = _NORMAL.inv_cdf(1.0 - 1.0 / (count * math.e))
     return standard_deviation * (
-        (1.0 - _EULER_MASCHERONI) * first_quantile
-        + _EULER_MASCHERONI * second_quantile
+        (1.0 - _EULER_MASCHERONI) * first_quantile + _EULER_MASCHERONI * second_quantile
     )
 
 
@@ -678,10 +667,7 @@ def _benjamini_hochberg_q_values(
     for index in range(count - 1, -1, -1):
         running = min(running, adjusted[index])
         adjusted[index] = running
-    return {
-        trial_id: adjusted[index]
-        for index, (trial_id, _) in enumerate(ordered)
-    }
+    return {trial_id: adjusted[index] for index, (trial_id, _) in enumerate(ordered)}
 
 
 def _subset_sharpe(
@@ -733,14 +719,17 @@ def _pearson_correlation(first: Sequence[float], second: Sequence[float]) -> flo
     )
     if denominator == 0:
         return 0.0
-    return sum(
-        first_value * second_value
-        for first_value, second_value in zip(
-            first_centered,
-            second_centered,
-            strict=True,
+    return (
+        sum(
+            first_value * second_value
+            for first_value, second_value in zip(
+                first_centered,
+                second_centered,
+                strict=True,
+            )
         )
-    ) / denominator
+        / denominator
+    )
 
 
 def _regression_slope(first: Sequence[float], second: Sequence[float]) -> float | None:
@@ -751,10 +740,13 @@ def _regression_slope(first: Sequence[float], second: Sequence[float]) -> float 
     denominator = sum((value - first_mean) ** 2 for value in first)
     if denominator == 0:
         return None
-    return sum(
-        (first_value - first_mean) * (second_value - second_mean)
-        for first_value, second_value in zip(first, second, strict=True)
-    ) / denominator
+    return (
+        sum(
+            (first_value - first_mean) * (second_value - second_mean)
+            for first_value, second_value in zip(first, second, strict=True)
+        )
+        / denominator
+    )
 
 
 def _warnings(

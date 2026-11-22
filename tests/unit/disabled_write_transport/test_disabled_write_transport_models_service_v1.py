@@ -71,10 +71,7 @@ class _Case:
 
 def _project_root() -> Path:
     for root in (Path.cwd(), *Path.cwd().parents):
-        if (
-            root
-            / "examples/toss_order_write_policy.example.json"
-        ).is_file():
+        if (root / "examples/toss_order_write_policy.example.json").is_file():
             return root
     raise FileNotFoundError("Project examples were not found.")
 
@@ -95,8 +92,7 @@ def _case() -> Iterator[_Case]:
             root / "examples/toss_order_write_intent.example.json"
         ),
         certification=load_read_only_certification(
-            root
-            / "examples/toss_read_only_certification_report.example.json"
+            root / "examples/toss_read_only_certification_report.example.json"
         ),
         account=load_account_state(
             root / "examples/toss_order_write_account.example.json"
@@ -202,14 +198,8 @@ async def test_valid_evidence_is_certified_but_terminally_blocked() -> None:
         assert report.decision is IntegrationDecision.CERTIFIED_BLOCKED
         assert report.receipt is not None
         assert report.receipt.state is TransportState.TRANSPORT_BLOCKED
-        assert (
-            report.receipt.outcome
-            is TransportOutcome.WRITE_TRANSPORT_DISABLED
-        )
-        assert (
-            report.receipt.retry_disposition
-            is RetryDisposition.NO_AUTOMATIC_RETRY
-        )
+        assert report.receipt.outcome is TransportOutcome.WRITE_TRANSPORT_DISABLED
+        assert report.receipt.retry_disposition is RetryDisposition.NO_AUTOMATIC_RETRY
         assert report.network_call_count == 0
         assert report.broker_write_count == 0
 

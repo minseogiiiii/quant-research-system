@@ -60,17 +60,12 @@ class ReadOnlyCaptureBundle:
         )
 
 
-
 def load_policy(path: str | Path) -> ReadOnlyAdapterPolicy:
     document = _load_object(path)
     required_raw = document.get("required_operations")
     if not isinstance(required_raw, list):
-        raise BrokerAdapterConfigurationError(
-            "required_operations must be a list."
-        )
-    required_operations = tuple(
-        _parse_operation(value) for value in required_raw
-    )
+        raise BrokerAdapterConfigurationError("required_operations must be a list.")
+    required_operations = tuple(_parse_operation(value) for value in required_raw)
     return ReadOnlyAdapterPolicy(
         provider=_text(document.get("provider"), "provider"),
         base_url=_text(document.get("base_url"), "base_url"),
@@ -123,8 +118,7 @@ def load_capture_bundle(path: str | Path) -> ReadOnlyCaptureBundle:
                 f"{operation.value} responses must be a non-empty list."
             )
         responses = tuple(
-            _parse_response(response_raw, operation)
-            for response_raw in responses_raw
+            _parse_response(response_raw, operation) for response_raw in responses_raw
         )
         captured_operations.append(
             CapturedOperation(operation=operation, responses=responses)

@@ -96,9 +96,7 @@ def parse_forward_shadow_state(raw: object) -> ForwardShadowState:
             "Forward-shadow state schema_version must equal 1."
         )
     if raw.get("execution_mode") != "forward_shadow":
-        raise ForwardShadowIntegrityError(
-            "Forward-shadow execution mode is invalid."
-        )
+        raise ForwardShadowIntegrityError("Forward-shadow execution mode is invalid.")
     for key, expected in (
         ("network_access", "disabled"),
         ("broker_provider", "none"),
@@ -111,24 +109,19 @@ def parse_forward_shadow_state(raw: object) -> ForwardShadowState:
             )
     policy = _parse_policy(_required_mapping(raw, "policy"))
     observations = tuple(
-        _parse_observation(item)
-        for item in _required_list(raw, "observations")
+        _parse_observation(item) for item in _required_list(raw, "observations")
     )
     journal = tuple(
-        _parse_journal_entry(item)
-        for item in _required_list(raw, "journal")
+        _parse_journal_entry(item) for item in _required_list(raw, "journal")
     )
     ledger = tuple(
-        _parse_ledger_snapshot(item)
-        for item in _required_list(raw, "ledger")
+        _parse_ledger_snapshot(item) for item in _required_list(raw, "ledger")
     )
     pending_raw = raw.get("pending_allocation")
     pending = None if pending_raw is None else _parse_pending(pending_raw)
     updated_raw = raw.get("updated_at")
     updated_at = (
-        None
-        if updated_raw is None
-        else parse_utc_datetime(updated_raw, "updated_at")
+        None if updated_raw is None else parse_utc_datetime(updated_raw, "updated_at")
     )
     visible_raw = _required_list(raw, "visible_event_ids")
     visible_event_ids: list[tuple[str, str]] = []
@@ -145,9 +138,7 @@ def parse_forward_shadow_state(raw: object) -> ForwardShadowState:
     return ForwardShadowState(
         dataset_digest=_required_text(raw, "dataset_digest"),
         manifest_digest=_required_text(raw, "manifest_digest"),
-        manifest_event_ids=tuple(
-            _required_string_list(raw, "manifest_event_ids")
-        ),
+        manifest_event_ids=tuple(_required_string_list(raw, "manifest_event_ids")),
         policy=policy,
         observations=observations,
         journal=journal,
@@ -166,9 +157,7 @@ def parse_forward_shadow_state(raw: object) -> ForwardShadowState:
 
 def _parse_policy(raw: dict[str, object]) -> ForwardShadowPolicy:
     try:
-        allocation_method = AllocationMethod(
-            _required_text(raw, "allocation_method")
-        )
+        allocation_method = AllocationMethod(_required_text(raw, "allocation_method"))
     except ValueError as error:
         raise ForwardShadowIntegrityError(
             "Stored allocation method is unsupported."
@@ -368,9 +357,7 @@ def _atomic_json_write(path: Path, document: object) -> None:
 
 def _as_mapping(value: object, field_name: str) -> dict[str, object]:
     if not isinstance(value, dict):
-        raise ForwardShadowIntegrityError(
-            f"{field_name} must be a JSON object."
-        )
+        raise ForwardShadowIntegrityError(f"{field_name} must be a JSON object.")
     return value
 
 
@@ -394,33 +381,25 @@ def _required_string_list(
 ) -> list[str]:
     values = _required_list(raw, key)
     if not all(isinstance(value, str) for value in values):
-        raise ForwardShadowIntegrityError(
-            f"{key} must contain only strings."
-        )
+        raise ForwardShadowIntegrityError(f"{key} must contain only strings.")
     return [value for value in values if isinstance(value, str)]
 
 
 def _required_text(raw: dict[str, object], key: str) -> str:
     value = raw.get(key)
     if not isinstance(value, str) or not value.strip():
-        raise ForwardShadowIntegrityError(
-            f"{key} must be a nonblank string."
-        )
+        raise ForwardShadowIntegrityError(f"{key} must be a nonblank string.")
     return value
 
 
 def _required_decimal(raw: dict[str, object], key: str) -> Decimal:
     value = raw.get(key)
     if isinstance(value, bool) or not isinstance(value, (str, int, float)):
-        raise ForwardShadowIntegrityError(
-            f"{key} must be a decimal-compatible value."
-        )
+        raise ForwardShadowIntegrityError(f"{key} must be a decimal-compatible value.")
     try:
         parsed = Decimal(str(value))
     except InvalidOperation as error:
-        raise ForwardShadowIntegrityError(
-            f"{key} is not a valid decimal."
-        ) from error
+        raise ForwardShadowIntegrityError(f"{key} is not a valid decimal.") from error
     if not parsed.is_finite():
         raise ForwardShadowIntegrityError(f"{key} must be finite.")
     return parsed

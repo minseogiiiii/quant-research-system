@@ -100,10 +100,9 @@ async def _run_backtest() -> NormalizedReplayBacktestResult:
             normalized_at=normalized_at,
             normalizer_version="1.0.0",
         )
-        duplicate_writes_idempotent = (
-            tuple(record.item_id for record in duplicate_records)
-            == tuple(record.item_id for record in pass_records)
-        )
+        duplicate_writes_idempotent = tuple(
+            record.item_id for record in duplicate_records
+        ) == tuple(record.item_id for record in pass_records)
 
         conflicting_rewrite_blocked = await _conflict_is_blocked(
             store,

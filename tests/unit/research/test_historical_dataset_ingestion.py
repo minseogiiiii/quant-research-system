@@ -145,9 +145,7 @@ async def test_manifest_tampering_is_detected(tmp_path: Path) -> None:
     source = write_csv(tmp_path / "source.csv")
     store = SQLiteHistoricalDatasetStore(tmp_path / "catalog")
     snapshot = await HistoricalDatasetImporter(store).import_csv(source, spec())
-    manifest = (
-        store.root / "manifests" / f"{snapshot.manifest.dataset_id}.json"
-    )
+    manifest = store.root / "manifests" / f"{snapshot.manifest.dataset_id}.json"
     manifest.write_text("{}", encoding="utf-8")
 
     with pytest.raises(HistoricalDatasetIntegrityError):

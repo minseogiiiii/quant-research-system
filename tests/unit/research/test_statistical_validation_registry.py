@@ -82,9 +82,7 @@ def _spec(trial_number: int) -> ExperimentSpec:
         ),
         search_audit=ParameterSearchAudit(
             search_id="grid-v1",
-            search_space_json=canonical_json_object(
-                {"short_window": [20, 21]}
-            ),
+            search_space_json=canonical_json_object({"short_window": [20, 21]}),
             trial_number=trial_number,
             total_trials=2,
             selection_metric="validation_sharpe",

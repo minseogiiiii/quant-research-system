@@ -203,9 +203,7 @@ def _normalize_order(raw_order: object) -> dict[str, str]:
     quantity_value = raw_order.get("quantity")
     order_amount_value = raw_order.get("orderAmount")
     if quantity_value is None and order_amount_value is None:
-        raise TossLiveReadIntegrityError(
-            "Order must contain quantity or orderAmount."
-        )
+        raise TossLiveReadIntegrityError("Order must contain quantity or orderAmount.")
     quantity = (
         _nonnegative_decimal(quantity_value, "Order quantity")
         if quantity_value is not None

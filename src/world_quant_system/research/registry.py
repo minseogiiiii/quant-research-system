@@ -280,9 +280,7 @@ class SQLiteExperimentRegistry:
         return ExperimentSnapshot(
             record=self._record_from_row(record_row),
             outcome=(
-                None
-                if outcome_row is None
-                else self._outcome_from_row(outcome_row)
+                None if outcome_row is None else self._outcome_from_row(outcome_row)
             ),
             holdout_consumption=(
                 None
@@ -393,9 +391,7 @@ class SQLiteExperimentRegistry:
         if not isinstance(serialized_value, str) or not isinstance(
             expected_sha256, str
         ):
-            raise ResearchIntegrityError(
-                f"Stored {label} catalog row is invalid."
-            )
+            raise ResearchIntegrityError(f"Stored {label} catalog row is invalid.")
         serialized = serialized_value.encode("utf-8")
         if hashlib.sha256(serialized).hexdigest() != expected_sha256:
             raise ResearchIntegrityError(f"Stored {label} failed SHA-256 verification.")

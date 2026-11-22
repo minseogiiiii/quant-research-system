@@ -152,6 +152,7 @@ def test_candle_availability_cannot_precede_effective_timestamp() -> None:
             source_digest="d" * 64,
         )
 
+
 def test_delisting_requires_last_tradable_before_delisted_at() -> None:
     with pytest.raises(PointInTimeConfigurationError):
         DelistingRecord(
@@ -231,9 +232,7 @@ def test_experiment_spec_requires_context_digest_and_policy_together() -> None:
         experiment_spec(point_in_time_context_digest="f" * 64)
     with pytest.raises(ResearchConfigurationError):
         experiment_spec(
-            point_in_time_policy_json=point_in_time_policy_json(
-                PointInTimePolicy()
-            )
+            point_in_time_policy_json=point_in_time_policy_json(PointInTimePolicy())
         )
 
 

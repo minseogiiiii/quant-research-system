@@ -37,8 +37,7 @@ SOURCE_URL = (
     f"{SOURCE_COMMIT}/data/SPY.csv"
 )
 SOURCE_LICENSE_URL = (
-    "https://github.com/quantstart/qstrader/blob/"
-    f"{SOURCE_COMMIT}/LICENSE"
+    f"https://github.com/quantstart/qstrader/blob/{SOURCE_COMMIT}/LICENSE"
 )
 SHORT_WINDOW = 20
 LONG_WINDOW = 100
@@ -230,12 +229,12 @@ async def run(output_dir: Path) -> None:
 
     experiment_path = output_dir / "historical-spy-experiment.json"
     experiment_path.write_bytes(canonical_json_bytes(document))
-    AtomicJsonBacktestSummaryWriter(
-        output_dir / "holdout-sma-backtest.json"
-    ).write(holdout_strategy)
-    AtomicJsonBacktestSummaryWriter(
-        output_dir / "holdout-buy-and-hold.json"
-    ).write(holdout_benchmark)
+    AtomicJsonBacktestSummaryWriter(output_dir / "holdout-sma-backtest.json").write(
+        holdout_strategy
+    )
+    AtomicJsonBacktestSummaryWriter(output_dir / "holdout-buy-and-hold.json").write(
+        holdout_benchmark
+    )
 
     _write_figure(
         output_dir / "holdout-cumulative-performance.svg",
@@ -262,13 +261,9 @@ async def run(output_dir: Path) -> None:
     print(f"Historical rows parsed: {len(records)}")
     print(f"Holdout observations: {holdout_strategy.replay_result.event_count}")
     print(f"Holdout SMA total return: {strategy_metrics.total_return * 100:.4f}%")
+    print(f"Holdout passive price return: {benchmark_metrics.total_return * 100:.4f}%")
     print(
-        "Holdout passive price return: "
-        f"{benchmark_metrics.total_return * 100:.4f}%"
-    )
-    print(
-        "Holdout SMA maximum drawdown: "
-        f"{strategy_metrics.maximum_drawdown * 100:.4f}%"
+        f"Holdout SMA maximum drawdown: {strategy_metrics.maximum_drawdown * 100:.4f}%"
     )
     print(
         "Holdout passive maximum drawdown: "
@@ -301,9 +296,7 @@ def _parse(raw: bytes) -> tuple[NormalizedCandleRecord, ...]:
     reader = csv.DictReader(io.StringIO(text))
     expected = {"Date", "Open", "High", "Low", "Close", "Volume", "Adj Close"}
     if set(reader.fieldnames or ()) != expected:
-        raise RuntimeError(
-            f"Unexpected historical CSV columns: {reader.fieldnames!r}"
-        )
+        raise RuntimeError(f"Unexpected historical CSV columns: {reader.fieldnames!r}")
 
     parsed: list[NormalizedCandleRecord] = []
     seen_dates: set[date] = set()
@@ -354,9 +347,7 @@ def _parse(raw: bytes) -> tuple[NormalizedCandleRecord, ...]:
             "volume": row["Volume"],
             "source_commit": SOURCE_COMMIT,
         }
-        raw_sha = hashlib.sha256(
-            canonical_json_bytes(source_document)
-        ).hexdigest()
+        raw_sha = hashlib.sha256(canonical_json_bytes(source_document)).hexdigest()
         identity = f"SPY|1d|{trading_date.isoformat()}|{SOURCE_COMMIT}"
         parsed.append(
             NormalizedCandleRecord(
@@ -502,8 +493,7 @@ def _write_figure(
     styles = (("#111111", None), ("#666666", "10 6"))
     for (_, values), (stroke, dash) in zip(series, styles, strict=True):
         points = " ".join(
-            f"{x(index):.2f},{y(value):.2f}"
-            for index, value in enumerate(values)
+            f"{x(index):.2f},{y(value):.2f}" for index, value in enumerate(values)
         )
         dash_attr = "" if dash is None else f' stroke-dasharray="{dash}"'
         svg.append(
@@ -521,8 +511,7 @@ def _write_figure(
             f'stroke="{stroke}" stroke-width="3"{dash_attr}/>'
         )
         svg.append(
-            f'<text x="{left + 72}" y="{yy + 5}" class="tick">'
-            f"{escape(label)}</text>"
+            f'<text x="{left + 72}" y="{yy + 5}" class="tick">{escape(label)}</text>'
         )
     svg.append("</svg>")
     path.write_text("\n".join(svg) + "\n", encoding="utf-8")

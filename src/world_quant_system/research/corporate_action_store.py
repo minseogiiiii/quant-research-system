@@ -359,9 +359,7 @@ class SQLiteCorporateActionStore:
         return tuple(
             sorted(
                 actions,
-                key=lambda action: min(
-                    event.sort_key() for event in action.events
-                ),
+                key=lambda action: min(event.sort_key() for event in action.events),
             )
         )
 

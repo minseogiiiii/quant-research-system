@@ -86,7 +86,7 @@ def extract_subset(archive: Path, root: Path) -> dict[str, Path]:
         for entry in z.infolist():
             if entry.is_dir():
                 continue
-            rel = entry.filename[len(PREFIX):]
+            rel = entry.filename[len(PREFIX) :]
             if not rel.startswith("frontend/") and entry.filename not in required:
                 continue
             if rel.startswith("frontend/node_modules/"):
@@ -167,7 +167,10 @@ def run(archive: Path, checkout: Path | None) -> dict[str, object]:
                 raise ValueError("Q13_INCOMPLETE_NODE_TAP")
             metrics[key] = int(match.group(1))
         if result.returncode or metrics != {
-            "tests": 31, "pass": 31, "fail": 0, "skipped": 0
+            "tests": 31,
+            "pass": 31,
+            "fail": 0,
+            "skipped": 0,
         }:
             raise ValueError("Q13_NODE_ZERO_SKIP_GATE_FAILED")
         return {

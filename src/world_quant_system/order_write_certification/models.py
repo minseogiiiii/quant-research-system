@@ -354,9 +354,7 @@ class TossOrderWritePolicy:
             "Expected account fingerprint",
         )
         if not self.allowed_symbols:
-            raise OrderWriteConfigurationError(
-                "At least one symbol must be allowed."
-            )
+            raise OrderWriteConfigurationError("At least one symbol must be allowed.")
         if self.allowed_symbols != tuple(sorted(self.allowed_symbols)):
             raise OrderWriteConfigurationError("Allowed symbols must be sorted.")
         if len(set(self.allowed_symbols)) != len(self.allowed_symbols):
@@ -409,8 +407,7 @@ class TossOrderWritePolicy:
             )
         if (
             self.market is TossOrderMarket.KR
-            and self.high_value_order_threshold
-            != OFFICIAL_HIGH_VALUE_THRESHOLD_KRW
+            and self.high_value_order_threshold != OFFICIAL_HIGH_VALUE_THRESHOLD_KRW
         ):
             raise OrderWriteSafetyError(
                 "KR high-value threshold must match the pinned contract."
@@ -432,9 +429,7 @@ class TossOrderWritePolicy:
                 self.maximum_certification_age_seconds
             ),
             "maximum_order_quantity": self.maximum_order_quantity,
-            "maximum_order_notional": decimal_text(
-                self.maximum_order_notional
-            ),
+            "maximum_order_notional": decimal_text(self.maximum_order_notional),
             "maximum_position_quantity": self.maximum_position_quantity,
             "maximum_open_orders": self.maximum_open_orders,
             "minimum_cash_reserve_fraction": decimal_text(
@@ -445,9 +440,7 @@ class TossOrderWritePolicy:
             ),
             "price_tick": decimal_text(self.price_tick),
             "human_approval_ttl_seconds": self.human_approval_ttl_seconds,
-            "high_value_order_threshold": decimal_text(
-                self.high_value_order_threshold
-            ),
+            "high_value_order_threshold": decimal_text(self.high_value_order_threshold),
             "require_marketable_limit": self.require_marketable_limit,
         }
 
@@ -488,13 +481,9 @@ class CompiledTossOrderRequest:
         _require_sha256(self.account_fingerprint, "Account fingerprint")
         _require_aware(self.compiled_at, "Request compile time")
         if self.network_sendable:
-            raise OrderWriteSafetyError(
-                "Dry-run requests cannot be network-sendable."
-            )
+            raise OrderWriteSafetyError("Dry-run requests cannot be network-sendable.")
         if self.credentials_loaded:
-            raise OrderWriteSafetyError(
-                "Dry-run requests cannot load credentials."
-            )
+            raise OrderWriteSafetyError("Dry-run requests cannot load credentials.")
         if self.headers != tuple(sorted(self.headers)):
             raise OrderWriteConfigurationError("Headers must be sorted.")
         normalized_headers = {name.lower(): value for name, value in self.headers}
@@ -502,13 +491,8 @@ class CompiledTossOrderRequest:
             raise OrderWriteSafetyError(
                 "Authorization must remain a redacted placeholder."
             )
-        expected_account_header = (
-            f"sha256:{self.account_fingerprint}"
-        )
-        if (
-            normalized_headers.get("x-tossinvest-account")
-            != expected_account_header
-        ):
+        expected_account_header = f"sha256:{self.account_fingerprint}"
+        if normalized_headers.get("x-tossinvest-account") != expected_account_header:
             raise OrderWriteSafetyError(
                 "Account header must contain only the account fingerprint."
             )
@@ -533,18 +517,14 @@ class CompiledTossOrderRequest:
             )
         client_order_id = body_document["clientOrderId"]
         if not isinstance(client_order_id, str):
-            raise OrderWriteConfigurationError(
-                "clientOrderId must be text."
-            )
+            raise OrderWriteConfigurationError("clientOrderId must be text.")
         _require_client_order_id(client_order_id)
         if body_document["orderType"] != "LIMIT":
             raise OrderWriteSafetyError("Dry-run v1 permits LIMIT only.")
         if body_document["timeInForce"] != "DAY":
             raise OrderWriteSafetyError("Dry-run v1 permits DAY only.")
         if body_document["confirmHighValueOrder"] is not False:
-            raise OrderWriteSafetyError(
-                "Dry-run v1 cannot confirm high-value orders."
-            )
+            raise OrderWriteSafetyError("Dry-run v1 cannot confirm high-value orders.")
         object.__setattr__(
             self,
             "request_digest",
@@ -798,9 +778,7 @@ def parse_utc_datetime(value: object, field_name: str) -> datetime:
 
 def decimal_from(value: object, field_name: str) -> Decimal:
     if isinstance(value, bool):
-        raise OrderWriteConfigurationError(
-            f"{field_name} must be a decimal value."
-        )
+        raise OrderWriteConfigurationError(f"{field_name} must be a decimal value.")
     try:
         parsed = Decimal(str(value))
     except (InvalidOperation, ValueError) as error:
@@ -828,9 +806,7 @@ def validate_price_precision(
         return price == price.to_integral_value()
     exponent = price.as_tuple().exponent
     if not isinstance(exponent, int):
-        raise OrderWriteConfigurationError(
-            "Price must be a finite decimal value."
-        )
+        raise OrderWriteConfigurationError("Price must be a finite decimal value.")
     scale = max(0, -exponent)
     return scale <= (4 if price < Decimal("1") else 2)
 
@@ -877,9 +853,7 @@ def _require_currency(value: str) -> None:
 
 def _require_aware(value: datetime, field_name: str) -> None:
     if value.tzinfo is None or value.utcoffset() is None:
-        raise OrderWriteConfigurationError(
-            f"{field_name} must be timezone-aware."
-        )
+        raise OrderWriteConfigurationError(f"{field_name} must be timezone-aware.")
 
 
 def _require_nonblank(value: str, field_name: str) -> None:
@@ -903,9 +877,7 @@ def _require_sha256(value: str, field_name: str) -> None:
 
 def _require_positive_int(value: int, field_name: str) -> None:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        raise OrderWriteConfigurationError(
-            f"{field_name} must be a positive integer."
-        )
+        raise OrderWriteConfigurationError(f"{field_name} must be a positive integer.")
 
 
 def _require_nonnegative_int(value: int, field_name: str) -> None:
@@ -917,9 +889,7 @@ def _require_nonnegative_int(value: int, field_name: str) -> None:
 
 def _require_finite_decimal(value: Decimal, field_name: str) -> None:
     if not isinstance(value, Decimal) or not value.is_finite():
-        raise OrderWriteConfigurationError(
-            f"{field_name} must be a finite Decimal."
-        )
+        raise OrderWriteConfigurationError(f"{field_name} must be a finite Decimal.")
 
 
 def _require_positive_decimal(value: Decimal, field_name: str) -> None:
@@ -931,17 +901,13 @@ def _require_positive_decimal(value: Decimal, field_name: str) -> None:
 def _require_nonnegative_decimal(value: Decimal, field_name: str) -> None:
     _require_finite_decimal(value, field_name)
     if value < _ZERO:
-        raise OrderWriteConfigurationError(
-            f"{field_name} must be nonnegative."
-        )
+        raise OrderWriteConfigurationError(f"{field_name} must be nonnegative.")
 
 
 def _require_unit_interval(value: Decimal, field_name: str) -> None:
     _require_finite_decimal(value, field_name)
     if value < _ZERO or value >= Decimal("1"):
-        raise OrderWriteConfigurationError(
-            f"{field_name} must be in [0, 1)."
-        )
+        raise OrderWriteConfigurationError(f"{field_name} must be in [0, 1).")
 
 
 __all__ = [

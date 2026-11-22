@@ -105,9 +105,7 @@ class CorporateActionPolicy:
         return {
             "fractional_share_policy": self.fractional_share_policy.value,
             "require_known_before_event": self.require_known_before_event,
-            "require_explicit_delisting_value": (
-                self.require_explicit_delisting_value
-            ),
+            "require_explicit_delisting_value": (self.require_explicit_delisting_value),
         }
 
 
@@ -227,20 +225,14 @@ class CorporateActionRecord:
             "source_digest": self.source_digest,
             "ratio_numerator": self.ratio_numerator,
             "ratio_denominator": self.ratio_denominator,
-            "cash_amount_per_share": _optional_decimal_text(
-                self.cash_amount_per_share
-            ),
+            "cash_amount_per_share": _optional_decimal_text(self.cash_amount_per_share),
             "declared_at": _optional_time_text(self.declared_at),
             "ex_at": _optional_time_text(self.ex_at),
             "record_at": _optional_time_text(self.record_at),
             "payment_at": _optional_time_text(self.payment_at),
             "new_symbol": self.new_symbol,
-            "cash_in_lieu_price": _optional_decimal_text(
-                self.cash_in_lieu_price
-            ),
-            "delisting_cash_price": _optional_decimal_text(
-                self.delisting_cash_price
-            ),
+            "cash_in_lieu_price": _optional_decimal_text(self.cash_in_lieu_price),
+            "delisting_cash_price": _optional_decimal_text(self.delisting_cash_price),
             "delisting_recovery_rate": _optional_decimal_text(
                 self.delisting_recovery_rate
             ),
