@@ -33,7 +33,7 @@ class FrontendReadOnlyParity(unittest.TestCase):
         cls.server = server_for_live(cls.e)
         cls.worker = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.worker.start()
-        cls.base = "http://127.0.0.1:%d" % cls.server.server_address[1]
+        cls.base = f"http://127.0.0.1:{cls.server.server_address[1]}"
 
     @classmethod
     def tearDownClass(cls):
