@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 concurrency:
   group: q18-live-30m-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -175,7 +175,7 @@ jobs:
           plan=[240]*6+[120]
           for i, seconds in enumerate(plan,1):
               fanout=(p/f'fanout_{i}.log').read_text()
-              match=re.search(r'PASS_REAL_PUBLIC_LIVE_FANOUT (\\{.*\\})',fanout)
+              match=re.search(r'PASS_REAL_PUBLIC_LIVE_FANOUT (\{.*\})',fanout)
               if not match:raise SystemExit('SSE_WINDOW_RESULT_MISSING:'+str(i))
               report=json.loads(match.group(1))
               if (report.get('status')!='PASS' or report.get('max_active_sse',0)<8
@@ -197,7 +197,7 @@ jobs:
           resource={'sample_count':len(samples),'peak_tracked_rss_bytes':max(totals),
                     'tracked_rss_growth_bytes':totals[-1]-totals[min(5,len(totals)-1)],
                     'minimum_host_disk_free_bytes':min(s['host_disk_free_bytes'] for s in samples)}
-          (p/'resource_summary.json').write_text(json.dumps(resource,indent=2,sort_keys=True)+'\\n')
+          (p/'resource_summary.json').write_text(json.dumps(resource,indent=2,sort_keys=True)+'\n')
           gate=(p/'archive_gate.log').read_text()
           if 'PASS_COINBASE_LIVE_POST_CAPTURE_AUDIT' not in replay:
               raise SystemExit('REPLAY_NOT_VERIFIED')
