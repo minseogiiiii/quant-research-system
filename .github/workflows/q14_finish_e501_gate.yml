@@ -1,0 +1,49 @@
+name: Q14 AST-identity finishing E501 gate (ISOLATED)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_finish_e501_gate.yml']
+permissions:
+  contents: write
+jobs:
+  q14-finish-e501:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - run: python -m pip install 'ruff==0.15.22'
+      - name: Refactor only AST-identical remaining literal/comment/fstring lines
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q14-import-order-20261122"
+          python .github/scripts/q14_safe_remaining_e501.py
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+      - name: Run root regression and Q7 read-only safety tests
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python .github/scripts/q7_static_cost_regression.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_transport_gap.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_durable_archive_gate.py' -q
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Commit tested source only to Q14 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only | python -c 'import sys; a=[x.strip() for x in sys.stdin if x.strip()]; assert a and all(x.startswith("btc_eth_terminal/") and x.endswith(".py") for x in a)'
+          git add -u -- btc_eth_terminal
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Q14: exact-AST reflow of residual comments and string literals'
+          git push origin HEAD:refs/heads/remediation/q14-import-order-20261122
