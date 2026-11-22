@@ -283,12 +283,12 @@ def main(argv=None) -> int:
         work.parent, args.archive_budget_bytes, args.disk_reserve_bytes
     ):
         ap.error(
-            (
+            
                 'INSUFFICIENT_DURABLE_DISK_CA'
                 'PACITY: 55GB archive budget '
                 'plus 10GiB reserve must be f'
                 'ree before startup'
-            )
+            
         )
     if work.exists() or work.is_symlink():
         ap.error("Workdir MUST NOT exist (no preexisting raw evidence can be reused)")

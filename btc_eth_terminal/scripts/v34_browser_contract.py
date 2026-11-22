@@ -88,25 +88,25 @@ def run(output: Path):
             )
             page.on("pageerror", lambda e: js_errors.append(str(e)))
             page.set_content(
-                (
+                
                     '<!doctype html><html lang="e'
                     'n"><head><meta name="viewpor'
                     't" content="width=device-wid'
                     'th,initial-scale=1"></head><'
                     'body><div id="root"></div></'
                     'body></html>'
-                )
+                
             )
             page.add_style_tag(content=css.decode())
             page.expose_function("__backend", real_fetch)
             page.evaluate(
-                (
+                
                     '(() => {window.fetch=async(u'
                     ')=>{const a=await window.__b'
                     'ackend(String(u));return {ok'
                     ':a.ok,status:a.status,json:a'
                     'sync()=>a.payload}}})()'
-                )
+                
             )
             page.add_script_tag(content=js.decode())
             page.wait_for_selector(".pro-terminal .pro-main-grid", timeout=20000)
@@ -201,12 +201,12 @@ def run(output: Path):
             check(
                 "first_asof_trade_sample_causal",
                 page.evaluate(
-                    (
+                    
                         '(() => {const cutoff=documen'
                         "t.querySelector('.pro-utc')."
                         'textContent;return cutoff.in'
                         "cludes('2026-')})()"
-                    )
+                    
                 ),
             )
             check(
@@ -228,14 +228,14 @@ def run(output: Path):
             )
             # Product switch: hide previous source until new product is validated.
             page.evaluate(
-                (
+                
                     '(() => {let previous=window.'
                     'fetch;window.fetch=async(u)='
                     ">{if(String(u).includes('pro"
                     "duct=ETH-USD'))await new Pro"
                     'mise(r=>setTimeout(r,320));r'
                     'eturn previous(u)}})()'
-                )
+                
             )
             page.locator(".pro-symbols button").filter(has_text="ETH-USD").click()
             check(

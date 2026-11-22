@@ -166,13 +166,13 @@ def run(output: Path, dist: Path):
                 check(
                     "rapid_product_switch_does_not_cross_contaminate",
                     page.evaluate(
-                        (
+                        
                             "state.product==='BTC-USD' &&"
                             ' state.trades.every(x=>x.pro'
                             "duct==='BTC-USD') && state.f"
                             'eatures.every(x=>x.instrumen'
                             "t==='BTC-USD')"
-                        )
+                        
                     ),
                 )
                 # Race two replay cutoffs, delaying the older snapshot.
@@ -232,12 +232,12 @@ def run(output: Path, dist: Path):
                 page = browser.new_page(viewport={"width": 1460, "height": 990})
                 page.on("pageerror", lambda e: errors.append(str(e)))
                 page.set_content(
-                    (
+                    
                         '<!doctype html><html><head><'
                         'title>Quant Research</title>'
                         '</head><body><div id="root">'
                         '</div></body></html>'
-                    )
+                    
                 )
                 css = list((dist / "assets").glob("*.css"))
                 js = list((dist / "assets").glob("*.js"))

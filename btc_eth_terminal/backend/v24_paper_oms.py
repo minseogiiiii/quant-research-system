@@ -495,12 +495,12 @@ class FixturePaperOMS:
 
     def _replay(self, conn):
         rows = conn.execute(
-            (
+            
                 'SELECT seq,token,kind,order_'
                 'id,payload,previous_hash,eve'
                 'nt_hash FROM events ORDER BY'
                 ' seq'
-            )
+            
         ).fetchall()
         if not rows or rows[0][2] != "INIT":
             raise PaperReject("Missing genesis policy event")

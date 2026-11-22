@@ -89,11 +89,11 @@ def verify_bundle(directory: Path) -> dict:
             or source.get("evidence_status") != "unverified"
         ):
             raise coinbase.SourceError(
-                (
+                
                     'Source identity/provenance a'
                     'ssertions do not match the d'
                     'eclared product'
-                )
+                
             )
         if source.get("available_at", "MISSING") is not None:
             raise coinbase.SourceError(
@@ -128,12 +128,12 @@ def verify_bundle(directory: Path) -> dict:
             or retrieved.timestamp() > datetime.now(UTC).timestamp() + 60
         ):
             raise coinbase.SourceError(
-                (
+                
                     'Source retrieval timestamp m'
                     'ust be UTC, after candle com'
                     'pletion, and not future-date'
                     'd'
-                )
+                
             )
         if start_sec % 300 or end_sec % 300 or end_sec <= start_sec:
             raise coinbase.SourceError("Invalid page horizon in source metadata")
@@ -177,11 +177,11 @@ def verify_bundle(directory: Path) -> dict:
                 and page["http_request_end_sec_inclusive"] != b - 1
             ):
                 raise coinbase.SourceError(
-                    (
+                    
                         'Archived HTTP request end is'
                         ' inconsistent with exclusive'
                         ' candle horizon'
-                    )
+                    
                 )
             if not start_sec <= a < b <= end_sec or (b - a) > coinbase.PAGE_BARS * 300:
                 raise coinbase.SourceError("Bad page boundary")
@@ -459,11 +459,11 @@ def main() -> None:
     print("Archived Coinbase BTC-USD and ETH-USD 5m source pages:", folder)
     print("Offline reconstruction:", verify_bundle(folder))
     print(
-        (
+        
             'No trades. No API credential'
             's. No historical availabilit'
             'y claims. No alpha claim.'
-        )
+        
     )
 
 

@@ -354,11 +354,11 @@ def read_manifest(path: Path | None = None) -> dict:
                 or not item.get("provenance_file")
             ):
                 raise InputError(
-                    (
+                    
                         'Coinbase spot data requires '
                         'canonical identity and paire'
                         'd raw-page provenance'
-                    )
+                    
                 )
         pair = (item["symbol"], item["resolution"])
         if pair in pairs:
@@ -379,11 +379,11 @@ def read_manifest(path: Path | None = None) -> dict:
         )
         if item["symbol"] in seen_symbols and seen_symbols[item["symbol"]] != identity:
             raise InputError(
-                (
+                
                     'Same symbol must use identic'
                     'al instrument/source metadat'
                     'a across resolutions'
-                )
+                
             )
         seen_symbols[item["symbol"]] = identity
         if (

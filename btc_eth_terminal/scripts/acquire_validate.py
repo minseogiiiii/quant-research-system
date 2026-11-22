@@ -150,11 +150,11 @@ def capture(
             if not status["same_provider_repeat_match"]:
                 status["status"] = "REPEAT_DIFFERED_NO_REGISTRATION"
                 status["reason"] = (
-                    (
+                    
                         'Repeat historical candle val'
                         'ues changed; review both pre'
                         'served archives'
-                    )
+                    
                 )
                 return status
         if register:

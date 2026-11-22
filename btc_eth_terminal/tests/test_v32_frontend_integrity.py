@@ -38,12 +38,12 @@ class BuildPinSafety(unittest.TestCase):
         self.dist.mkdir()
         (self.dist / "assets").mkdir()
         (self.dist / "index.html").write_text(
-            (
+            
                 '<script src="/assets/index-a'
                 'bc123.js"></script><link hre'
                 'f="/assets/index-testcss.css'
                 '" rel="stylesheet">'
-            )
+            
         )
         (self.dist / "assets/index-abc123.js").write_bytes(b"console.log(1)")
         (self.dist / "assets/index-testcss.css").write_bytes(b"body{color:steelblue}")
