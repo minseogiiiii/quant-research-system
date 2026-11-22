@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   frontend-immutable:
     runs-on: ubuntu-24.04
@@ -57,6 +58,33 @@ jobs:
               assert hashlib.sha256(contents).hexdigest()==meta['sha256'],f'Q14_BAD_BUNDLE_SHA:{name}'
           assert original['trading_enabled'] is False
           print('PASS_Q14_EXACT_CANDIDATE_FRONTEND_BUILD_SHA',len(candidates))
+          PY
+      - name: Restore historical v35.1 assets from reviewed Actions run
+        uses: actions/download-artifact@v4
+        with:
+          name: v35-1-unpinned-candidate-dist
+          run-id: 43993998279
+          github-token: ${{ github.token }}
+          path: btc_eth_terminal/frontend/dist_v35_1
+      - name: Verify immutable historical v35.1 frontend before Node tests
+        working-directory: btc_eth_terminal/frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          root=Path('dist_v35_1')
+          frozen=json.loads(Path('v35_1_dist_integrity.json').read_text())
+          found={p.relative_to(root).as_posix():p for p in root.rglob('*') if p.is_file()}
+          assert set(found)==set(frozen['files']), 'Q14_V35_1_FILESET_MISMATCH'
+          for name,meta in frozen['files'].items():
+              p=found[name]
+              assert not p.is_symlink(), 'Q14_V35_1_LINK_NOT_ALLOWED'
+              content=p.read_bytes()
+              assert len(content)==meta['bytes'] and hashlib.sha256(content).hexdigest()==meta['sha256'], name
+          print('PASS_Q14_RESTORED_V35_1_BUNDLE_IMMUTABLE')
           PY
       - name: Public contracts, explicitly report skip count without false release approval
         working-directory: btc_eth_terminal/frontend
