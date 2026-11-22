@@ -382,7 +382,7 @@ def evaluate(source: Path, observation_intents: list, assumptions: Assumptions) 
                     no_order_sent=True,
                 )
             waiting = future_waiting
-    for seq, intents in pending_by_seq.items():
+    for _, intents in pending_by_seq.items():
         for i in intents:
             finished[i["id"]] = _outcome(i, "REJECTED_SIGNAL_SEQUENCE_NOT_IN_SOURCE")
     for i in waiting:
