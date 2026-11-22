@@ -140,7 +140,11 @@ class CollectorLiveGap(unittest.TestCase):
                     time.sleep(0.05)
                 else:
                     self.fail(
-                        "Second authenticated source snapshot did not reinitialize engine"
+                        (
+                            'Second authenticated source '
+                            'snapshot did not reinitializ'
+                            'e engine'
+                        )
                     )
                 self.assertEqual(engine.first_session, engine.fault_session)
                 self.assertNotEqual(engine.first_session, h["session_id"])

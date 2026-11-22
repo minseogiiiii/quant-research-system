@@ -1,4 +1,9 @@
-"""Run deterministic isolated example. Never reads historical market data or sends orders."""
+(
+    'Run deterministic isolated e'
+    'xample. Never reads historic'
+    'al market data or sends orde'
+    'rs.'
+)
 
 from __future__ import annotations
 

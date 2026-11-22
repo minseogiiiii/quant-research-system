@@ -29,7 +29,11 @@ def benchmark(rounds: int = 7) -> dict:
             "status": "NO_REGISTERED_MARKET_DATA",
             "timings_ms": [],
             "performance_bottleneck_demonstrated": False,
-            "note": "No A/B integration decision is supported by an empty data manifest",
+            "note": (
+                'No A/B integration decision '
+                'is supported by an empty dat'
+                'a manifest'
+            ),
         }
     for _ in range(rounds):
         tracemalloc.start()
@@ -56,9 +60,19 @@ def benchmark(rounds: int = 7) -> dict:
         "median_ms": statistics.median(timings),
         "max_ms": max(timings),
         "tracemalloc_peak_bytes": peak_bytes,
-        "method": "In-process Python parse + provenance verification + history filtering; no network; not event latency",
+        "method": (
+            'In-process Python parse + pr'
+            'ovenance verification + hist'
+            'ory filtering; no network; n'
+            'ot event latency'
+        ),
         "performance_bottleneck_demonstrated": False,
-        "note": "Requires independent representative A/B baseline before adopting CSP, ArcticDB or C++.",
+        "note": (
+            'Requires independent represe'
+            'ntative A/B baseline before '
+            'adopting CSP, ArcticDB or C+'
+            '+.'
+        ),
     }
 
 

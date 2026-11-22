@@ -153,7 +153,12 @@ try:
             "price_unit": "USD per base asset",
             "volume_unit": "base asset (as specified by exchange)",
             "no_trading_or_authentication": True,
-            "data_caveat": "Historical snapshots cannot prove historical market-data arrival or executable fills.",
+            "data_caveat": (
+                'Historical snapshots cannot '
+                'prove historical market-data'
+                ' arrival or executable fills'
+                '.'
+            ),
             "derived_csv_filename": f"{slug}.csv",
             "derived_csv_sha256": sha,
         }

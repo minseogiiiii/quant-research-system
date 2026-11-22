@@ -123,7 +123,11 @@ def convert(
         )
         if _sha(source) != initial_digest:
             raise InputError(
-                "Input changed during export; refusing to publish stale/ambiguous output"
+                (
+                    'Input changed during export;'
+                    ' refusing to publish stale/a'
+                    'mbiguous output'
+                )
             )
         if target.exists() and not overwrite:
             raise InputError("Concurrent output creation; refusing overwrite")

@@ -387,7 +387,11 @@ def deep_replay(folder: Path, *, allow_exact_trade_replays: bool = False) -> dic
             "source_reported_trades_total": trade_counts[p],
             "unique_trade_id_count": trade_counts[p],
             "identical_update_trade_replays_excluded": replayed_identical_trades[p],
-            "initial_trade_snapshot_records_not_post_subscription_fills": snapshot_trade_counts[
+            (
+                'initial_trade_snapshot_recor'
+                'ds_not_post_subscription_fil'
+                'ls'
+            ): snapshot_trade_counts[
                 p
             ],
             "incremental_trade_records": live_trade_counts[p],
@@ -449,7 +453,11 @@ def main():
     parser.add_argument(
         "--allow-exact-trade-replays",
         action="store_true",
-        help="Explicitly permit only byte/economically identical duplicate update trade IDs",
+        help=(
+            'Explicitly permit only byte/'
+            'economically identical dupli'
+            'cate update trade IDs'
+        ),
     )
     args = parser.parse_args()
     result = deep_replay(

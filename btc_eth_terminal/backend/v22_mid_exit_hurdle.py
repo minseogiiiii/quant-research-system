@@ -383,7 +383,11 @@ def evaluate(
                 else None,
                 "static_taker_depth_status": entry["status"],
                 "original_best_level_quote_status": entry["original_quote_status"],
-                "hypothetical_sell_requires_independent_inventory_or_short_eligibility": side
+                (
+                    'hypothetical_sell_requires_i'
+                    'ndependent_inventory_or_shor'
+                    't_eligibility'
+                ): side
                 == "SELL",
                 "maker_queue_scenarios_not_fills": sensitivity,
                 "future_only_labels": horizon_rows,

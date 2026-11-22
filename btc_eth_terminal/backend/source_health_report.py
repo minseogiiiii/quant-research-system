@@ -50,7 +50,11 @@ def report(folder: Path) -> dict:
             "source_chunk_sha256": [c["archive_sha256"] for c in manifest["chunks"]],
             "recording_machine_telemetry_unverified_external": telemetry,
             "live_feed_freshness_status": "NOT_A_LIVE_CONNECTION",
-            "source_integrity_note": "Double replay/cryptographic hashes prove only internal source consistency.",
+            "source_integrity_note": (
+                'Double replay/cryptographic '
+                'hashes prove only internal s'
+                'ource consistency.'
+            ),
         }
     except (ValueError, OSError, KeyError, TypeError) as exc:
         result = {

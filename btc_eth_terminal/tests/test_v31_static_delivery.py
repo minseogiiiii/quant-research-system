@@ -135,7 +135,11 @@ class V31ReplayUIContracts(unittest.TestCase):
     def test_pending_cutoff_hides_old_observations(self):
         src = (ROOT / "frontend/standalone/app.js").read_text()
         self.assertIn(
-            "$('verified-views').hidden=true;words($('replay-state'),'VERIFYING REPLAY…')",
+            (
+                "$('verified-views').hidden=t"
+                "rue;words($('replay-state'),"
+                "'VERIFYING REPLAY…')"
+            ),
             src,
         )
         self.assertIn("$('verified-views').hidden=false;redrawMetrics()", src)

@@ -134,7 +134,11 @@ def compare(source: Path, intents: list, scenarios: list) -> dict:
         "actual_fee_latency_measured": False,
         "market_impact_or_maker_queue_verified": False,
         "profitability_or_alpha_verified": False,
-        "note": "Scenario sensitivity is not an OOS model selection, execution fill or PnL estimate.",
+        "note": (
+            'Scenario sensitivity is not '
+            'an OOS model selection, exec'
+            'ution fill or PnL estimate.'
+        ),
     }
 
 

@@ -31,7 +31,11 @@ MAX_REQUEST_BARS = 20_000
 SHA256 = re.compile(r"[0-9a-fA-F]{64}\Z")
 EPOCH_MS = re.compile(r"\d{12,13}\Z")
 FORWARD_FIELD = re.compile(
-    r"(?:^|[_ .-])(future|label|labels|target|targets|forward|lookahead|lead)(?:$|[_ .-])",
+    (
+        '(?:^|[_ .-])(future|label|la'
+        'bels|target|targets|forward|'
+        'lookahead|lead)(?:$|[_ .-])'
+    ),
     re.IGNORECASE,
 )
 
@@ -350,7 +354,11 @@ def read_manifest(path: Path | None = None) -> dict:
                 or not item.get("provenance_file")
             ):
                 raise InputError(
-                    "Coinbase spot data requires canonical identity and paired raw-page provenance"
+                    (
+                        'Coinbase spot data requires '
+                        'canonical identity and paire'
+                        'd raw-page provenance'
+                    )
                 )
         pair = (item["symbol"], item["resolution"])
         if pair in pairs:
@@ -371,7 +379,11 @@ def read_manifest(path: Path | None = None) -> dict:
         )
         if item["symbol"] in seen_symbols and seen_symbols[item["symbol"]] != identity:
             raise InputError(
-                "Same symbol must use identical instrument/source metadata across resolutions"
+                (
+                    'Same symbol must use identic'
+                    'al instrument/source metadat'
+                    'a across resolutions'
+                )
             )
         seen_symbols[item["symbol"]] = identity
         if (
@@ -681,7 +693,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("X-Content-Type-Options", "nosniff")
                 self.send_header(
                     "Content-Security-Policy",
-                    "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+                    (
+                        "default-src 'none'; script-s"
+                        "rc 'self'; style-src 'self';"
+                        " connect-src 'self'; img-src"
+                        " 'self'; base-uri 'none'; fr"
+                        "ame-ancestors 'none'"
+                    ),
                 )
                 self.end_headers()
                 self.wfile.write(payload)
@@ -705,7 +723,11 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_obj(
                         503,
                         {
-                            "error": "Pinned frontend bundle is unavailable or failed SHA-256 integrity"
+                            "error": (
+                                'Pinned frontend bundle is un'
+                                'available or failed SHA-256 '
+                                'integrity'
+                            )
                         },
                     )
                     return

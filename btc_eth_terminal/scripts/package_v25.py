@@ -76,7 +76,11 @@ def build(root, parent, full, patch):
         "release": "v25",
         "parent_release": "v24",
         "parent_zip_sha256": PARENT,
-        "source_manifest_sha256": "08255d79f0a7f081921f370feca2e92686cde3dffbb406eadc23e918d43e73d7",
+        "source_manifest_sha256": (
+            '08255d79f0a7f081921f370feca2'
+            'e92686cde3dffbb406eadc23e918'
+            'd43e73d7'
+        ),
         "scope": "HOST_REPORTED_SOURCE_EVIDENCE_GATE_NOT_REAL_LIVE_VERIFIED",
         "actual_24h_capture_verified": False,
         "original_user_feature_label_pit_verified": False,

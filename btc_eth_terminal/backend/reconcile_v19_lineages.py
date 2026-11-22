@@ -288,9 +288,30 @@ def reconcile(source: Path, report_a: dict, report_b: dict) -> dict:
         "independent_market_truth_proven": False,
         "summary": {
             "shared_anchors_same_sequence_price_visible_qty": True,
-            "v19_a": "7 anchors including 2 failing earlier taker top-level capacity; 30s; historical exact-price volume of all sides with receiver+trade-event preanchor exclusion; 10bps hypothetical fee",
-            "v19_b": "5 anchors passing taker capacity; 5s; historical exact-price matching resting maker side; receiver-only time gate; 6bps hypothetical fee",
-            "economic_interpretation": "Side, horizon, event-time gate, eligibility and fee policy differ. Neither computation observes actual filled quantity or calibrated queue position.",
+            "v19_a": (
+                '7 anchors including 2 failin'
+                'g earlier taker top-level ca'
+                'pacity; 30s; historical exac'
+                't-price volume of all sides '
+                'with receiver+trade-event pr'
+                'eanchor exclusion; 10bps hyp'
+                'othetical fee'
+            ),
+            "v19_b": (
+                '5 anchors passing taker capa'
+                'city; 5s; historical exact-p'
+                'rice matching resting maker '
+                'side; receiver-only time gat'
+                'e; 6bps hypothetical fee'
+            ),
+            "economic_interpretation": (
+                'Side, horizon, event-time ga'
+                'te, eligibility and fee poli'
+                'cy differ. Neither computati'
+                'on observes actual filled qu'
+                'antity or calibrated queue p'
+                'osition.'
+            ),
         },
         "rows": result_rows,
     }

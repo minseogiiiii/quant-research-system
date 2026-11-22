@@ -150,7 +150,11 @@ def capture(
             if not status["same_provider_repeat_match"]:
                 status["status"] = "REPEAT_DIFFERED_NO_REGISTRATION"
                 status["reason"] = (
-                    "Repeat historical candle values changed; review both preserved archives"
+                    (
+                        'Repeat historical candle val'
+                        'ues changed; review both pre'
+                        'served archives'
+                    )
                 )
                 return status
         if register:
@@ -189,12 +193,20 @@ def main() -> None:
     p.add_argument(
         "--repeat",
         action="store_true",
-        help="Re-download both markets; preserve second raw archive and compare candles",
+        help=(
+            'Re-download both markets; pr'
+            'eserve second raw archive an'
+            'd compare candles'
+        ),
     )
     p.add_argument(
         "--register",
         action="store_true",
-        help="Opt-in chart registration only after matching repeat and independent audit",
+        help=(
+            'Opt-in chart registration on'
+            'ly after matching repeat and'
+            ' independent audit'
+        ),
     )
     p.add_argument(
         "--report", type=Path, default=BASE / "reports" / "latest_capture_attempt.json"

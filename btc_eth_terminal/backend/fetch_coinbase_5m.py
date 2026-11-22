@@ -181,7 +181,11 @@ def request_json(product: str, start_sec: int, end_sec: int) -> tuple[bytes, dic
 def parse_page(doc: dict, *, start_sec: int, end_sec: int) -> dict[int, dict[str, str]]:
     if not isinstance(doc, dict) or not isinstance(doc.get("candles"), list):
         raise SourceError(
-            "Coinbase did not return a candles array; API error or incompatible response"
+            (
+                'Coinbase did not return a ca'
+                'ndles array; API error or in'
+                'compatible response'
+            )
         )
     results: dict[int, dict[str, str]] = {}
     for item in doc["candles"]:
@@ -294,7 +298,12 @@ def collect(
         "price_unit": "USD per base asset",
         "volume_unit": "base asset (as specified by exchange)",
         "no_trading_or_authentication": True,
-        "data_caveat": "Historical snapshots cannot establish historical event receipt time or executable slippage.",
+        "data_caveat": (
+            'Historical snapshots cannot '
+            'establish historical event r'
+            'eceipt time or executable sl'
+            'ippage.'
+        ),
     }
     return ordered, manifest
 
@@ -333,7 +342,12 @@ def export(
         # The one-product exporter stores source hashes but not raw HTTP pages,
         # so it cannot meet the paired evidence gate required for registration.
         raise SourceError(
-            "Single-product registration is disabled; use fetch_btc_eth.py for audited paired archives"
+            (
+                'Single-product registration '
+                'is disabled; use fetch_btc_e'
+                'th.py for audited paired arc'
+                'hives'
+            )
         )
     base = PRODUCTS[product][0].lower() + "_5m"
     path = out_dir / f"{base}.csv"
@@ -342,7 +356,12 @@ def export(
     # audited snapshot.
     if path.exists() or sidecar.exists():
         raise SourceError(
-            "Output exists. Preserve old source; choose a new output directory or archive existing data first."
+            (
+                'Output exists. Preserve old '
+                'source; choose a new output '
+                'directory or archive existin'
+                'g data first.'
+            )
         )
     buffer = io.StringIO(newline="")
     writer = csv.DictWriter(

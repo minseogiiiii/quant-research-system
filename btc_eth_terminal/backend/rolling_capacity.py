@@ -113,7 +113,12 @@ def project(
         "no_trading_orders": True,
         "source_replay_independently_verified_by_this_tool": False,
         "clock_offset_or_live_source_uptime_verified": False,
-        "note": "Not a forecast: bursts, disk pressure, compressor ratios, crashes and provider outages are unknown.",
+        "note": (
+            'Not a forecast: bursts, disk'
+            ' pressure, compressor ratios'
+            ', crashes and provider outag'
+            'es are unknown.'
+        ),
     }
 
 

@@ -374,7 +374,15 @@ def inspect(
         "strategy_alpha_verified": False,
         "historical_blind_oos_used": False,
         "scope": "BTC_ETH_COINBASE_SPOT_RESEARCH_ONLY",
-        "trade_volume_warning": "Counterfactual order can change market behavior. These scenario allocations are NOT guaranteed attainable fills, actual-fill upper bounds, or independently observed queue positions.",
+        "trade_volume_warning": (
+            'Counterfactual order can cha'
+            'nge market behavior. These s'
+            'cenario allocations are NOT '
+            'guaranteed attainable fills,'
+            ' actual-fill upper bounds, o'
+            'r independently observed que'
+            'ue positions.'
+        ),
         "results": outcome,
     }
 

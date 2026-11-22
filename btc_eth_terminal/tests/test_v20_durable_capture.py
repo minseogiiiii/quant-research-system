@@ -1,4 +1,9 @@
-"""Controlled, synthetic-only Node durable collector tests, NEVER genuine venue captures."""
+(
+    'Controlled, synthetic-only N'
+    'ode durable collector tests,'
+    ' NEVER genuine venue capture'
+    's.'
+)
 
 import json
 import os

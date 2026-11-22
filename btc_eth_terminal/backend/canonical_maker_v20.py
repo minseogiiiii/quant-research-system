@@ -51,7 +51,11 @@ def build(reconciled, report_a):
                     "pre_anchor_events_excluded"
                 ],
                 "conditional_zero_ahead_quantity_no_impact": str(min(requested, cflow)),
-                "conditional_initial_displayed_ahead_fifo_no_cancel_quantity_no_impact": str(
+                (
+                    'conditional_initial_displaye'
+                    'd_ahead_fifo_no_cancel_quant'
+                    'ity_no_impact'
+                ): str(
                     min(requested, max(Decimal(0), cflow - ahead))
                 ),
                 "unverified_actual_fill_base": None,
@@ -82,9 +86,25 @@ def build(reconciled, report_a):
         "sample_used_for_alpha_model_selection": False,
         "frozen_existing_candidate_ids": len(records),
         "baseline_assumed_local_quote_observation_delay_ms": 250,
-        "canonical_trade_side": "Coinbase Advanced market_trades.side means MAKER / resting side",
-        "trade_eligibility": "post-anchor receiver order; exact passive quote price; matching maker side; trade event timestamp not earlier than anchor receiver UTC",
-        "warning": "Receiver and exchange clocks are uncalibrated, so cross-clock event-time gate is a sensitivity choice, not proof of order acceptance.",
+        "canonical_trade_side": (
+            'Coinbase Advanced market_tra'
+            'des.side means MAKER / resti'
+            'ng side'
+        ),
+        "trade_eligibility": (
+            'post-anchor receiver order; '
+            'exact passive quote price; m'
+            'atching maker side; trade ev'
+            'ent timestamp not earlier th'
+            'an anchor receiver UTC'
+        ),
+        "warning": (
+            'Receiver and exchange clocks'
+            ' are uncalibrated, so cross-'
+            'clock event-time gate is a s'
+            'ensitivity choice, not proof'
+            ' of order acceptance.'
+        ),
         "windows_frozen_ms": [5000, 30000],
         "account_maker_fee_bps_verified": None,
         "real_maker_fill_probability_verified": False,

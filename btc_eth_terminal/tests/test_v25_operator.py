@@ -25,7 +25,12 @@ class OperatorTests(TestCase):
         self.assertEqual(x["method"], "unavailable")
 
     def test_chrony_normal_parsed(self):
-        out = "System time     : 0.000123456 seconds slow of NTP time\nStratum         : 3\nLeap status     : Normal\n"
+        out = (
+            'System time     : 0.00012345'
+            '6 seconds slow of NTP time\nS'
+            'tratum         : 3\nLeap stat'
+            'us     : Normal\n'
+        )
         with patch.object(module, "run_command", return_value=(0, out, "")):
             x = module.chrono_observation()
         self.assertEqual(x["stratum"], 3)
@@ -33,7 +38,12 @@ class OperatorTests(TestCase):
         self.assertAlmostEqual(x["system_offset_seconds"], -0.000123456)
 
     def test_chrony_not_synchronized(self):
-        out = "System time : 0.000000000 seconds fast of NTP time\nStratum: 0\nLeap status: Not synchronised\n"
+        out = (
+            'System time : 0.000000000 se'
+            'conds fast of NTP time\nStrat'
+            'um: 0\nLeap status: Not synch'
+            'ronised\n'
+        )
         with patch.object(module, "run_command", return_value=(0, out, "")):
             x = module.chrono_observation()
         self.assertEqual(x["leap_status"], "Not synchronised")

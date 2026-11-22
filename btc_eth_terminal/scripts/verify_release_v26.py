@@ -1,4 +1,8 @@
-"""Verify extracted v26 package manifest and every file, without trusting ZIP metadata."""
+(
+    'Verify extracted v26 package'
+    ' manifest and every file, wi'
+    'thout trusting ZIP metadata.'
+)
 
 from __future__ import annotations
 

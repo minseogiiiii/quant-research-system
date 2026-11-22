@@ -257,7 +257,11 @@ def create_report(root: Path, v21_reference: dict):
         "source_message_count": admitted["message_count"],
         "input_reference": "V21_SOURCE_EVIDENCE_REPORT.json",
         "sample_grid": "UTC five-minute receiver-asof, 5min rolling OFI, no lookahead",
-        "ofi_definition": "L1 bid/ask price-change signed displayed-size delta; snapshot not counted",
+        "ofi_definition": (
+            'L1 bid/ask price-change sign'
+            'ed displayed-size delta; sna'
+            'pshot not counted'
+        ),
         "original_user_feature_label_pair_verified": False,
         "eligible_for_oos_or_execution": False,
         "results": rows,

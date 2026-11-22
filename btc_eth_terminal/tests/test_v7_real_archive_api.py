@@ -28,8 +28,16 @@ bridge = _q14_load_after_path_setup_0()
 del _q14_load_after_path_setup_0
 
 MARKET_HASHES = {
-    "BTC_COINBASE_SPOT": "9869f1833669492fa4156fb51ffd529cfd42a6c870a54215c238a3f9a12bb353",
-    "ETH_COINBASE_SPOT": "17782415aaebf7291a81cfcac3e4c313a99fb9c471fd8f3fd7bbc7f781f34f98",
+    "BTC_COINBASE_SPOT": (
+        '9869f1833669492fa4156fb51ffd'
+        '529cfd42a6c870a54215c238a3f9'
+        'a12bb353'
+    ),
+    "ETH_COINBASE_SPOT": (
+        '17782415aaebf7291a81cfcac3e4'
+        'c313a99fb9c471fd8f3fd7bbc7f7'
+        '81f34f98'
+    ),
 }
 
 

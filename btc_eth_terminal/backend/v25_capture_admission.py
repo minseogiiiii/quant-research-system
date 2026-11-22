@@ -70,7 +70,11 @@ def clock_pass(obs):
 
 
 def evaluate_operator_observation(observation, manifest, manifest_sha):
-    """Evaluate binding; caller must *never* treat host self-report as exchange truth."""
+    (
+        'Evaluate binding; caller mus'
+        't *never* treat host self-re'
+        'port as exchange truth.'
+    )
     flags = []
     if (
         not isinstance(observation, dict)

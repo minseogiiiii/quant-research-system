@@ -21,19 +21,39 @@ class RecoveryEvidenceError(ValueError):
 PROVENANCE = {
     "clean": {
         "relative_dir": "backend/data/live_v14_clean_120s/coinbase_btc_eth_soak_wsgXRy",
-        "manifest_sha256": "8f2e0ec88a601a92ab4c7bcd0e04b20536fbe46bbd8b3c7f67ae3c1d075c28e5",
+        "manifest_sha256": (
+            '8f2e0ec88a601a92ab4c7bcd0e04'
+            'b20536fbe46bbd8b3c7f67ae3c1d'
+            '075c28e5'
+        ),
         "messages": 5177,
         "chunks": 28,
         "connections": 1,
-        "artifact_sha256": "4211a5e9c30e15d2e64826b596612235f42a3b3ced2f8fd2627c806419c724a2",
+        "artifact_sha256": (
+            '4211a5e9c30e15d2e64826b59661'
+            '2235f42a3b3ced2f8fd2627c8064'
+            '19c724a2'
+        ),
     },
     "injected": {
-        "relative_dir": "backend/data/live_v14_disconnect_120s/coinbase_btc_eth_soak_gEF6uZ",
-        "manifest_sha256": "35e024fc87b317ebcf06c452562ef809a996bcc350c581356b7394c8022e5955",
+        "relative_dir": (
+            'backend/data/live_v14_discon'
+            'nect_120s/coinbase_btc_eth_s'
+            'oak_gEF6uZ'
+        ),
+        "manifest_sha256": (
+            '35e024fc87b317ebcf06c452562e'
+            'f809a996bcc350c581356b7394c8'
+            '022e5955'
+        ),
         "messages": 5164,
         "chunks": 31,
         "connections": 2,
-        "artifact_sha256": "b8bc35012bf06f864b4813972d855f070981bc07845e67a53782c1985d7ed8ca",
+        "artifact_sha256": (
+            'b8bc35012bf06f864b4813972d85'
+            '5f070981bc07845e67a53782c198'
+            '5d7ed8ca'
+        ),
     },
 }
 

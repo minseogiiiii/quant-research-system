@@ -127,7 +127,11 @@ def run(output: Path, dist: Path):
                 )
                 page.locator("#asof").select_option(index=1)
                 page.wait_for_function(
-                    "document.querySelector('#replay-state')?.textContent==='RECEIVER AS-OF'",
+                    (
+                        "document.querySelector('#rep"
+                        "lay-state')?.textContent==='"
+                        "RECEIVER AS-OF'"
+                    ),
                     timeout=12000,
                 )
                 check(
@@ -162,7 +166,13 @@ def run(output: Path, dist: Path):
                 check(
                     "rapid_product_switch_does_not_cross_contaminate",
                     page.evaluate(
-                        "state.product==='BTC-USD' && state.trades.every(x=>x.product==='BTC-USD') && state.features.every(x=>x.instrument==='BTC-USD')"
+                        (
+                            "state.product==='BTC-USD' &&"
+                            ' state.trades.every(x=>x.pro'
+                            "duct==='BTC-USD') && state.f"
+                            'eatures.every(x=>x.instrumen'
+                            "t==='BTC-USD')"
+                        )
                     ),
                 )
                 # Race two replay cutoffs, delaying the older snapshot.
@@ -222,7 +232,12 @@ def run(output: Path, dist: Path):
                 page = browser.new_page(viewport={"width": 1460, "height": 990})
                 page.on("pageerror", lambda e: errors.append(str(e)))
                 page.set_content(
-                    '<!doctype html><html><head><title>Quant Research</title></head><body><div id="root"></div></body></html>'
+                    (
+                        '<!doctype html><html><head><'
+                        'title>Quant Research</title>'
+                        '</head><body><div id="root">'
+                        '</div></body></html>'
+                    )
                 )
                 css = list((dist / "assets").glob("*.css"))
                 js = list((dist / "assets").glob("*.js"))
@@ -232,7 +247,12 @@ def run(output: Path, dist: Path):
                 page.add_script_tag(content=js[0].read_text())
                 page.wait_for_selector(".uni-chart canvas", timeout=16000)
                 page.wait_for_function(
-                    "document.querySelector('.uni-chart')?.textContent?.includes('Coinbase Advanced (public spot)')",
+                    (
+                        "document.querySelector('.uni"
+                        "-chart')?.textContent?.inclu"
+                        "des('Coinbase Advanced (publ"
+                        "ic spot)')"
+                    ),
                     timeout=14000,
                 )
                 page.wait_for_function(
@@ -288,7 +308,11 @@ def run(output: Path, dist: Path):
                     == "Unavailable",
                 )
                 page.wait_for_function(
-                    "document.querySelector('.uni-stats article strong')?.textContent!=='Unavailable'",
+                    (
+                        "document.querySelector('.uni"
+                        "-stats article strong')?.tex"
+                        "tContent!=='Unavailable'"
+                    ),
                     timeout=12000,
                 )
                 page.wait_for_function(
@@ -359,7 +383,11 @@ def run(output: Path, dist: Path):
                     in page.locator(".uni-replay-controller").inner_text(),
                 )
                 page.wait_for_function(
-                    "Number(document.querySelector('select[aria-label=\"Replay as-of time\"]')?.value)>=3",
+                    (
+                        'Number(document.querySelecto'
+                        'r(\'select[aria-label="Replay'
+                        ' as-of time"]\')?.value)>=3'
+                    ),
                     timeout=7500,
                 )
                 page.get_by_role("button", name="Pause historical replay").click()
@@ -378,7 +406,11 @@ def run(output: Path, dist: Path):
                 )
                 page.get_by_role("button", name="Reset historical replay").click()
                 page.wait_for_function(
-                    "document.querySelector('select[aria-label=\"Replay as-of time\"]')?.value==='latest'",
+                    (
+                        "document.querySelector('sele"
+                        'ct[aria-label="Replay as-of '
+                        'time"]\')?.value===\'latest\''
+                    ),
                     timeout=3000,
                 )
                 check(
@@ -413,7 +445,11 @@ def run(output: Path, dist: Path):
         "http": "PYTHON_LOOPBACK_BRIDGE_FROM_CHROMIUM_FETCH_CALLBACK",
         "real_historical_source": True,
         "production_funnest_bundle": True,
-        "source_manifest_sha256": "08255d79f0a7f081921f370feca2e92686cde3dffbb406eadc23e918d43e73d7",
+        "source_manifest_sha256": (
+            '08255d79f0a7f081921f370feca2'
+            'e92686cde3dffbb406eadc23e918'
+            'd43e73d7'
+        ),
         "network_live_source": False,
         "OOS_verified": False,
         "real_orders": 0,

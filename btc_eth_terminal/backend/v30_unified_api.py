@@ -36,7 +36,11 @@ def _checked_file(path: Path, limit: int) -> bytes:
 
 
 def load_projection() -> tuple[dict, str]:
-    """Rehash projection + pinned source manifest per request; not a raw-archive re-audit."""
+    (
+        'Rehash projection + pinned s'
+        'ource manifest per request; '
+        'not a raw-archive re-audit.'
+    )
     content = _checked_file(PROJECTION, MAX_PROJECTION_BYTES)
     pinned = _strict_json(_checked_file(PIN, 8_000))
     digest = sha256(content).hexdigest()

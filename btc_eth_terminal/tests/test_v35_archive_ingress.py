@@ -143,7 +143,11 @@ class IngressContract(unittest.TestCase):
         self.tmp.cleanup()
 
     def _rewrite(self, operation):
-        """Re-pin malicious fixture to prove structural checks operate after SHA verification."""
+        (
+            'Re-pin malicious fixture to '
+            'prove structural checks oper'
+            'ate after SHA verification.'
+        )
         envelope_file = next((self.root / "chunks").glob("*.jsonl"))
         messages = [json.loads(s) for s in envelope_file.read_bytes().splitlines()]
         operation(messages)

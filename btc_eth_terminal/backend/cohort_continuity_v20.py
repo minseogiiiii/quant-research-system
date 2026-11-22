@@ -62,7 +62,12 @@ def validate_intervals(rows):
                 "wall_clock_gap_seconds": gap,
                 "has_unreconciled_connection_boundary": True,
                 "continuous_trading_or_training_join_allowed": False,
-                "reason": "Separate sessions never establish exchange event continuity, even when wall-clock gap <=0",
+                "reason": (
+                    'Separate sessions never esta'
+                    'blish exchange event continu'
+                    'ity, even when wall-clock ga'
+                    'p <=0'
+                ),
             }
         )
     single_24h = (

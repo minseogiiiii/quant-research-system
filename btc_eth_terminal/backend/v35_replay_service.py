@@ -135,7 +135,11 @@ class ReplayDataset:
             "product": product,
             "source_manifest_sha256": self.certificate["manifest_sha256"],
             "timeframe_ms": CANDLE_MS,
-            "source_definition": "RECEIVER_TIME_COMPLETED_BUCKETS_OBSERVED_TRADE_UPDATES_ONLY",
+            "source_definition": (
+                'RECEIVER_TIME_COMPLETED_BUCK'
+                'ETS_OBSERVED_TRADE_UPDATES_O'
+                'NLY'
+            ),
             "rows": list(records),
             "live_feed": False,
             "trading_enabled": False,
@@ -473,7 +477,11 @@ def replay_capture(root: Path, expected_manifest_sha256: str) -> ReplayDataset:
                             "close": str(data["close"]),
                             "volume": str(data["volume"]),
                             "observed_trade_count": data["observed_trade_count"],
-                            "source_definition": "RECEIVER_TIME_COMPLETED_BUCKET_OBSERVED_TRADE_UPDATES_ONLY",
+                            "source_definition": (
+                                'RECEIVER_TIME_COMPLETED_BUCK'
+                                'ET_OBSERVED_TRADE_UPDATES_ON'
+                                'LY'
+                            ),
                         }
                     )
                 if len(completed) > MAX_COMPLETED_CANDLES:

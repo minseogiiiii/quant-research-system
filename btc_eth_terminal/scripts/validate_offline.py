@@ -93,7 +93,11 @@ def audit_local_registered_source() -> dict:
             "verified": passed,
             "matched_two_acquisitions": same_provider_repeat,
             "markets": primary["markets"],
-            "archive_origin": "public Coinbase HTTPS requests through GitHub Actions; no separately signed record",
+            "archive_origin": (
+                'public Coinbase HTTPS reques'
+                'ts through GitHub Actions; n'
+                'o separately signed record'
+            ),
             "independent_exchange_corroboration": False,
             "historical_point_in_time_proven": False,
             "actual_live_l2_capture_proven": False,

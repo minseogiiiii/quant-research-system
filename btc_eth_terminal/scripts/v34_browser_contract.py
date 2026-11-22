@@ -88,12 +88,25 @@ def run(output: Path):
             )
             page.on("pageerror", lambda e: js_errors.append(str(e)))
             page.set_content(
-                '<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div></body></html>'
+                (
+                    '<!doctype html><html lang="e'
+                    'n"><head><meta name="viewpor'
+                    't" content="width=device-wid'
+                    'th,initial-scale=1"></head><'
+                    'body><div id="root"></div></'
+                    'body></html>'
+                )
             )
             page.add_style_tag(content=css.decode())
             page.expose_function("__backend", real_fetch)
             page.evaluate(
-                """(() => {window.fetch=async(u)=>{const a=await window.__backend(String(u));return {ok:a.ok,status:a.status,json:async()=>a.payload}}})()"""
+                (
+                    '(() => {window.fetch=async(u'
+                    ')=>{const a=await window.__b'
+                    'ackend(String(u));return {ok'
+                    ':a.ok,status:a.status,json:a'
+                    'sync()=>a.payload}}})()'
+                )
             )
             page.add_script_tag(content=js.decode())
             page.wait_for_selector(".pro-terminal .pro-main-grid", timeout=20000)
@@ -123,7 +136,13 @@ def run(output: Path):
                 page.locator(".pro-trades-scroll tbody tr").count() > 2,
             )
             page.wait_for_function(
-                "document.querySelectorAll('.pro-l2-level.bid').length===10 && document.querySelectorAll('.pro-l2-level.ask').length===10",
+                (
+                    "document.querySelectorAll('."
+                    "pro-l2-level.bid').length==="
+                    '10 && document.querySelector'
+                    "All('.pro-l2-level.ask').len"
+                    'gth===10'
+                ),
                 timeout=14000,
             )
             check(
@@ -182,7 +201,12 @@ def run(output: Path):
             check(
                 "first_asof_trade_sample_causal",
                 page.evaluate(
-                    "(() => {const cutoff=document.querySelector('.pro-utc').textContent;return cutoff.includes('2026-')})()"
+                    (
+                        '(() => {const cutoff=documen'
+                        "t.querySelector('.pro-utc')."
+                        'textContent;return cutoff.in'
+                        "cludes('2026-')})()"
+                    )
                 ),
             )
             check(
@@ -204,7 +228,14 @@ def run(output: Path):
             )
             # Product switch: hide previous source until new product is validated.
             page.evaluate(
-                """(() => {let previous=window.fetch;window.fetch=async(u)=>{if(String(u).includes('product=ETH-USD'))await new Promise(r=>setTimeout(r,320));return previous(u)}})()"""
+                (
+                    '(() => {let previous=window.'
+                    'fetch;window.fetch=async(u)='
+                    ">{if(String(u).includes('pro"
+                    "duct=ETH-USD'))await new Pro"
+                    'mise(r=>setTimeout(r,320));r'
+                    'eturn previous(u)}})()'
+                )
             )
             page.locator(".pro-symbols button").filter(has_text="ETH-USD").click()
             check(
@@ -212,7 +243,11 @@ def run(output: Path):
                 page.locator(".pro-metrics article strong").first.inner_text() == "—",
             )
             page.wait_for_function(
-                "document.querySelector('.pro-metrics article strong')?.textContent?.includes('1,')",
+                (
+                    "document.querySelector('.pro"
+                    "-metrics article strong')?.t"
+                    "extContent?.includes('1,')"
+                ),
                 timeout=13000,
             )
             check(
@@ -225,7 +260,11 @@ def run(output: Path):
             )
             page.locator(".pro-symbols button").filter(has_text="BTC-USD").click()
             page.wait_for_function(
-                "document.querySelector('.pro-metrics article strong')?.textContent?.includes('66,')",
+                (
+                    "document.querySelector('.pro"
+                    "-metrics article strong')?.t"
+                    "extContent?.includes('66,')"
+                ),
                 timeout=12000,
             )
             check(

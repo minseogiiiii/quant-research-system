@@ -367,9 +367,20 @@ def build(source=BASE_ROOT):
         "source_end_receiver_ms": historical["source_finished_at_ms"],
         "source_clock": "UTC_LOCAL_RECEIVER_NOT_EXCHANGE_ATTESTED",
         "ofi_engine": "v23_causal_microstructure.features_from_events + ofi_delta",
-        "ofi_definition": "L1 bid/offer best-price-or-size delta on each Coinbase L2 event batch; snapshot excluded; five-minute rolling receiver-time window; NOT atomic exchange order flow",
+        "ofi_definition": (
+            'L1 bid/offer best-price-or-s'
+            'ize delta on each Coinbase L'
+            '2 event batch; snapshot excl'
+            'uded; five-minute rolling re'
+            'ceiver-time window; NOT atom'
+            'ic exchange order flow'
+        ),
         "trade_imbalance_status": "NOT_CALCULATED_ARCHIVE_TRADES_SUBSAMPLED_IN_V30",
-        "liquidity_recovery_status": "V34_POST_HOC_COHORT_ONLY_DO_NOT_SELECT_AT_SHOCK_TIME_WITH_FUTURE_OUTCOME",
+        "liquidity_recovery_status": (
+            'V34_POST_HOC_COHORT_ONLY_DO_'
+            'NOT_SELECT_AT_SHOCK_TIME_WIT'
+            'H_FUTURE_OUTCOME'
+        ),
         "label_horizons_ms": [60_000, 5_000, 30_000],
         "signals_with_future_labels_isolated": signals,
         "sample_summary": summarize(signals),

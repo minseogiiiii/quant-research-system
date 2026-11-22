@@ -206,7 +206,11 @@ def verify() -> dict:
         )
     return {
         "verified": True,
-        "status": "INDEPENDENT_SOFTWARE_REPLAY_SAME_COINBASE_RAW_SOURCE_NOT_SECOND_VENUE",
+        "status": (
+            'INDEPENDENT_SOFTWARE_REPLAY_'
+            'SAME_COINBASE_RAW_SOURCE_NOT'
+            '_SECOND_VENUE'
+        ),
         "messages": count,
         "frozen_quote_count": len(active),
         "historical_future_label_count": label_count,

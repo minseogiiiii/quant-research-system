@@ -257,10 +257,23 @@ def build(source: Path = BASE_ROOT, reference: Path = REFERENCE) -> dict:
         "oos_approved": False,
         "execution_authorized": False,
         "evidence_status": "HISTORICAL_SOURCE_AUDITED_PIT_NOT_VERIFIED",
-        "candles_description": "5m receiver-time observed market_trades update aggregation; not exchange OHLCV, not exhaustive volume",
+        "candles_description": (
+            '5m receiver-time observed ma'
+            'rket_trades update aggregati'
+            'on; not exchange OHLCV, not '
+            'exhaustive volume'
+        ),
         "candles_first_last_partial_excluded": True,
-        "trade_side_semantics": "Coinbase feed side field unmodified, not interpreted as aggressor",
-        "features_description": "Existing v23 5m receiver-asof causal L1 best imbalance, microprice and rolling OFI",
+        "trade_side_semantics": (
+            'Coinbase feed side field unm'
+            'odified, not interpreted as '
+            'aggressor'
+        ),
+        "features_description": (
+            'Existing v23 5m receiver-aso'
+            'f causal L1 best imbalance, '
+            'microprice and rolling OFI'
+        ),
         "products": products,
     }
     return result

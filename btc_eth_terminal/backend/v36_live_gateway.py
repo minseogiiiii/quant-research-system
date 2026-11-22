@@ -60,7 +60,15 @@ class LiveHandler(UnifiedHandler):
                     ("X-Frame-Options", "DENY"),
                     (
                         "Content-Security-Policy",
-                        "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'",
+                        (
+                            "default-src 'none'; script-s"
+                            "rc 'self'; style-src 'self' "
+                            "'unsafe-inline'; connect-src"
+                            " 'self'; img-src 'self' data"
+                            ":; font-src 'self' data:; ob"
+                            "ject-src 'none'; frame-ances"
+                            "tors 'none'"
+                        ),
                     ),
                 ]:
                     self.send_header(key, val)
@@ -94,7 +102,15 @@ class LiveHandler(UnifiedHandler):
                     ("X-Frame-Options", "DENY"),
                     (
                         "Content-Security-Policy",
-                        "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'",
+                        (
+                            "default-src 'none'; script-s"
+                            "rc 'self'; style-src 'self' "
+                            "'unsafe-inline'; connect-src"
+                            " 'self'; img-src 'self' data"
+                            ":; font-src 'self' data:; ob"
+                            "ject-src 'none'; frame-ances"
+                            "tors 'none'"
+                        ),
                     ),
                 ]:
                     self.send_header(key, val)

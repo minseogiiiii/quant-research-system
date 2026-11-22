@@ -22,7 +22,11 @@ STEP_MS = 300_000
 MAX_INPUT_BYTES = 1_000_000_000
 MAX_ROWS = 2_000_000
 SUSPECT_FEATURE = re.compile(
-    r"(?:^|[_ .-])(future|label|labels|target|targets|forward|lookahead|lead)(?:$|[_ .-])",
+    (
+        '(?:^|[_ .-])(future|label|la'
+        'bels|target|targets|forward|'
+        'lookahead|lead)(?:$|[_ .-])'
+    ),
     flags=re.IGNORECASE,
 )
 
@@ -148,7 +152,13 @@ def audit(
         "instrument_declared_not_verified": instrument,
         "price_and_execution_integrity_tested": False,
         "eligible_for_live_trading": False,
-        "note": "Hashes and row-level invariants do not independently prove provider authenticity, arrival time, profitability or tradability.",
+        "note": (
+            'Hashes and row-level invaria'
+            'nts do not independently pro'
+            've provider authenticity, ar'
+            'rival time, profitability or'
+            ' tradability.'
+        ),
     }
 
 
@@ -160,7 +170,11 @@ def main() -> None:
     )
     p.add_argument(
         "--available-column",
-        help="Column explicitly containing independently recorded complete-bar availability",
+        help=(
+            'Column explicitly containing'
+            ' independently recorded comp'
+            'lete-bar availability'
+        ),
     )
     p.add_argument(
         "--venue", help="Declared exchange/venue; NOT independently verified"

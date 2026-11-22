@@ -121,7 +121,12 @@ def validate_pin(root: Path, rel: str, expected_sha: str):
 
 
 def verify_chunk_inventory(source: Path, manifest: dict) -> tuple[int, int]:
-    """Check every raw archive member against the immutable manifest SHA, even without full replay."""
+    (
+        'Check every raw archive memb'
+        'er against the immutable man'
+        'ifest SHA, even without full'
+        ' replay.'
+    )
     chunks = manifest.get("chunks")
     if not isinstance(chunks, list) or not chunks or len(chunks) > 20000:
         raise CohortLedgerError("Unbounded or missing archive chunk list")

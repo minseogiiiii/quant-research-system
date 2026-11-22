@@ -281,8 +281,23 @@ def build(*, root: Path = BASE_ROOT, reference: Path = BASE_PROJECTION) -> dict:
         "oos_approved": False,
         "execution_authorized": False,
         "trading_enabled": False,
-        "ten_level_definition": "Top 10 displayed order-book levels reconstructed by receiver-ordered L2 snapshot/update; base-unit displayed quantity; not executable queue certainty",
-        "recovery_definition": "Post-hoc receiver-second-sampled L2 depth diagnostic, 30s trailing median baseline, 50% drop shock, 80% recovery within 30s; hypothesis/parameters unoptimized and not independently OOS validated",
+        "ten_level_definition": (
+            'Top 10 displayed order-book '
+            'levels reconstructed by rece'
+            'iver-ordered L2 snapshot/upd'
+            'ate; base-unit displayed qua'
+            'ntity; not executable queue '
+            'certainty'
+        ),
+        "recovery_definition": (
+            'Post-hoc receiver-second-sam'
+            'pled L2 depth diagnostic, 30'
+            's trailing median baseline, '
+            '50% drop shock, 80% recovery'
+            ' within 30s; hypothesis/para'
+            'meters unoptimized and not i'
+            'ndependently OOS validated'
+        ),
         "recovery_window_ms": RECOVERY_SAMPLES * SAMPLE_MS,
         "products": {
             p: {

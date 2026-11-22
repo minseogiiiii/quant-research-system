@@ -102,7 +102,11 @@ def inventory(roots, scan_zips=True):
         "actual_original_pair_source_provenance_verified": False,
         "point_in_time_availability_verified": False,
         "eligible_for_blind_oos": False,
-        "scope_note": "Only listed accessible roots scanned; absent elsewhere remains unknown.",
+        "scope_note": (
+            'Only listed accessible roots'
+            ' scanned; absent elsewhere r'
+            'emains unknown.'
+        ),
     }
 
 

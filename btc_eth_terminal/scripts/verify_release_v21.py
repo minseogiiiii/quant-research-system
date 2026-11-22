@@ -1,4 +1,8 @@
-"""Verify exact v21 extracted file inventory and hashes; no market authenticity claim."""
+(
+    'Verify exact v21 extracted f'
+    'ile inventory and hashes; no'
+    ' market authenticity claim.'
+)
 
 from __future__ import annotations
 

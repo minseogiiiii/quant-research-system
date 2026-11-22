@@ -78,7 +78,11 @@ def build(root, parent, full, patch):
         "format": "immutable_original_plus_derived_v22_SHA256",
         "parent_release": "v21",
         "parent_zip_sha256": FROZEN_PARENT_SHA,
-        "source_manifest_sha256": "08255d79f0a7f081921f370feca2e92686cde3dffbb406eadc23e918d43e73d7",
+        "source_manifest_sha256": (
+            '08255d79f0a7f081921f370feca2'
+            'e92686cde3dffbb406eadc23e918'
+            'd43e73d7'
+        ),
         "original_user_pair_audited": False,
         "real_24h_capture_verified": False,
         "actual_market_order_fills_verified": False,

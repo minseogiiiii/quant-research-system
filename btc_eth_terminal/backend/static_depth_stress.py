@@ -276,7 +276,10 @@ def diagnose(
         "fee_bps_hypothetical": str(fee),
         "slippage_bps_hypothetical": str(slippage),
         "delay_ms_local_receipt_assumption": assumptions.latency_ms,
-        "original_quote_source": "v15 first later product L2 packet after assumed latency",
+        "original_quote_source": (
+            'v15 first later product L2 p'
+            'acket after assumed latency'
+        ),
         "results": outcome,
         "actual_order_sent": False,
         "actual_fills_verified": False,

@@ -1,4 +1,9 @@
-"""v18 tests prove label separation, source integrity, and bounded receipt-time sampling."""
+(
+    'v18 tests prove label separa'
+    'tion, source integrity, and '
+    'bounded receipt-time samplin'
+    'g.'
+)
 
 from __future__ import annotations
 

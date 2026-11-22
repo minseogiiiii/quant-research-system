@@ -338,7 +338,10 @@ def inspect(
         "source_manifest_sha256": baseline["source_manifest_sha256"],
         "source_messages_audited": seq_count,
         "horizons_ms_predeclared": list(horizons),
-        "first_observation_tolerance_ms_predeclared": policy.first_observation_tolerance_ms,
+        (
+            'first_observation_tolerance_'
+            'ms_predeclared'
+        ): policy.first_observation_tolerance_ms,
         "receipt_clock": "LOCAL_MONOTONIC_RECEIVE_ONLY_NOT_EXCHANGE_SYNC",
         "quote_selection": "FIRST_PRODUCT_L2_AFTER_USER_ASSUMED_LATENCY_NO_LOOKAHEAD",
         "future_labels_are_never_input_features": True,
