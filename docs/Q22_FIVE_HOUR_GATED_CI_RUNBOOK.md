@@ -36,8 +36,9 @@ summary evidence have all completed successfully.
   `LiveMarketEngine`, read-only gateway, original host-PID-verified tap,
   original archive format and Unix-only private operator monitor. It does
   **not** weaken the production 24h `--durable-operator-mode`.
-- CI-specific strict limits: 4,000,000,000 raw text bytes,
-  6,000,000,000 archive bytes, 4GiB per-write disk reserve, at least
+- CI-specific strict limits based on actual Q18 source-volume evidence:
+  10,000,000,000 raw text bytes, 14,000,000,000 archive bytes,
+  4GiB per-write disk reserve, at least
   700MB additional disk margin at start and 500MB throughout.
 - Every 15 seconds: verify a single source session, strictly increasing
   message counters, no reconnect/gaps, both product snapshots, fresh data
