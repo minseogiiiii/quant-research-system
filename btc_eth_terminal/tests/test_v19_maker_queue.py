@@ -73,8 +73,8 @@ class V19MakerTests(unittest.TestCase):
         for chunk in mf["chunks"]:
             path = self.src / chunk["file"]
             rows = []
-            for l in path.read_text().splitlines():
-                row = json.loads(l)
+            for line in path.read_text().splitlines():
+                row = json.loads(line)
                 seq = json.loads(row["raw_text"])["sequence_num"]
                 row["local_monotonic_ns"] = str((seq + 1) * 1_000_000_000)
                 row["sha256"] = sha256(row["raw_text"].encode()).hexdigest()
@@ -84,7 +84,7 @@ class V19MakerTests(unittest.TestCase):
             chunk["archive_sha256"] = sha256(body).hexdigest()
             chunk["archived_line_bytes"] = len(body)
             chunk["raw_text_bytes"] = sum(
-                len(json.loads(l)["raw_text"].encode()) for l in rows
+                len(json.loads(line)["raw_text"].encode()) for line in rows
             )
         mf["bytes"] = sum(c["raw_text_bytes"] for c in mf["chunks"])
         (self.src / "manifest.json").write_text(json.dumps(mf))
