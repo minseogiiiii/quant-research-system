@@ -184,7 +184,8 @@ class FrozenReplayContract(unittest.TestCase):
                 patch.object(m, 'verify_capture', mutate_after_gate),
                 self.assertRaisesRegex(
                     StateRejected,
-                    'SOURCE_CHANGED_AFTER_ADMISSION|SOURCE_LENGTH_CHANGED_AFTER_ADMISSION',
+                    'SOURCE_CHANGED_AFTER_ADMISSION|'
+                    'SOURCE_LENGTH_CHANGED_AFTER_ADMISSION',
                 ),
             ):
                 replay_capture(clone, digest)
