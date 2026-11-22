@@ -71,10 +71,15 @@ window.fetch=async function(input,options){
  window.__seenFetch.push(u.pathname+u.search);
  let body=null;
  if(u.pathname==='/api/v36/health') body=window.__responses.health;
- if(u.pathname==='/api/v36/snapshot') body=window.__responses.snapshots[u.searchParams.get('product')];
- if(u.pathname==='/api/v36/candles') body=window.__responses.candles[u.searchParams.get('product')];
- if(body==null)return new Response(JSON.stringify({error:'NOT_INTERCEPTED'}),{status:404,headers:{'Content-Type':'application/json'}});
- return new Response(JSON.stringify(body),{status:200,headers:{'Content-Type':'application/json'}});
+ if(u.pathname==='/api/v36/snapshot')
+  body=window.__responses.snapshots[u.searchParams.get('product')];
+ if(u.pathname==='/api/v36/candles')
+  body=window.__responses.candles[u.searchParams.get('product')];
+ if(body==null)
+  return new Response(JSON.stringify({error:'NOT_INTERCEPTED'}),
+    {status:404,headers:{'Content-Type':'application/json'}});
+ return new Response(JSON.stringify(body),
+  {status:200,headers:{'Content-Type':'application/json'}});
 };
 window.__mockEventSources=[];
 window.EventSource=class OfflineEventSource{
