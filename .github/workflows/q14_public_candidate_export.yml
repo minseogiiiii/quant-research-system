@@ -1,0 +1,82 @@
+name: Q14 export reviewed public Python delta for private full regression
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_public_candidate_export.yml']
+permissions:
+  contents: read
+jobs:
+  export-candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Export only changed public Python source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import subprocess
+          import zipfile
+
+          base='17923d4a226411fb0ebd3c1b260c7ec85f8d291b'
+          head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          subprocess.run(['git','merge-base','--is-ancestor',base,head],check=True)
+          paths=subprocess.check_output(
+              ['git','diff','--name-only','--diff-filter=AM',base+'..'+head],
+              text=True
+          ).splitlines()
+          source=sorted(p for p in paths
+              if p.startswith('btc_eth_terminal/') and p.endswith('.py'))
+          if len(source)<60:
+              raise SystemExit('Q14_SOURCE_EXPORT_UNEXPECTEDLY_INCOMPLETE')
+          output=pathlib.Path(os.environ['RUNNER_TEMP'])
+          manifest={
+              'schema':'q14_public_source_replay_delta_v1',
+              'base_q13_sha':base,
+              'q14_commit_sha':head,
+              'count':len(source),
+              'files':{},
+              'private_archive_included':False,
+              'live_ordering_enabled':False,
+              'release_approved':False
+          }
+          with zipfile.ZipFile(
+              output/'q14_public_source_delta.zip','w',
+              compression=zipfile.ZIP_DEFLATED,
+          ) as z:
+              for name in source:
+                  p=pathlib.Path(name)
+                  if '..' in p.parts or not p.is_file() or p.is_symlink():
+                      raise SystemExit('Q14_INVALID_SOURCE_ENTRY')
+                  blob=p.read_bytes()
+                  if len(blob)>1_000_000:
+                      raise SystemExit('Q14_SOURCE_ENTRY_TOO_LARGE')
+                  z.writestr(name,blob)
+                  manifest['files'][name]={
+                      'bytes':len(blob),
+                      'sha256':hashlib.sha256(blob).hexdigest(),
+                      'git_blob':subprocess.check_output(
+                          ['git','hash-object',name],text=True
+                      ).strip(),
+                  }
+          (output/'q14_public_source_delta_manifest.json').write_text(
+              json.dumps(manifest,sort_keys=True,indent=2)+'\n'
+          )
+          print('PASS_Q14_SOURCE_ONLY_DELTA',len(source),'HEAD',head)
+          PY
+      - name: Publish code only, no raw market bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: q14-reviewed-public-python-delta
+          path: |
+            ${{ runner.temp }}/q14_public_source_delta.zip
+            ${{ runner.temp }}/q14_public_source_delta_manifest.json
+          retention-days: 7
+          if-no-files-found: error
