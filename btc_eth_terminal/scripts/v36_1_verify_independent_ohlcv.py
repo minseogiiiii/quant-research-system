@@ -60,7 +60,7 @@ def reference_ohlcv(records: list[bytes]) -> dict[str, list[dict]]:
         last_observation = recv
         wire = json.loads(envelope["raw_text"])
         # The first source message whose receipt proves each interval ended.
-        bucket = recv // 60_000
+        _ = recv // 60_000
         for b in list({i for p in PRODUCTS for i in bars[p]}):
             if (b + 60_000) <= recv and b not in availability:
                 availability[b] = recv
