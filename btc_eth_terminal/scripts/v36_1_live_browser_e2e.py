@@ -163,7 +163,8 @@ strong')?.textContent||'',
                             back = read(origin, "/api/v36/state?" + params)["state"]
                         except HTTPError as exc:
                             if exc.code == 409:
-                                continue  # old version evicted or source no longer healthy
+                                # Old version was evicted or source is unhealthy.
+                                continue
                             raise
                         if back["session_id"] != session or back["product"] != product:
                             fail("BAD_BACKEND_PRODUCT_SESSION")
