@@ -1,4 +1,4 @@
-name: Q14 gateway log context ownership and AST-equivalence gate
+name: Q14 gateway log context ownership retry after source lease refresh
 on:
   push:
     branches: [remediation/q14-import-order-20261122]
