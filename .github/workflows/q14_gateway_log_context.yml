@@ -54,6 +54,26 @@ jobs:
                        for x in lines[assign.lineno:ret.lineno-1])
               +''.join(lines[ret.lineno-1:])
           )
+          # Keep the existing gateway request bytes exact after scope indentation.
+          segments=updated.splitlines(keepends=True)
+          reflow=[]
+          broken=0
+          for source_line in segments:
+              if (
+                  'b"GET /api/v35/health HTTP/1.1' in source_line
+                  and 'Host: localhost' in source_line
+                  and 'X-Pending:' in source_line
+              ):
+                  whitespace=source_line[:len(source_line)-len(source_line.lstrip())]
+                  prefix,suffix=source_line.strip().split('Host: localhost',1)
+                  reflow.append(whitespace+prefix+'"\n')
+                  reflow.append(whitespace+'b"Host: localhost'+suffix+'\n')
+                  broken+=1
+              else:
+                  reflow.append(source_line)
+          if broken!=1:
+              raise SystemExit('Q14_EXPECTED_GATEWAY_REQUEST_LITERAL_MISSING')
+          updated=''.join(reflow)
           class FlattenLogWith(ast.NodeTransformer):
               def visit_FunctionDef(self,node):
                   self.generic_visit(node)
