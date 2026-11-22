@@ -353,22 +353,21 @@ def read_manifest(path: Path | None = None) -> dict:
         if doc.get("scope") == "BTC_ETH_SPOT_5M_RESEARCH_ONLY" and (
             item["exchange"] == "Coinbase Advanced Trade"
             or item["symbol"] in {"BTC_COINBASE_SPOT", "ETH_COINBASE_SPOT"}
+        ) and (
+            item["exchange"] != "Coinbase Advanced Trade"
+            or item["symbol"] not in {"BTC_COINBASE_SPOT", "ETH_COINBASE_SPOT"}
+            or item["resolution"] != "5"
+            or item["source_type"] != "real"
+            or item["evidence_status"] != "unverified"
+            or not item.get("provenance_file")
         ):
-            if (
-                item["exchange"] != "Coinbase Advanced Trade"
-                or item["symbol"] not in {"BTC_COINBASE_SPOT", "ETH_COINBASE_SPOT"}
-                or item["resolution"] != "5"
-                or item["source_type"] != "real"
-                or item["evidence_status"] != "unverified"
-                or not item.get("provenance_file")
-            ):
-                raise InputError(
-                    
-                        'Coinbase spot data requires '
-                        'canonical identity and paire'
-                        'd raw-page provenance'
-                    
-                )
+            raise InputError(
+                
+                    'Coinbase spot data requires '
+                    'canonical identity and paire'
+                    'd raw-page provenance'
+                
+            )
         pair = (item["symbol"], item["resolution"])
         if pair in pairs:
             raise InputError("Duplicate symbol/resolution pair")

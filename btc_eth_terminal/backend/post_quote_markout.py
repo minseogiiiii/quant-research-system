@@ -271,13 +271,12 @@ def inspect(
                         "Pinned quote packet does not update expected product"
                     )
                 mid = _quote_mid(book[product])
-                if "market_best_bid" in original:
-                    if (
-                        str(book[product].best("bid")[0]) != original["market_best_bid"]
-                        or str(book[product].best("offer")[0])
-                        != original["market_best_ask"]
-                    ):
-                        raise MarkoutError("Pinned baseline quote has changed")
+                if "market_best_bid" in original and (
+                    str(book[product].best("bid")[0]) != original["market_best_bid"]
+                    or str(book[product].best("offer")[0])
+                    != original["market_best_ask"]
+                ):
+                    raise MarkoutError("Pinned baseline quote has changed")
                 state = {
                     "id": original["id"],
                     "product_id": product,

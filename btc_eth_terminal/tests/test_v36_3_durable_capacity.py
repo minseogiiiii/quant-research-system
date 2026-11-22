@@ -26,14 +26,13 @@ RESERVE = 10 * 1024**3
 
 class DurableDiskPreflight(unittest.TestCase):
     def test_insufficient_total_capacity_fails_before_capture(self):
-        with tempfile.TemporaryDirectory() as path:
-            with patch(
-                "v36_observe_existing_collector.shutil.disk_usage",
-                return_value=_ntuple_diskusage(60_000_000_000, 0, 60_000_000_000),
-            ):
-                self.assertFalse(
-                    durable_disk_capacity_sufficient(Path(path), BUDGET, RESERVE)
-                )
+        with tempfile.TemporaryDirectory() as path, patch(
+            "v36_observe_existing_collector.shutil.disk_usage",
+            return_value=_ntuple_diskusage(60_000_000_000, 0, 60_000_000_000),
+        ):
+            self.assertFalse(
+                durable_disk_capacity_sufficient(Path(path), BUDGET, RESERVE)
+            )
 
     def test_sufficient_capacity_satisfies_preflight_only(self):
         with tempfile.TemporaryDirectory() as path:
@@ -68,14 +67,13 @@ class DurableDiskPreflight(unittest.TestCase):
             )
 
     def test_filesystem_query_failure_fails_closed(self):
-        with tempfile.TemporaryDirectory() as path:
-            with patch(
-                "v36_observe_existing_collector.shutil.disk_usage",
-                side_effect=OSError("storage unavailable"),
-            ):
-                self.assertFalse(
-                    durable_disk_capacity_sufficient(Path(path), BUDGET, RESERVE)
-                )
+        with tempfile.TemporaryDirectory() as path, patch(
+            "v36_observe_existing_collector.shutil.disk_usage",
+            side_effect=OSError("storage unavailable"),
+        ):
+            self.assertFalse(
+                durable_disk_capacity_sufficient(Path(path), BUDGET, RESERVE)
+            )
 
 
 if __name__ == "__main__":

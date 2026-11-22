@@ -6,6 +6,7 @@ Live sessions and cursors are completely separate from archive replay cursors.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import time
@@ -345,10 +346,8 @@ class LiveHandler(UnifiedHandler):
             self.server.count("sse_completed")
         except StateRejected as exc:
             self.server.count("resync_required")
-            try:
+            with contextlib.suppress(OSError, TimeoutError):
                 emit("resync_required", {"reason": str(exc), "session_id": session})
-            except (OSError, TimeoutError):
-                pass
         except (BrokenPipeError, ConnectionError, TimeoutError, OSError):
             self.server.count("sse_aborted")
 

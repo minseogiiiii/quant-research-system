@@ -140,7 +140,7 @@ class ExistingArchivedSourceThroughPersistentSSE(unittest.TestCase):
         snapshot = self.engine.snapshot("BTC-USD")["state"]
         old = snapshot["state_version"]
         with self.engine._cv:
-            for i in range(MAX_RETAINED + 3):
+            for _i in range(MAX_RETAINED + 3):
                 self.engine.version += 1
                 self.engine.rows["BTC-USD"].append(
                     {**snapshot, "state_version": self.engine.version}

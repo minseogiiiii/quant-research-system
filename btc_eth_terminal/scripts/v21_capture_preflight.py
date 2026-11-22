@@ -36,8 +36,6 @@ def assess(root: Path, duration: int):
         or int(node_version[1:].split(".")[0]) < 22
     ):
         candidates.append("NODE_22_REQUIRED")
-    if sys.version_info < (3, 11):
-        candidates.append("PYTHON_3_11_REQUIRED")
     if not root.is_dir() or root.is_symlink():
         candidates.append("PERSISTENT_WRITABLE_DIRECTORY_NOT_ESTABLISHED")
         free = None

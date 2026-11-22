@@ -49,11 +49,10 @@ class SourceProtocol(unittest.TestCase):
 
     def test_rejects_nan_and_infinity_in_raw_payload(self):
         for illegal in (b"NaN", b"Infinity", b"-Infinity"):
-            with self.subTest(illegal=illegal):
-                with self.assertRaisesRegex(
-                    coinbase.SourceError, "Invalid JSON constant"
-                ):
-                    coinbase.strict_source_json(b'{"candles":' + illegal + b"}")
+            with self.subTest(illegal=illegal), self.assertRaisesRegex(
+                coinbase.SourceError, "Invalid JSON constant"
+            ):
+                coinbase.strict_source_json(b'{"candles":' + illegal + b"}")
 
     def test_rejects_duplicate_archive_metadata_keys(self):
         archive = self.capture()

@@ -358,7 +358,6 @@ class GateReplayTests(TestCase):
             patch("v25_capture_admission.primary_replay", side_effect=mutate),
             patch(
                 "v25_capture_admission.secondary_replay", return_value=self.secondary
-            ),
+            ),self.assertRaisesRegex(V25AdmissionError, "MANIFEST_MUTATED")
         ):
-            with self.assertRaisesRegex(V25AdmissionError, "MANIFEST_MUTATED"):
-                assess_archive(self.root)
+            assess_archive(self.root)

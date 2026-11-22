@@ -9,6 +9,7 @@ No broker, authentication or live order interface is present.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import resource
 import shutil
@@ -58,17 +59,13 @@ def write_trace_sample(stream, seq, previous, obs):
 def stop_process(proc):
     if proc.poll() is not None:
         return proc.returncode
-    try:
+    with contextlib.suppress(ProcessLookupError):
         os.killpg(proc.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
     try:
         return proc.wait(timeout=3)
     except subprocess.TimeoutExpired:
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.killpg(proc.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
         return proc.wait(timeout=3)
 
 

@@ -120,8 +120,6 @@ def preflight(root, mode, raw_budget, archive_budget, reserve):
         or int(version[1:].split(".")[0]) < 22
     ):
         failures.append("NODE_22_MISSING")
-    if sys.version_info < (3, 11):
-        failures.append("PYTHON_3_11_MISSING")
     if not COLLECTOR.is_file():
         failures.append("SOURCE_COLLECTOR_MISSING")
     if (

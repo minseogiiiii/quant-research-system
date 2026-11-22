@@ -106,7 +106,7 @@ def audit_session(folder: Path, *, allow_exact_trade_replays: bool = False) -> d
     payload_size = 0
     rows = 0
     with raw_path.open("rb") as file:
-        for n, line in enumerate(file, 1):
+        for _n, line in enumerate(file, 1):
             if len(line) > 14_000_000 or not line.endswith(b"\n"):
                 raise L2AuditError("Truncated or oversized JSONL record")
             entry = _json(line)

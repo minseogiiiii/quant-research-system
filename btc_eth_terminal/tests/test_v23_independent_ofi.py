@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 def _q14_load_after_path_setup_0():
     from decimal import Decimal
+
     from v23_independent_microstructure_audit import (
         IndependentOFIReject,
         independent_delta,

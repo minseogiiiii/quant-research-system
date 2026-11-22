@@ -13,6 +13,7 @@ Example: python scripts/v36_observe_existing_collector.py --execute-public-captu
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import shutil
@@ -103,10 +104,8 @@ def read_tap(connection: socket.socket, engine: LiveMarketEngine, done: list):
     except OSError as exc:
         engine.transport_lost("OBSERVER_SOCKET_FAILURE:" + type(exc).__name__)
     finally:
-        try:
+        with contextlib.suppress(OSError):
             connection.close()
-        except OSError:
-            pass
 
 
 def capture_ready_for_research(collector_rc: int, manifest: object) -> bool:
@@ -465,18 +464,14 @@ def main(argv=None) -> int:
         operator_server.shutdown()
         operator_server.server_close()
         operator_thread.join(timeout=3)
-        try:
+        with contextlib.suppress(FileNotFoundError):
             operator_path.unlink()
-        except FileNotFoundError:
-            pass
         server.shutdown()
         server.server_close()
         gateway_thread.join(timeout=3)
         listener.close()
-        try:
+        with contextlib.suppress(FileNotFoundError):
             tap_path.unlink()
-        except FileNotFoundError:
-            pass
 
 
 if __name__ == "__main__":

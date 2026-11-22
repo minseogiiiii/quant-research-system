@@ -377,10 +377,9 @@ class V29TerminalVerdict(TestCase):
                 sys,
                 "argv",
                 ["v25_capture_admission.py", str(source), "--output", str(output)],
-            ),
+            ),self.assertRaises(SystemExit) as context
         ):
-            with self.assertRaises(SystemExit) as context:
-                main()
+            main()
         self.assertEqual(context.exception.code, 2)
         self.assertFalse(
             json.loads(output.read_text())["candidate_24h_internal_source"]
@@ -398,10 +397,9 @@ class V29TerminalVerdict(TestCase):
                 sys,
                 "argv",
                 ["v25_capture_admission.py", str(self.source), "--output", str(output)],
-            ),
+            ),self.assertRaises(SystemExit) as context
         ):
-            with self.assertRaises(SystemExit) as context:
-                main()
+            main()
         self.assertEqual(context.exception.code, 2)
         self.assertEqual(json.loads(output.read_text())["status"], "REJECTED_SOURCE")
 
