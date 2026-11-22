@@ -41,7 +41,8 @@ def verify(root: Path, report: dict) -> dict:
         or report.get("actual_fill_or_realized_pnl_verified") is not False
     ):
         raise IndependentMismatch("Unverified claim promoted")
-    loads = lambda x: json.loads((root / x).read_text())
+    def loads(path_name):
+        return json.loads((root / path_name).read_text())
     depth = loads("P1_STATIC_DEPTH_STRESS_v17.json")
     future = loads("P1_POST_QUOTE_MARKOUT_v18.json")
     maker = loads("V20_CANONICAL_MAKER_SCENARIOS.json")
