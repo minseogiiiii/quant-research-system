@@ -28,7 +28,7 @@ No paper/live order authorization and no confirmed executable alpha.
 | GitHub private genuine archived historical Node fixture run | [Actions 44984062133](https://github.com/minseogiiiii/quant-research-system/actions/runs/44984062133) | BLOCKED: missing `Q13_PRIVATE_RELEASE_URL` |
 | 24-hour single-host Linux capture, archival independent replay, disk and multiple SSE client fault recovery | No passing current candidate evidence | NOT VERIFIED |
 | Historical *shipped* v36 browser DOM E2E (not only rebuilt Q14 preview) | No passing current candidate browser DOM test | NOT VERIFIED |
-| Q14 after-final-fix independent 992-test archive regression | Must pass against exact SHA-pinned candidate | Not approved until verified and recorded |
+| Q14 after-final-fix independent 992-test archive regression | Local 278/278 Git blob matched candidate, historical frozen archives, 410.234s | **992/992 PASS, exit 0**. GitHub-hosted private archive CI still missing |
 
 ## Secure GitHub historical Node archive gate
 
@@ -74,3 +74,12 @@ Require, for one exact candidate commit:
 
 Until all are met: no merge to the protected integration/main branches,
 no Production Ready designation, no paper/live exchange order writing.
+
+## November 21 Q14 exact-source independent regression evidence
+
+- Latest local historical Python: **992/992 PASS**, 0 failed, exit code 0, 410.234 seconds.
+- Local real-source Node: **31/31 PASS**, **SKIP 0**, Node exit 0.
+- Candidate Git blobs: **278/278** match the checked-out GitHub source, with the original historical market fixtures kept off public Git.
+- Safe evidence bundle SHA-256: `970420c3f20f47bb3b506cbb3fe7e3647892c10be5780b3ee9e6432b7cacfb4b`.
+- [PR #7 official Validation](https://github.com/minseogiiiii/quant-research-system/actions/runs/44987377743): **SUCCESS**.
+- The release verdict **does not change**: GitHub private 0 SKIP, 24h host and shipped v36 browser DOM E2E remain hard blockers.
