@@ -13,14 +13,22 @@ from pathlib import Path
 BASE = "64aa85081cab73c917333249eb8e200c8d4044fa"
 BRANCH = "staging/q7-readonly-qualification-20261119"
 PINS = {
-    "btc_eth_terminal/backend/v37_factor_lab.py": "13e14f89e6668f88ee03726f4ef2875df6bdf9af",
-    "btc_eth_terminal/backend/v37_frontend_integrity.py": "b7cb343a4f921b9a2db110feff2090aa67294f3b",
-    "btc_eth_terminal/backend/v37_independent_factor_audit.py": "b8c32b0406492b63a0c87efbaa025682dfe5a26e",
-    "btc_eth_terminal/backend/q7_experiment_prereg.json": "e498cfaa0aec66b24e3720599566a4babcdade67",
-    "btc_eth_terminal/backend/q7_experiment_prereg.sha256.json": "e3445a4eb19e74c4abd1d69e5a02cfabc6bde92a",
-    "btc_eth_terminal/frontend/src/FactorLabPanel.tsx": "4e2c9347dd90f2e9748eec52602ee250d228a261",
-    "btc_eth_terminal/frontend/v37_dist_integrity.json": "e4b28a72ef15f772271236f7e047af4757fcc303",
-    "btc_eth_terminal/scripts/v37_build_frontend.py": "bbd825e35f02f3d653a1b5de7e5ef7f4062edaaa",
+    "btc_eth_terminal/backend/v37_factor_lab.py":
+        "13e14f89e6668f88ee03726f4ef2875df6bdf9af",
+    "btc_eth_terminal/backend/v37_frontend_integrity.py":
+        "b7cb343a4f921b9a2db110feff2090aa67294f3b",
+    "btc_eth_terminal/backend/v37_independent_factor_audit.py":
+        "b8c32b0406492b63a0c87efbaa025682dfe5a26e",
+    "btc_eth_terminal/backend/q7_experiment_prereg.json":
+        "e498cfaa0aec66b24e3720599566a4babcdade67",
+    "btc_eth_terminal/backend/q7_experiment_prereg.sha256.json":
+        "e3445a4eb19e74c4abd1d69e5a02cfabc6bde92a",
+    "btc_eth_terminal/frontend/src/FactorLabPanel.tsx":
+        "4e2c9347dd90f2e9748eec52602ee250d228a261",
+    "btc_eth_terminal/frontend/v37_dist_integrity.json":
+        "e4b28a72ef15f772271236f7e047af4757fcc303",
+    "btc_eth_terminal/scripts/v37_build_frontend.py":
+        "bbd825e35f02f3d653a1b5de7e5ef7f4062edaaa",
 }
 
 
