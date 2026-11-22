@@ -38,7 +38,7 @@ test('stable immutable-source-bound draft with no market orders or result',()=>{
   assert.equal(d.constraints.trading_enabled,false);
   assert.equal(d.constraints.preregistration_proved,false);
   assert.equal(d.constraints.independent_blind_oos,false);
-  assert.equal('future_only_diagnostic_labels' in JSON.stringify(d),false);
+  assert.equal(JSON.stringify(d).includes('future_only_diagnostic_labels'),false);
 });
 test('draft snapshot rejects changed source product or archived as-of',()=>{
   const d=draft();
