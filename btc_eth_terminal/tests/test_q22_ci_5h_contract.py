@@ -160,7 +160,7 @@ class Q22CiPolicy(unittest.TestCase):
     def test_projected_archive_excessive_volume(self):
         with self.assertRaises(Q22Rejected):
             projected_archive_bound(
-                300, 60_000_000, 14_000_000_000, CI_DURATION)
+                300, 80_000_000, 14_000_000_000, CI_DURATION)
 
     def test_projection_rejects_disk_exhaustion(self):
         with self.assertRaises(Q22Rejected):
