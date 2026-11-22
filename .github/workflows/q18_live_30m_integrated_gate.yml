@@ -95,13 +95,21 @@ jobs:
           # The 1560s span is segmented, not a claim of one uninterrupted SSE socket.
           capture_session() {
             python - "$PUBLIC/session_boundaries.jsonl" "$1" "$2" <<'PY'
-          import hashlib,json,sys
+          import hashlib,json,sys,time
           from urllib.request import urlopen
-          with urlopen('http://127.0.0.1:8766/api/v36/health',timeout=3) as r:
-              h=json.load(r)
-          if not (h.get('mode')=='LIVE_SOURCE' and h.get('status')=='HEALTHY'
-                  and h.get('live_feed') is True and h.get('trading_enabled') is False
-                  and set(h.get('snapshots',[]))=={'BTC-USD','ETH-USD'}):
+          deadline=time.monotonic()+50
+          while time.monotonic()<deadline:
+              try:
+                  with urlopen('http://127.0.0.1:8766/api/v36/health',timeout=3) as r:
+                      h=json.load(r)
+                  if (h.get('mode')=='LIVE_SOURCE' and h.get('status')=='HEALTHY'
+                      and h.get('live_feed') is True and h.get('trading_enabled') is False
+                      and set(h.get('snapshots',[]))=={'BTC-USD','ETH-USD'}):
+                      break
+              except (OSError,ValueError,TimeoutError):
+                  pass
+              time.sleep(.5)
+          else:
               raise SystemExit('SSE_BOUNDARY_SOURCE_NOT_HEALTHY')
           session=h.get('session_id')
           if not isinstance(session,str) or not session:raise SystemExit('SOURCE_SESSION_MISSING')
