@@ -53,17 +53,21 @@ sudo -u btceth python3 /opt/btc-eth-terminal/scripts/q21_host_witness.py audit-w
   --samples "$CAPTURE/q21_operator_witness.jsonl" \
   --external-sha256 "$TRUSTED_WITNESS_SHA256"
 
-# Audit the actual completed Coinbase capture with original independent
-# algorithms. These commands may take substantial time for a 24h archive.
-sudo -u btceth python3 /opt/btc-eth-terminal/scripts/v36_verify_live_capture.py \
-  --evidence "$CAPTURE/V36_OBSERVER_EVIDENCE.json"
+# Audit the full 24-hour capture with the separately bounded large-archive
+# verifier, NOT the legacy short-capture v36_verify_live_capture.py.
 sudo -u btceth python3 /opt/btc-eth-terminal/scripts/v36_3_durable_archive_gate.py \
   --capture "$EXACT_SEALED_SOURCE_DIR" \
   --manifest-sha256 "$TRUSTED_SOURCE_MANIFEST_SHA256"
+
+# Additional independent final-book replay uses a separate source interpreter.
+# For full-day archives, memory and run time must be profiled in a bounded
+# offline environment. No success is claimed without this actual full run.
+sudo -u btceth python3 /opt/btc-eth-terminal/backend/independent_soak_replay.py \
+  "$EXACT_SEALED_SOURCE_DIR" --report "$CAPTURE/q21_independent_replay.json"
 ```
 
 Required manual acceptance evidence:
-1. `observer_source_complete == true`, collector exit code 0, no fault injection or reconnect, both BTC and ETH final books verified by independent replay, `duration 86400`, source span >= 86,395 seconds and one continuous source connection.
+1. `observer_source_complete == true`, collector exit code 0, no fault injection or reconnect, `duration 86400`, source span >= 86,395 seconds and one continuous source connection. The large archive gate and a **separate actually completed full-day BTC/ETH final-book replay** must both pass.
 2. Witness file SHA-256 matches the independently preserved pin; at least 85,200 seconds of monotonic samples; sample gaps <=120 seconds, same boot ID, process PID, and source-session hash; all samples healthy, no stale market, disk pressure or resource limits.
 3. Separate operator review of host service restart/stop history, disk usage, process logs, external network reachability, and source data lineage. A **host interruption** or restarted source cannot be labeled the same uninterrupted 24h trial.
 4. Q18 30-minute continuous-source plus segmented eight-client SSE acceptance also needs a final **PASS**. A failed/queued/in-progress CI workflow is not proof.
@@ -72,6 +76,7 @@ Required manual acceptance evidence:
 ## Explicitly deferred
 
 - Q20 notebook UI, P1 improvements, broker APIs, trading execution, alpha claims.
+- The legacy `v36_verify_live_capture.py` uses the original short-archive `v35_archive_ingress` defaults (including 1GB total input), so it must not be presented as a valid 24-hour archive gate. Use the large-archive `v36_3_durable_archive_gate.py` and independently replay final books after separate resource profiling.
 - An unattended process is not 24-hour operational certification without the complete immutable archive and external host evidence.
 - No public site has been deployed by this Q21 change. No services provisioned or paid resources created. No `main`, `integration`, or `staging` merges.
 
