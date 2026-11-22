@@ -69,7 +69,7 @@ jobs:
               'Q22_DEFAULT_RUNNER_CANNOT_FIT_5H_ARCHIVE_BUDGET')
           print('PASS_Q22_PINNED_278_SOURCE_AND_ACTUAL_CI_DISK_PREFLIGHT',free)
           PY
-      - name: Static analysis and 16 adversarial Q22 contract tests
+      - name: Static analysis and 17 adversarial Q22 contract tests
         shell: bash
         run: |
           set -euo pipefail
