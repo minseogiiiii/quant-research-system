@@ -53,3 +53,5 @@ jobs:
         run: rm -rf -- "$RUNNER_TEMP/q14_immutable"
 # No raw market data in public Git, actions logs or upload artifacts.
 # Passing this gate alone does not authorize release promotion or order execution.
+
+# Q17 revalidation: immutable authenticated Q7 archive and actual 31/31, zero skips.
