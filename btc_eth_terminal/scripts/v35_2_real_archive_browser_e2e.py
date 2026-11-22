@@ -135,10 +135,10 @@ def run(archive: Path, pin: str, browser_executable: str | None = None) -> dict:
                             actual = field_card.locator("strong").inner_text().strip()
                             if actual != expected:
                                 raise AssertionError(
-                                    (
+                                    
                                         f"DOM_MARKET_VALUE_MISMATCH {product}"
                                         f" {field}: {actual} != {expected}"
-                                    )
+                                    
                                 )
                         table = panel.get_by_role(
                             "table", name="Verified replay order book"
@@ -156,10 +156,10 @@ def run(archive: Path, pin: str, browser_executable: str | None = None) -> dict:
                         ]
                         if first != expected_first:
                             raise AssertionError(
-                                (
+                                
                                     f"DOM_BOOK_MISMATCH {product}:"
                                     f" {first} vs {expected_first}"
-                                )
+                                
                             )
                         chart = panel.get_by_label(
                             "Admitted archive trade candle chart"

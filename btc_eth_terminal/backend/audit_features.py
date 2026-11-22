@@ -88,10 +88,10 @@ def audit(
         suspicious = [f for f in fields if SUSPECT_FEATURE.search(f)]
         if feature_input and suspicious:
             raise InputError(
-                (
+                
                     f"Potential future/label columns"
                     f" forbidden in feature input: {suspicious}"
-                )
+                
             )
         for row in reader:
             n += 1
