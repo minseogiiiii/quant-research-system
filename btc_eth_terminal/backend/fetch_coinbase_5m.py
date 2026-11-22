@@ -144,11 +144,14 @@ def request_json(product: str, start_sec: int, end_sec: int) -> tuple[bytes, dic
                 if getattr(response, "status", 200) != 200:
                     raise SourceError("Coinbase response does not have HTTP 200 status")
                 headers = getattr(response, "headers", None)
-                if headers is not None and hasattr(headers, "get_content_type"):
-                    if headers.get_content_type() != "application/json":
-                        raise SourceError(
-                            "Coinbase response has unexpected content type"
-                        )
+                if (
+                    headers is not None
+                    and hasattr(headers, "get_content_type")
+                    and headers.get_content_type() != "application/json"
+                ):
+                    raise SourceError(
+                        "Coinbase response has unexpected content type"
+                    )
                 data = response.read(2_000_001)
             break
         except HTTPError as exc:
