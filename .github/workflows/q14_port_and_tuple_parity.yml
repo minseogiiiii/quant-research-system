@@ -44,18 +44,18 @@ jobs:
           PY
           python -m compileall -q src tests btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
           ruff check . --select UP031,F401 --output-format concise
-      - name: Run root and relevant HTTP/security tests
+      - name: Run root and fixture-free read-only safety tests; HTTP bundle parity remains private
         shell: bash
         env:
           PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
         run: |
           set -euo pipefail
-          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_frontend_http.py' -q
-          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_persistent_sse.py' -q
-          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v37_factor_lab_http.py' -q
           python .github/scripts/q7_static_cost_regression.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_transport_gap.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_durable_archive_gate.py' -q
           uv sync --locked --no-editable --default-index https://pypi.org/simple
           .venv/bin/python -m pytest -q
+          echo 'HISTORICAL_FRONTEND_HTTP_E2E_NOT_RUN_REQUIRES_PINNED_IMMUTABLE_ASSETS'
       - name: Record final Ruff total, never suppress errors
         run: |
           python - <<'PY'
