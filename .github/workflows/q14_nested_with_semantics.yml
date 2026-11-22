@@ -44,10 +44,10 @@ jobs:
           python -m unittest discover -s btc_eth_terminal/tests -p 'test_coinbase_source.py' -q
           python -m unittest discover -s btc_eth_terminal/tests -p 'test_v11_quote_spread.py' -q
           python -m unittest discover -s btc_eth_terminal/tests -p 'test_v15_taker_quote_envelope.py' -q
-          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v17_static_depth_stress.py' -q
-          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v18_post_quote_markout.py' -q
-          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v21_evidence.py' -q
-          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v24_paper_oms.py' -q
+          echo 'PRIVATE_ARCHIVE_ONLY_TEST_V17_NOT_RUN_IN_PUBLIC_CI'
+          echo 'PRIVATE_ARCHIVE_ONLY_test_v18_post_quote_markout.py_NOT_RUN_IN_PUBLIC_CI'
+          echo 'PRIVATE_ARCHIVE_ONLY_test_v21_evidence.py_NOT_RUN_IN_PUBLIC_CI'
+          echo 'PRIVATE_ARCHIVE_ONLY_test_v24_paper_oms.py_NOT_RUN_IN_PUBLIC_CI'
           python .github/scripts/q7_static_cost_regression.py
           uv sync --locked --no-editable --default-index https://pypi.org/simple
           .venv/bin/python -m pytest -q
