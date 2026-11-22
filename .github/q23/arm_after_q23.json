@@ -1,12 +1,14 @@
 {
   "schema": "q23_explicit_single_use_5h_arm_v1",
-  "preflight_commit": "70cfda9e48ddb0861828b492ff72d971c576f746",
-  "preflight_success_run_id": 45084825331,
-  "validation_success_run_id": 45084830222,
+  "preflight_commit": "ec8b9195770806bb3d0afcbb7870712028e59145",
+  "preflight_success_run_id": 45085256968,
+  "validation_success_run_id": 45085262561,
   "q18_run_id": 45001633746,
   "q18_head_sha": "d832110e8e3484e82fafa2533270a6d38bee0865",
   "approval": "CI_ONLY_NO_ORDERS",
   "real_orders_enabled": false,
   "previous_q22_failure_run_id": 45005526920,
-  "assertion": "One exact 18,000s Coinbase LIVE engineering qualification, memory-bounded separate archive replays, privacy-redacted fail-fast evidence; no P1 release authorization."
+  "assertion": "One exact 18,000s Coinbase LIVE engineering qualification, memory-bounded separate archive replays, privacy-redacted fail-fast evidence; no P1 release authorization.",
+  "previous_attempt_refused_before_collector": 45085207333,
+  "purpose": "Retry one exact Q23 18000s actual Coinbase LIVE check only after PASS on latest redacted health and memory-bounded two-worker replay. Read only; never execute orders."
 }
