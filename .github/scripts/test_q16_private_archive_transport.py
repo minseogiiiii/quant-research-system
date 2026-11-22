@@ -31,9 +31,11 @@ class Q16PrivateArchiveTransportTests(unittest.TestCase):
             "/repos/other/repo/releases/assets/2",
             "/repos/minseogiiiii/private/issues/2",
         ):
-            with self.subTest(path=path):
-                with self.assertRaisesRegex(ValueError, "ENDPOINT_REQUIRED"):
-                    authorized_headers("https://api.github.com" + path, "secret")
+            with (
+                self.subTest(path=path),
+                self.assertRaisesRegex(ValueError, "ENDPOINT_REQUIRED"),
+            ):
+                authorized_headers("https://api.github.com" + path, "secret")
 
     def test_private_asset_api_requires_readonly_token(self):
         url = (
