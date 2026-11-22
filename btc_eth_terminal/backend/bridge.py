@@ -747,7 +747,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("X-Frame-Options", "DENY")
                 self.send_header(
                     "Content-Security-Policy",
-                    "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                    "default-src 'none'; script-src 'self'; style-src 'self' "
+                    "'unsafe-inline'; "
                     "connect-src 'self'; img-src 'self' data:; font-src 'self' data:; "
                     "base-uri 'none'; object-src 'none'; frame-ancestors 'none'",
                 )
