@@ -138,8 +138,8 @@ jobs:
           if not ci_source_policy(CI_DURATION,RAW_BUDGET,ARCHIVE_BUDGET,DISK_RESERVE,free):
               raise SystemExit('FAIL_Q22_RUNNER_DISK_OR_CI_POLICY_BEFORE_5H')
           assert CI_DURATION==18000
-          assert ARCHIVE_BUDGET==6000000000
-          assert RAW_BUDGET==4000000000
+          assert ARCHIVE_BUDGET==14000000000
+          assert RAW_BUDGET==10000000000
           assert DISK_RESERVE==4*1024**3
           print('PASS_Q22_ACTUAL_5H_PRESTART_STORAGE',free)
           PY
