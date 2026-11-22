@@ -518,7 +518,8 @@ class TestLifecycle(Base):
         cmd = (
             "import sqlite3,sys,os; c=sqlite3.connect(sys.argv[1]); "
             "c.execute('BEGIN IMMEDIATE'); "
-            "c.execute(\"INSERT INTO events VALUES (99,'bad','ACK','PAPER:bad','{}','x','x')\"); "
+            "c.execute(\"INSERT INTO events VALUES "
+            "(99,'bad','ACK','PAPER:bad','{}','x','x')\"); "
             "os._exit(12)"
         )
         res = subprocess.run(
