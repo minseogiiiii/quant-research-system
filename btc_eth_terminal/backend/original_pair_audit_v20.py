@@ -310,7 +310,10 @@ def audit(root: Path, manifest: dict):
     lp = Path(label_entry["file"]).name.removesuffix("_future_labels.csv.gz")
     if not fp or fp != lp:
         reject("Feature and label original filename cohort prefixes disagree")
-    if f["file"] == label_entry["file"] or f["timeline_digest"] != label_entry["timeline_digest"]:
+    if (
+        f["file"] == label_entry["file"]
+        or f["timeline_digest"] != label_entry["timeline_digest"]
+    ):
         reject("Features/labels not separate or 5m pair row cohort mismatch")
     return {
         "status": "STRUCTURAL_PAIR_AUDIT_ONLY_NOT_PIT_ATTESTATION",
