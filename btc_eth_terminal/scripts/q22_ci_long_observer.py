@@ -60,7 +60,9 @@ def ci_source_policy(seconds, raw, archive, reserve, free) -> bool:
     )
 
 
-def evaluate_capture(working: Path, rc: int, engine, finished: bool, start: float) -> dict:
+def evaluate_capture(
+    working: Path, rc: int, engine, finished: bool, start: float
+) -> dict:
     sources = list((working / "soak_evidence").glob("coinbase_btc_eth_soak_*"))
     source = sources[0] if len(sources) == 1 else None
     manifest_path = source / "manifest.json" if source else None
@@ -82,9 +84,13 @@ def evaluate_capture(working: Path, rc: int, engine, finished: bool, start: floa
         if manifest_bytes else None,
         "capture_ready_for_research": capture_ready_for_research(rc, manifest),
         "observer_reader_finished": finished,
-        "observer_source_complete": observer_source_complete(manifest, health, finished),
+        "observer_source_complete": observer_source_complete(
+            manifest, health, finished
+        ),
         "observer_health_before_stop": health,
-        "capture_status": manifest.get("status") if isinstance(manifest, dict) else None,
+        "capture_status": (
+            manifest.get("status") if isinstance(manifest, dict) else None
+        ),
         "capture_message_count": manifest.get("messages")
         if isinstance(manifest, dict) else None,
         "capture_fault_count": len(manifest.get("faults", []))
