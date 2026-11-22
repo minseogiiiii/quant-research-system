@@ -113,7 +113,10 @@ def inventory(roots, scan_zips=True):
                                 if match and not member.is_dir():
                                     records.append(
                                         {
-                                            "location_kind": "unextracted_zip_member_name_only",
+                                            "location_kind": (
+                                                "unextracted_zip_"
+                                                "member_name_only"
+                                            ),
                                             "path": str(file.resolve()),
                                             "member": member.filename,
                                             "sha256_compressed_bytes": None,
