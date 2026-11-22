@@ -352,7 +352,10 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                 if now >= next_sample:
                     s, child = record_sample(
                         work, observer.pid, child, prior, len(samples))
-                    if samples and not 0 < s["monotonic_ns"] - samples[-1]["monotonic_ns"] <= 40_000_000_000:
+                    if samples and not (
+                        0 < s["monotonic_ns"] - samples[-1]["monotonic_ns"]
+                        <= 40_000_000_000
+                    ):
                         raise Q22Rejected("MONITOR_WALLCLOCK_OR_EVENT_LOOP_GAP")
                     samples.append(s)
                     prior = s["source"]
@@ -398,7 +401,7 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                     and next_idx < window_count
                     and elapsed >= first_window + next_idx * period
                 ):
-                    log_path = work / ("q22_fanout_%02d.log" % (next_idx + 1))
+                    log_path = work / f"q22_fanout_{next_idx + 1:02d}.log"
                     window_log = log_path.open("x")
                     window_active = subprocess.Popen(
                         [sys.executable, "-u", str(
