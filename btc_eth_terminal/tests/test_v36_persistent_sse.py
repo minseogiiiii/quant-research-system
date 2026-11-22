@@ -65,7 +65,7 @@ class ExistingArchivedSourceThroughPersistentSSE(unittest.TestCase):
         self.server = server_for_live(self.engine)
         self.runner = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.runner.start()
-        self.base = "http://127.0.0.1:%d" % self.server.server_address[1]
+        self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
 
     def tearDown(self):
         if hasattr(self, "server"):
