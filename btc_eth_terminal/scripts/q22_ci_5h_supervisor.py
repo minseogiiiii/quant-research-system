@@ -23,17 +23,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from q21_host_witness import unix_json  # noqa: E402
-from q23_redacted_diagnostics import (  # noqa: E402
-    failure_receipt,
-    named_failures,
-    read_private_status,
-)
 from q22_ci_long_observer import (  # noqa: E402
     ARCHIVE_BUDGET,
     CI_DURATION,
     DISK_RESERVE,
     RAW_BUDGET,
     SMOKE_DURATION,
+)
+from q23_redacted_diagnostics import (  # noqa: E402
+    failure_receipt,
+    named_failures,
+    read_private_status,
 )
 
 MONITOR_INTERVAL = 15
