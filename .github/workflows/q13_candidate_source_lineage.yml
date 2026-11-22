@@ -2,7 +2,9 @@ name: Q13 candidate source-lineage diff (NO RELEASE REPIN)
 on:
   push:
     branches: [remediation/q13-ruff-safe-autofix-20261121]
-    paths: ['.github/workflows/q13_candidate_source_lineage.yml']
+    paths:
+      - '.github/workflows/q13_candidate_source_lineage.yml'
+      - 'btc_eth_terminal/tests/test_v36_3_q6_frontend_isolation.py'
   workflow_dispatch:
 permissions:
   contents: read
