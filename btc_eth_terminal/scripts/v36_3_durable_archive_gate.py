@@ -106,8 +106,8 @@ def _mono_span(root, entries):
                 line = data.splitlines()[-1]
         try:
             val = json.loads(line)["local_monotonic_ns"]
-        except (ValueError, KeyError, TypeError, IndexError):
-            raise DurableRejected("MISSING_MONOTONIC_SOURCE_EVIDENCE")
+        except (ValueError, KeyError, TypeError, IndexError) as exc:
+            raise DurableRejected("MISSING_MONOTONIC_SOURCE_EVIDENCE") from exc
         if (
             not isinstance(val, str)
             or not val.isascii()
@@ -134,8 +134,8 @@ def audit(root: Path, pin: str) -> dict:
         raise DurableRejected("MANIFEST_PIN_MISMATCH")
     try:
         manifest = json.loads((root / "manifest.json").read_bytes())
-    except (ValueError, UnicodeError):
-        raise DurableRejected("INVALID_MANIFEST")
+    except (ValueError, UnicodeError) as exc:
+        raise DurableRejected("INVALID_MANIFEST") from exc
     if not isinstance(manifest, dict):
         raise DurableRejected("INVALID_MANIFEST_OBJECT")
     chunks = manifest.get("chunks")
@@ -182,7 +182,7 @@ def audit(root: Path, pin: str) -> dict:
         try:
             cert = verifier.verify_capture(root, pin)
         except (verifier.ArchiveRejected, OSError) as exc:
-            raise DurableRejected(str(exc))
+            raise DurableRejected(str(exc)) from exc
     elif committed:
         raise DurableRejected("FINALIZED_CHUNKS_NOT_MANIFESTED")
     span = _mono_span(root, chunks) if chunks else None
