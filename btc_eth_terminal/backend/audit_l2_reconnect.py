@@ -215,7 +215,7 @@ def audit_reconnect(folder: Path) -> dict:
     results = []
     previous_end = None
     gate = BookAdmissionGate()
-    for name, entry in zip(EXPECTED, declared):
+    for name, entry in zip(EXPECTED, declared, strict=False):
         if entry.get("folder") != "reconnect_evidence/" + name:
             raise StrictL2Error("Changed segment path in parent")
         segment = folder / name

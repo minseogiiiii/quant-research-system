@@ -121,7 +121,7 @@ def build(source: Path = BASE_ROOT, reference: Path = REFERENCE) -> dict:
         or len(causal.get("results", [])) != len(ref.get("rows", []))
     ):
         raise ProjectionError("Unsafe or missing frozen feature report")
-    for row, rr in zip(causal["results"], ref["rows"]):
+    for row, rr in zip(causal["results"], ref["rows"], strict=False):
         if (
             row.get("instrument") != rr.get("instrument")
             or row.get("decision_receive_utc_ms") != rr.get("decision_receive_utc_ms")

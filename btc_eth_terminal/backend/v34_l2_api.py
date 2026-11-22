@@ -115,7 +115,7 @@ def load_l2():
         rows = data["products"][p]["depth_snapshots"]
         if len(rows) != len(source):
             raise L2APIError("Source decision grid mismatch")
-        for a, b in zip(rows, source):
+        for a, b in zip(rows, source, strict=False):
             if (
                 a["product"] != p
                 or a["decision_receiver_ms"] != b["decision_receive_utc_ms"]

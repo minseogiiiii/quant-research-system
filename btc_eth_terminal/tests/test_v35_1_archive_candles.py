@@ -101,7 +101,7 @@ class AuthenticCandleContract(unittest.TestCase):
             actual = self.ds.candles[product]
             self.assertEqual(len(actual), len(expected[product]))
             self.assertGreaterEqual(len(actual), 1)
-            for row, baseline in zip(actual, expected[product]):
+            for row, baseline in zip(actual, expected[product], strict=False):
                 self.assertEqual(row["time"], baseline[0])
                 self.assertEqual(row["available_at"], row["time"] + 60000)
                 self.assertEqual(

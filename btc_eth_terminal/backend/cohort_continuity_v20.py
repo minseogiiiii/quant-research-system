@@ -53,7 +53,7 @@ def validate_intervals(rows):
         ordered.append((a, b, row))
     ordered.sort(key=lambda r: r[0])
     boundaries = []
-    for prev, nxt in zip(ordered, ordered[1:]):
+    for prev, nxt in zip(ordered, ordered[1:], strict=False):
         gap = (nxt[0] - prev[1]).total_seconds()
         boundaries.append(
             {

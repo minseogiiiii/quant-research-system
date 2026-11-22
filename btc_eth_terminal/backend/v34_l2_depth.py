@@ -237,7 +237,7 @@ def build(*, root: Path = BASE_ROOT, reference: Path = BASE_PROJECTION) -> dict:
         expected = by_product[p]
         if len(rows[p]) != len(expected):
             raise DepthError("Missing L2 decision")
-        for actual, prev in zip(rows[p], expected):
+        for actual, prev in zip(rows[p], expected, strict=False):
             if actual["decision_receiver_ms"] != prev["decision_receive_utc_ms"]:
                 raise DepthError("Decision time mismatch")
             if (

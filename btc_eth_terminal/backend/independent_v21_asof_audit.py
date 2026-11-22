@@ -150,7 +150,7 @@ def audit(root, canonical):
         "displayed_best_bid_qty",
         "displayed_best_ask_qty",
     )
-    for i, (a, b) in enumerate(zip(primary["rows"], other["rows"])):
+    for i, (a, b) in enumerate(zip(primary["rows"], other["rows"], strict=False)):
         for field in required:
             if a.get(field) != b.get(field):
                 raise ValueError(f"As-of quote discrepancy row {i}: {field}")

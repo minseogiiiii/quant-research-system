@@ -255,7 +255,7 @@ def audit_session(folder: Path, *, allow_exact_trade_replays: bool = False) -> d
     # In THIS one captured WS connection the sequence numbering spans all
     # channels and products; do not incorrectly detect gaps per product by
     # filtering other-channel messages away.
-    gap_count = sum(b != a + 1 for a, b in zip(sequence, sequence[1:]))
+    gap_count = sum(b != a + 1 for a, b in zip(sequence, sequence[1:], strict=False))
     if len(sequence) != len(set(sequence)):
         raise L2AuditError("Duplicate connection message sequence numbers")
     if gap_count:

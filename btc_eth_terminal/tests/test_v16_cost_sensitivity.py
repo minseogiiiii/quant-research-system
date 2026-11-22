@@ -81,7 +81,7 @@ class RealArchiveSensitivity(unittest.TestCase):
         self.assertFalse(r["actual_fills_verified"])
         baseline = r["scenario_matrix"][0]["observations"]
         stress = r["scenario_matrix"][1]["observations"]
-        for a, b in zip(baseline, stress):
+        for a, b in zip(baseline, stress, strict=False):
             self.assertEqual(a["id"], b["id"])
             self.assertEqual(a["quote_sequence"], b["quote_sequence"])
             self.assertEqual(a["status"], "INDICATIVE_TAKER_QUOTE_ONLY")

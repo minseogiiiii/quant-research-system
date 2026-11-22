@@ -92,7 +92,7 @@ def replay(root: Path = BASE_ROOT):
                 if len(selected) != 10 or len(projected) != 10:
                     raise IndependentDepthReject("wrong depth count")
                 running = Decimal(0)
-                for (price, qty), r in zip(selected, projected):
+                for (price, qty), r in zip(selected, projected, strict=False):
                     running += qty
                     if (
                         price != Decimal(r["price"])

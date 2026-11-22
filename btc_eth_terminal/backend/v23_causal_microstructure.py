@@ -228,7 +228,7 @@ def create_report(root: Path, v21_reference: dict):
     expected = v21_reference["rows"]
     if len(expected) != len(rows):
         raise FeatureReject("v21 fixed decisions not preserved")
-    for r, b in zip(rows, expected):
+    for r, b in zip(rows, expected, strict=False):
         if (
             r["instrument"] != b["instrument"]
             or r["decision_receive_utc_ms"] != b["decision_receive_utc_ms"]

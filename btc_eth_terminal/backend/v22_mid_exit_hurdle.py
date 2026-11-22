@@ -294,7 +294,7 @@ def evaluate(
             except (ValueError, TypeError, KeyError) as exc:
                 raise EvidenceReject("Invalid frozen quote receive timestamp") from exc
         horizon_rows = []
-        for label, expected_horizon in zip(labels, HORIZONS):
+        for label, expected_horizon in zip(labels, HORIZONS, strict=False):
             if (
                 label.get("horizon_ms") != expected_horizon
                 or label.get("label_not_available_to_signal") is not True

@@ -120,7 +120,7 @@ def verify(root: Path, report: dict) -> dict:
         label_rows = row["future_only_labels"]
         if len(label_rows) != 3:
             raise IndependentMismatch("Missing future label")
-        for pos, (obs, original) in enumerate(zip(label_rows, f["labels"])):
+        for pos, (obs, original) in enumerate(zip(label_rows, f["labels"], strict=False)):
             horizon = HORIZONS[pos]
             if (
                 obs["horizon_ms"] != horizon

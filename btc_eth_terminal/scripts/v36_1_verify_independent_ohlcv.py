@@ -143,7 +143,7 @@ def compare_private_capture(
                 actual = json.load(res)["rows"]
             if len(expected) != len(actual) or len(expected) != len(derived):
                 raise StateRejected("INDEPENDENT_CANDLE_COUNT_MISMATCH_" + p)
-            for i, (r, d, a) in enumerate(zip(expected, derived, actual)):
+            for i, (r, d, a) in enumerate(zip(expected, derived, actual, strict=False)):
                 for field in ("time", "available_at", "observed_trade_count"):
                     if r[field] != d[field] or r[field] != a[field]:
                         raise StateRejected(
