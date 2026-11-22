@@ -1,0 +1,68 @@
+name: Q13 export changed public Python sources only (NO RAW MARKET DATA)
+
+on:
+  push:
+    branches: [remediation/q13-ruff-safe-autofix-20261121]
+    paths: ['.github/workflows/q13_export_public_python_patch.yml']
+permissions:
+  contents: read
+jobs:
+  export-source-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Export only changed reviewable btc_eth_terminal Python source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import subprocess
+          import zipfile
+
+          base='203520030c8fd3df2b4cd3829ee7b84e548b754f'
+          head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          paths=subprocess.check_output(
+              ['git','diff','--name-only','--diff-filter=AM',base+'..'+head],text=True
+          ).splitlines()
+          sources=sorted(p for p in paths if
+              p.startswith('btc_eth_terminal/') and p.endswith('.py')
+          )
+          if len(sources)<100:
+              raise SystemExit('INCOMPLETE_Q13_SOURCE_REMEDIATION:'+str(len(sources)))
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])
+          manifest={'schema':'q13_public_python_source_only_v1',
+                    'base_sha':base,'candidate_sha':head,'files':{}}
+          with zipfile.ZipFile(out/'q13_public_python_source_only.zip','w',
+                               compression=zipfile.ZIP_DEFLATED) as z:
+              for name in sources:
+                  p=pathlib.Path(name)
+                  if not p.is_file() or '..' in p.parts or p.is_symlink():
+                      raise SystemExit('INVALID_PUBLIC_SOURCE_PATH')
+                  b=p.read_bytes()
+                  if len(b)>1_000_000:
+                      raise SystemExit('UNEXPECTED_SOURCE_FILE_SIZE')
+                  z.writestr(name,b)
+                  manifest['files'][name]={'bytes':len(b),
+                                          'sha256':hashlib.sha256(b).hexdigest()}
+          manifest['count']=len(sources)
+          (out/'q13_public_python_source_manifest.json').write_text(
+              json.dumps(manifest,indent=2,sort_keys=True)+'\n'
+          )
+          print('PASS_Q13_PUBLIC_SOURCE_ONLY_PATCH',len(sources))
+          PY
+      - name: Upload reviewed public source only, never any Coinbase archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: q13-remediation-public-python-only
+          path: |
+            ${{ runner.temp }}/q13_public_python_source_only.zip
+            ${{ runner.temp }}/q13_public_python_source_manifest.json
+          retention-days: 7
+          if-no-files-found: error
