@@ -1,0 +1,84 @@
+name: Q14 non-literal Ruff safe/unsafe fixability survey (NO COMMIT)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_remaining_autofix_diagnostic.yml']
+permissions:
+  contents: read
+jobs:
+  q14-survey:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - run: python -m pip install 'ruff==0.15.22'
+      - name: Diagnose available changes only, no mutation of Git refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          import collections
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          selected='B007,B023,B904,E731,E741,F841,I001,SIM102,SIM105,SIM115,SIM117,UP031,UP036'
+          def scan():
+              r=subprocess.run(['ruff','check','.','--output-format','json'],
+                    capture_output=True,text=True)
+              if r.returncode not in (0,1):raise RuntimeError(r.stderr[:250])
+              return json.loads(r.stdout)
+          before=scan()
+          paths=[pathlib.Path(x) for x in subprocess.check_output(
+              ['git','ls-files'],text=True).splitlines() if x.endswith('.py')]
+          old={str(p):ast.dump(ast.parse(p.read_text()),include_attributes=False) for p in paths}
+          r=subprocess.run(['ruff','check','.','--select',selected,'--fix','--unsafe-fixes'],
+                capture_output=True,text=True)
+          if r.returncode not in (0,1):raise RuntimeError(r.stderr[:600])
+          after=scan()
+          def rules(rows):
+              return dict(sorted(collections.Counter(x['code'] for x in rows).items()))
+          changed=[str(p) for p in paths if
+                ast.dump(ast.parse(p.read_text()),include_attributes=False)!=old[str(p)]]
+          changed_all=subprocess.check_output(['git','diff','--name-only'],text=True).splitlines()
+          report={'schema':'q14_no_commit_nonliteral_fixability_v1',
+                  'commit':os.environ['GITHUB_SHA'],
+                  'before':len(before),'after':len(after),
+                  'before_by_rule':rules(before),'after_by_rule':rules(after),
+                  'ast_changing_python_files':changed,
+                  'modified_python_files':changed_all,
+                  'release_approved':False,
+                  'actions_taken':'diagnostic_worktree_only'}
+          output=pathlib.Path(os.environ['RUNNER_TEMP'])/'q14_nonliteral_fixability.json'
+          output.write_text(json.dumps(report,sort_keys=True,indent=2)+'\n')
+          print('Q14_NONLITERAL_FIXABILITY',json.dumps({
+              'before':len(before),'after':len(after),
+              'ast_changed_files':len(changed),
+              'modified_files':len(changed_all),
+              'remaining_by_rule':rules(after)},sort_keys=True))
+          PY
+      - name: Test changed ephemeral candidate without committing
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+          python .github/scripts/q7_static_cost_regression.py
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - uses: actions/upload-artifact@v4
+        with:
+          name: q14-nonliteral-fixability-diagnostic
+          path: ${{ runner.temp }}/q14_nonliteral_fixability.json
+          retention-days: 7
+          if-no-files-found: error
+# No source change is pushed or committed by this diagnostic.
