@@ -26,6 +26,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Ensure immutable Q14 source and no live execution changes
         shell: bash
         run: |
@@ -66,6 +69,14 @@ jobs:
           python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_operator_monitor.py' -v
           python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_systemd_launch.py' -v
           echo 'PASS_Q21_SYNTHETIC_OPERATOR_WITNESS_CONTRACT_ONLY'
+      - name: Re-run existing P0 SSE overload, storage failure, reconnect and archive guards
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_sse_backpressure.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_storage_faults.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_transport_gap.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_durable_archive_gate.py' -v
+          echo 'PASS_Q21_P0_EPHEMERAL_FAULT_GUARDS_NOT_REAL_24H_RECOVERY'
       - name: Enforce documented limits
         run: |
           set -euo pipefail
