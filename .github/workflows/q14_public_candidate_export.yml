@@ -2,7 +2,9 @@ name: Q14 export reviewed public Python delta for private full regression
 on:
   push:
     branches: [remediation/q14-import-order-20261122]
-    paths: ['.github/workflows/q14_public_candidate_export.yml']
+    paths:
+      - '.github/workflows/q14_public_candidate_export.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
