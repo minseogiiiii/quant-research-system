@@ -291,11 +291,15 @@
     "q14_root_full_validation": "SUCCESS 44986988899",
     "ruff_violations": 0,
     "python_534": "PASS",
-    "python_992_latest": "PENDING",
+    "python_992_latest": "PASS_LOCAL_992_OF_992_EXIT_ZERO_SOURCE_GIT_BLOBS_278_OF_278",
     "private_node_github_zero_skip": "BLOCKED_PRIVATE_FIXTURE_SECRET_NOT_CONFIGURED",
-    "local_node_31_zero_skip": "PASS",
+    "local_node_31_zero_skip": "PASS_LOCAL_31_OF_31_SKIP_ZERO",
     "live_24h_persistent_host": "NOT_VERIFIED",
-    "frozen_v36_shipped_e2e": "NOT_VERIFIED"
+    "frozen_v36_shipped_e2e": "NOT_VERIFIED",
+    "github_private_node_zero_skip": "BLOCKED_PRIVATE_FIXTURE_SECRET_NOT_CONFIGURED",
+    "evidence_sha256": "970420c3f20f47bb3b506cbb3fe7e3647892c10be5780b3ee9e6432b7cacfb4b",
+    "github_pr_validation": "SUCCESS_44987377743",
+    "github_frontend_pinned_build": "SUCCESS_44987235754"
   },
   "release_approved": false,
   "merge_approved": false,
