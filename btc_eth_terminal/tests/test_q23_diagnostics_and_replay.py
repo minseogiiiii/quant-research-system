@@ -15,19 +15,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "backend"))
 
-from q23_redacted_diagnostics import (  # noqa: E402
-    failure_receipt,
-    named_failures,
-    redacted_snapshot,
-)
+from q22_ci_5h_supervisor import Q22Rejected, check_private_health  # noqa: E402
+from q22_ci_full_replay import _book_agreement  # noqa: E402
 from q23_isolated_replay_worker import (  # noqa: E402
     PRIVATE_STATE_ROWS_PER_PRODUCT,
     WORKER_AS_BYTES,
     replay_primary,
     verify_manifest_pin,
 )
-from q22_ci_full_replay import _book_agreement  # noqa: E402
-from q22_ci_5h_supervisor import Q22Rejected, check_private_health  # noqa: E402
+from q23_redacted_diagnostics import failure_receipt, named_failures  # noqa: E402
 
 SESSION = "a" * 32
 MS = 1_800_000_000_000
@@ -241,22 +237,18 @@ class Q23Replay(unittest.TestCase):
             source.mkdir()
             pin = _large_private_fixture(source)
             verify_manifest_pin(source, pin)
-            import v35_archive_ingress as ingress
             import v35_replay_service as primary
 
             with self.assertRaisesRegex(
                 primary.StateRejected, "BOUNDED_STATE_HISTORY_EXCEEDED"
             ):
                 primary.replay_capture(source, pin)
-            with patch.object(primary, "MAX_ROWS_PER_PRODUCT",
-                              PRIVATE_STATE_ROWS_PER_PRODUCT):
-                result = primary.replay_capture(source, pin)
-            self.assertEqual(result.message_count, 2 * 10011)
+            result = replay_primary(source, pin)
+            self.assertEqual(result["messages"], 2 * 10011)
             for product in ("BTC-USD", "ETH-USD"):
-                self.assertGreater(len(result.rows[product]), 10000)
-                self.assertLessEqual(
-                    len(result.rows[product]), PRIVATE_STATE_ROWS_PER_PRODUCT
-                )
+                retained = result["products"][product]["retained_states"]
+                self.assertGreater(retained, 10000)
+                self.assertLessEqual(retained, PRIVATE_STATE_ROWS_PER_PRODUCT)
             # Valid source is synthetic and not promoted to LIVE or real data.
             self.assertTrue(
                 json.loads((source / "manifest.json").read_bytes())[
