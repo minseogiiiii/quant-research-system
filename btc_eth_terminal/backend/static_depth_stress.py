@@ -186,12 +186,12 @@ def diagnose(
                     != q["observed_best_level_qty"]
                 ):
                     raise DepthStressError("Mismatch with existing first-quote model")
-                if q["status"] == "REJECTED_INSUFFICIENT_BEST_LEVEL_DEPTH":
-                    if (
-                        str((ask if q["side"] == "BUY" else bid)[1])
-                        != q["observed_best_level_qty"]
-                    ):
-                        raise DepthStressError("Quote best-level quantity inconsistent")
+                if (
+                    q["status"] == "REJECTED_INSUFFICIENT_BEST_LEVEL_DEPTH"
+                    and str((ask if q["side"] == "BUY" else bid)[1])
+                    != q["observed_best_level_qty"]
+                ):
+                    raise DepthStressError("Quote best-level quantity inconsistent")
                 qty = number(
                     q["requested_quantity"],
                     "requested quantity",
