@@ -1,4 +1,4 @@
-name: Q14 full residual Ruff inventory after UP034 (DIAGNOSTIC ONLY)
+name: Q14 final Ruff residual after explicit exception chaining (DIAGNOSTIC)
 on:
   push:
     branches: [remediation/q14-import-order-20261122]
