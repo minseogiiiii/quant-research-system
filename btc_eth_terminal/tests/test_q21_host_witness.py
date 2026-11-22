@@ -68,9 +68,8 @@ class Q21WitnessContract(unittest.TestCase):
             {"disk_free_bytes": DISK_RESERVE_BYTES - 1},
         ):
             rows = [sample(0), {**sample(1), **change}]
-            with self.subTest(change=change):
-                with self.assertRaises(WitnessRejected):
-                    verify_sequence(rows, minimum_span=60)
+            with self.subTest(change=change), self.assertRaises(WitnessRejected):
+                verify_sequence(rows, minimum_span=60)
 
     def test_no_missing_or_duplicated_sample_index(self):
         with self.assertRaises(WitnessRejected):
@@ -82,10 +81,9 @@ class Q21WitnessContract(unittest.TestCase):
             {"monotonic_ns": sample(0)["monotonic_ns"] + 121_000_000_000},
             {"wall_time_ns": sample(0)["wall_time_ns"] + 10_000_000_000},
         ):
-            with self.subTest(change=change):
-                with self.assertRaises(WitnessRejected):
-                    verify_sequence([sample(0), {**sample(1), **change}],
-                                    minimum_span=60)
+            with self.subTest(change=change), self.assertRaises(WitnessRejected):
+                verify_sequence([sample(0), {**sample(1), **change}],
+                                minimum_span=60)
 
     def test_stale_or_decreasing_source_progress(self):
         for change in (
@@ -94,10 +92,9 @@ class Q21WitnessContract(unittest.TestCase):
             {"heartbeats": sample(0)["heartbeats"] - 1},
             {"messages": True},
         ):
-            with self.subTest(change=change):
-                with self.assertRaises(WitnessRejected):
-                    verify_sequence([sample(0), {**sample(1), **change}],
-                                    minimum_span=60)
+            with self.subTest(change=change), self.assertRaises(WitnessRejected):
+                verify_sequence([sample(0), {**sample(1), **change}],
+                                minimum_span=60)
 
     def test_short_duration_is_not_24_hour_evidence(self):
         with self.assertRaisesRegex(WitnessRejected, "DURATION"):
