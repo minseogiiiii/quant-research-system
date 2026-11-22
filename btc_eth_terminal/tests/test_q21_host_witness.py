@@ -1,6 +1,5 @@
 """Synthetic contract tests only: no claim of real 24h Linux certification."""
 
-import copy
 import json
 import sys
 import tempfile
