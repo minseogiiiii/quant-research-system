@@ -310,9 +310,9 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
     drain_started = None
     preflight = None
     was_ready = False
-    with (public / "observer_stdout_private.log").open("x") as out:
-        # This observer log is private and never included in artifact uploads.
-        with (public / "observer_stderr_private.log").open("x") as err:
+    # Private logs live OUTSIDE the public summary artifact directory.
+    with Path(str(work) + ".observer_stdout.log").open("x") as out:
+        with Path(str(work) + ".observer_stderr.log").open("x") as err:
             observer = subprocess.Popen(
                 [
                     sys.executable, "-u",
