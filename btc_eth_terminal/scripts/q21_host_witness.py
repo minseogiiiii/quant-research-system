@@ -158,7 +158,9 @@ def capture_sample(capture_dir: Path, observer_pid: int) -> dict:
     }
 
 
-def verify_sequence(rows: list[dict], minimum_span: int = MIN_WITNESS_SPAN_SECONDS) -> dict:
+def verify_sequence(
+    rows: list[dict], minimum_span: int = MIN_WITNESS_SPAN_SECONDS
+) -> dict:
     if (not isinstance(rows, list) or len(rows) < 2 or
             not 0 < minimum_span <= 86400):
         raise WitnessRejected("WITNESS_SAMPLE_COUNT_OR_SPAN_INVALID")
@@ -232,7 +234,8 @@ def witness(capture_dir: Path, pid: int, output: Path, seconds: int, interval: i
         while True:
             record = capture_sample(capture_dir, pid)
             record["index"] = index
-            writer.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+            encoded = json.dumps(record, sort_keys=True, separators=(",", ":"))
+            writer.write(encoded + "\n")
             writer.flush()
             os.fsync(writer.fileno())
             index += 1
