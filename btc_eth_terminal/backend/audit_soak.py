@@ -232,11 +232,13 @@ def audit(directory: Path) -> dict:
         or not connections
     ):
         raise SoakAuditError("No/oversized source session")
-    if status == "CAPTURE_COMPLETED_NO_GAPS_UNVERIFIED_MARKET_TRUTH":
-        # A rejected source packet or uncommitted write must never be hidden by
-        # an otherwise plausible success manifest.
-        if {p.name for p in root.iterdir()} != {"manifest.json", "chunks"}:
-            raise SoakAuditError("Unexpected unlisted root archive evidence")
+    # A rejected source packet or uncommitted write must never be hidden by
+    # an otherwise plausible success manifest.
+    if (
+        status == "CAPTURE_COMPLETED_NO_GAPS_UNVERIFIED_MARKET_TRUTH"
+        and {p.name for p in root.iterdir()} != {"manifest.json", "chunks"}
+    ):
+        raise SoakAuditError("Unexpected unlisted root archive evidence")
     conn_by_id = {}
     for i, c in enumerate(connections):
         if not isinstance(c, dict) or type(c.get("id")) is not int or c["id"] != i:
