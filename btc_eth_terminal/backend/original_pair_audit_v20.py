@@ -303,14 +303,14 @@ def audit(root: Path, manifest: dict):
     f = validate_entry(
         root, manifest["feature"], "_features_5m.csv.gz", format_, "feature"
     )
-    l = validate_entry(
+    label_entry = validate_entry(
         root, manifest["future_labels"], "_future_labels.csv.gz", format_, "label"
     )
     fp = Path(f["file"]).name.removesuffix("_features_5m.csv.gz")
-    lp = Path(l["file"]).name.removesuffix("_future_labels.csv.gz")
+    lp = Path(label_entry["file"]).name.removesuffix("_future_labels.csv.gz")
     if not fp or fp != lp:
         reject("Feature and label original filename cohort prefixes disagree")
-    if f["file"] == l["file"] or f["timeline_digest"] != l["timeline_digest"]:
+    if f["file"] == label_entry["file"] or f["timeline_digest"] != label_entry["timeline_digest"]:
         reject("Features/labels not separate or 5m pair row cohort mismatch")
     return {
         "status": "STRUCTURAL_PAIR_AUDIT_ONLY_NOT_PIT_ATTESTATION",
@@ -322,7 +322,7 @@ def audit(root: Path, manifest: dict):
         },
         "label_horizon_ms_explicit": manifest["future_labels"]["horizon_ms"],
         "feature": f,
-        "future_labels": l,
+        "future_labels": label_entry,
         "source_provider_authenticity_verified": False,
         "feature_availability_original_capture_verified": False,
         "future_label_never_allowed_as_signal_feature": True,
