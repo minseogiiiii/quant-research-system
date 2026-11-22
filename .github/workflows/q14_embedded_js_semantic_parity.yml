@@ -80,7 +80,7 @@ jobs:
           const ts=require('./btc_eth_terminal/frontend/node_modules/typescript');
           function canonical(node){
             const obj={kind:node.kind};
-            if(typeof node.text==='string') obj.text=node.text;
+            if(node.kind!==ts.SyntaxKind.SourceFile && typeof node.text==='string') obj.text=node.text;
             if(typeof node.escapedText==='string') obj.name=node.escapedText;
             const children=[];
             node.forEachChild(c=>{children.push(canonical(c));});
