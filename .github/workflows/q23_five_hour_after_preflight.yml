@@ -56,6 +56,7 @@ jobs:
             'btc_eth_terminal/tests/test_q22_ci_5h_contract.py',
             '.github/workflows/q22_five_hour_preflight.yml',
             '.github/workflows/q22_five_hour_after_q18.yml',
+            '.github/q22/arm_after_q18.json',
             'docs/Q22_FIVE_HOUR_GATED_CI_RUNBOOK.md',
             'btc_eth_terminal/scripts/q23_redacted_diagnostics.py',
             'btc_eth_terminal/scripts/q23_isolated_replay_worker.py',
