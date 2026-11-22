@@ -56,7 +56,10 @@ def private_request(path: Path, route: str, method="GET"):
     try:
         sock.connect(str(path))
         sock.sendall(
-            f"{method} {route} HTTP/1.1\r\nHost: local\r\nConnection: close\r\n\r\n".encode()
+            (
+                f"{method} {route} HTTP/1.1\r\nHost:"
+                f" local\r\nConnection: close\r\n\r\n"
+            ).encode()
         )
         chunks = []
         while True:

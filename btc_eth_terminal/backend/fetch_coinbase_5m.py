@@ -273,7 +273,10 @@ def collect(
     gaps = sorted(expected - observed)
     if gaps:
         raise SourceError(
-            f"Missing {len(gaps)} five-minute candles in Coinbase responses; first={gaps[0]}"
+            (
+                f"Missing {len(gaps)} five-minute candles"
+                f" in Coinbase responses; first={gaps[0]}"
+            )
         )
     ordered = [{"time": str(t * 1000), **bars[t]} for t in sorted(bars)]
     manifest = {

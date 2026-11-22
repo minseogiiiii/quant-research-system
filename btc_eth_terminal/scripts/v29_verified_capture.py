@@ -1,8 +1,10 @@
 """Fail-closed public BTC/ETH capture supervision, with terminal dual-replay audit.
 
 Examples:
-  python scripts/v29_verified_capture.py --workdir /data/btceth --evidence-dir /data/evidence/run1 --mode smoke
-  python scripts/v29_verified_capture.py --workdir /data/btceth --evidence-dir /data/evidence/run2 --mode 24h --execute-real-public-capture
+  python scripts/v29_verified_capture.py --workdir /data/btceth \
+--evidence-dir /data/evidence/run1 --mode smoke
+  python scripts/v29_verified_capture.py --workdir /data/btceth \
+--evidence-dir /data/evidence/run2 --mode 24h --execute-real-public-capture
 
 Preflight alone NEVER means market capture succeeded. Each run needs a new
 observer directory outside the collector workdir. No broker credentials/orders.

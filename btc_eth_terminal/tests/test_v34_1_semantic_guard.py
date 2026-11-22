@@ -1,4 +1,5 @@
-"""v34.1: independent semantic checks even when a malformed artifact is freshly re-pinned.
+"""v34.1: independent semantic checks even when a malformed artifact is \
+freshly re-pinned.
 
 No original market archive, derived projection or original evidence pin is modified.
 The test deliberately simulates a newly approved but internally inconsistent

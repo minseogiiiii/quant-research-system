@@ -1,6 +1,7 @@
 """Synthetic-only CI contract tests for source/product scoped SSE cursors.
 
-Real Coinbase archive cross-source tests run locally in test_v35_3_source_bound_stream.py.
+Real Coinbase archive cross-source tests run locally in \
+test_v35_3_source_bound_stream.py.
 No synthetic quote is treated as verified market data here.
 """
 

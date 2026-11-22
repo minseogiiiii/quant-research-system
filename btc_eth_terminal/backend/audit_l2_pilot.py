@@ -187,7 +187,8 @@ def audit_session(folder: Path, *, allow_exact_trade_replays: bool = False) -> d
                         if kind == "snapshot":
                             snapshot_levels[p] += 1
                     if kind == "update" and books[p]["bid"] and books[p]["offer"]:
-                        # A positive spread is a useful, limited internal sanity invariant.
+                        # A positive spread is a useful, limited internal sanity
+                        # invariant.
                         # This is not independent verification against source exchange
                         # state.
                         if max(books[p]["bid"]) >= min(books[p]["offer"]):

@@ -140,7 +140,8 @@ with sync_playwright() as pw:
        if(label)cards[label]=value;
      }
      const depth=document.querySelector('[aria-label="Live order book 10 levels"]');
-     return {cards,rows:Array.from(depth.querySelectorAll('tbody tr'),tr=>Array.from(tr.querySelectorAll('td'),td=>td.textContent?.trim())),
+     return {cards,rows:Array.from(depth.querySelectorAll('tbody tr'),\
+tr=>Array.from(tr.querySelectorAll('td'),td=>td.textContent?.trim())),
        product:document.querySelector('button[aria-pressed="true"]')?.textContent?.trim(),
        datafeed:document.querySelector('[data-testid="funnest-actual-getbars"]')?.getAttribute('data-bars'),
        canvas_count:document.querySelectorAll('canvas').length,
@@ -201,7 +202,8 @@ with sync_playwright() as pw:
         }
         report["api_fetches"] = page.evaluate("window.__seenFetch")[:30]
         assert not report["page_errors"], report["page_errors"]
-        # Deliberately tamper one metric while keeping authenticated book/session identical.
+        # Deliberately tamper one metric while keeping authenticated book/session
+        # identical.
         # This verifies the frozen release's client-side validation weakness, not
         # genuine source quality.
         old = (

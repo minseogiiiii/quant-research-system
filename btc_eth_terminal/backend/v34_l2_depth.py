@@ -73,7 +73,8 @@ def top_levels(book: Book):
 
 
 def shock_events(samples: list[dict], *, product: str):
-    """Fixed descriptive threshold with PAST-only baseline, FUTURE outcome gated by availability.
+    """Fixed descriptive threshold with PAST-only baseline, FUTURE \
+outcome gated by availability.
 
     Samples are end-of-receiver-second L2 observations, not an exchange-event
     series. No unknown future recovery is exposed before the 30-second window.

@@ -1,4 +1,5 @@
-"""Strict two-connection source integrity and conservative public REST book corroboration.
+"""Strict two-connection source integrity and conservative public REST \
+book corroboration.
 
 A locally imposed WebSocket close is a controlled recovery experiment, not an
 exchange outage. REST responses and WS messages have different as-of semantics:

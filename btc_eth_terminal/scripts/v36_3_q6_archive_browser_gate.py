@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Q6 Chromium DOM verification of freshly built Q6 React bundle with archived-state fixtures.
+"""Q6 Chromium DOM verification of freshly built Q6 React bundle with \
+archived-state fixtures.
 
 Browser network is prohibited in this runtime. This harness does NOT test HTTP/SSE
 transport or claim genuine LIVE. It changes only an IN-MEMORY copy of the built
@@ -147,7 +148,8 @@ with sync_playwright() as pw:
        if(label)cards[label]=value;
      }
      const depth=document.querySelector('[aria-label="Live order book 10 levels"]');
-     return {cards,rows:Array.from(depth.querySelectorAll('tbody tr'),tr=>Array.from(tr.querySelectorAll('td'),td=>td.textContent?.trim())),
+     return {cards,rows:Array.from(depth.querySelectorAll('tbody tr'),\
+tr=>Array.from(tr.querySelectorAll('td'),td=>td.textContent?.trim())),
        product:document.querySelector('button[aria-pressed="true"]')?.textContent?.trim(),
        datafeed:document.querySelector('[data-testid="funnest-actual-getbars"]')?.getAttribute('data-bars'),
        canvas_count:document.querySelectorAll('canvas').length,

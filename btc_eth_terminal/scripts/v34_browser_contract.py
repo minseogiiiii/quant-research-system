@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""v34 compiled Funnest L2 historical browser smoke, using exact real loopback API bytes.
+"""v34 compiled Funnest L2 historical browser smoke, using exact real \
+loopback API bytes.
 
 The sandbox disallows direct Chromium localhost network navigation. Browser
 fetches are mediated by Python urllib to a real 127.0.0.1 Python API.

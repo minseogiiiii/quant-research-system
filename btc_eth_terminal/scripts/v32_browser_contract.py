@@ -152,7 +152,8 @@ def run(output: Path, dist: Path):
                 # Delay stale ETH responses so they arrive after a newer BTC request.
                 page.evaluate("""(() => {const original=window.fetch;
                   window.fetch=async(url)=>{
-                    if(String(url).includes('product=ETH-USD')) await new Promise(r=>setTimeout(r,400));
+                    if(String(url).includes('product=ETH-USD')) await \
+new Promise(r=>setTimeout(r,400));
                     return original(url);
                   }})()""")
                 page.locator('button[data-product="BTC-USD"]').click()
@@ -182,7 +183,8 @@ def run(output: Path, dist: Path):
                 page.evaluate(
                     """(early)=>{const old=window.fetch;
                   window.fetch=async(url)=>{
-                    if(String(url).includes('asof='+early))await new Promise(r=>setTimeout(r,300));
+                    if(String(url).includes('asof='+early))await new \
+Promise(r=>setTimeout(r,300));
                     return old(url);
                   }}""",
                     early,
@@ -211,7 +213,8 @@ def run(output: Path, dist: Path):
                 # Deliberately corrupt the apparent lineage of a fresh request.
                 page.evaluate("""(() =>{const old=window.fetch;
                   window.fetch=async(url)=>{const r=await old(url);
-                    if(String(url).includes('product=ETH-USD') && String(url).includes('kind=features')){
+                    if(String(url).includes('product=ETH-USD') && \
+String(url).includes('kind=features')){
                       const bad=await r.json();bad.projection_sha256='0'.repeat(64);
                       return {ok:true,status:200,json:async()=>bad};
                     }return r;
@@ -298,7 +301,8 @@ def run(output: Path, dist: Path):
                 # Verify newly selected product is not rendered with old quote.
                 page.evaluate("""(() => {const old=window.fetch;
                   window.fetch=async(url)=>{
-                    if(String(url).includes('product=ETH-USD')) await new Promise(r=>setTimeout(r,350));
+                    if(String(url).includes('product=ETH-USD')) await \
+new Promise(r=>setTimeout(r,350));
                     return old(url);
                   }})()""")
                 page.locator(".uni-switch button").filter(has_text="ETH-USD").click()

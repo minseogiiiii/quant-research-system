@@ -1,4 +1,5 @@
-"""Pinned, read-only audit for one genuine clean and one fault-injected provider capture.
+"""Pinned, read-only audit for one genuine clean and one fault-injected \
+provider capture.
 
 A controlled disconnect is not an unplanned outage, and neither recorded
 session proves third-party order book truth, executable fills or profitable alpha.

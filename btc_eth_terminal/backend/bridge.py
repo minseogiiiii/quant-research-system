@@ -155,7 +155,10 @@ def parse_bars(
         vol = _num(r["volume"], "volume") if r.get("volume") not in ("", None) else None
         if t <= prev:
             raise InputError(
-                f"Row {i}: not strictly increasing (duplicate/out-of-order candle timestamp)"
+                (
+                    f"Row {i}: not strictly increasing"
+                    f" (duplicate/out-of-order candle timestamp)"
+                )
             )
         if min(o, h, low, c) <= 0 or low > min(o, c) or h < max(o, c) or low > h:
             raise InputError(f"Row {i}: invalid OHLC or nonpositive financial price")
@@ -219,7 +222,10 @@ def _parse_dated_events(relative: str, *, kind: str) -> tuple[list[dict], str]:
             feature_max = _time_ms(r["feature_max_observed_at"])
             if avail > t or feature_max > avail:
                 raise InputError(
-                    f"Row {i}: point-in-time signal leak (feature/availability after decision)"
+                    (
+                        f"Row {i}: point-in-time signal leak"
+                        f" (feature/availability after decision)"
+                    )
                 )
             out.append(
                 {
@@ -235,7 +241,10 @@ def _parse_dated_events(relative: str, *, kind: str) -> tuple[list[dict], str]:
         else:
             if r["event_type"] not in {"paper_fill", "real_fill"}:
                 raise InputError(
-                    f"Row {i}: fills file accepts only recorded paper_fill/real_fill, not signals"
+                    (
+                        f"Row {i}: fills file accepts only recorded"
+                        f" paper_fill/real_fill, not signals"
+                    )
                 )
             if r["side"] not in {"buy", "sell"}:
                 raise InputError(f"Row {i}: fill side must be buy/sell")

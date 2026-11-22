@@ -104,17 +104,21 @@ def run(origin: str, executable: str, seconds: int, min_states: int) -> dict:
               window.__q7 = {started:Date.now(), traces:{}, errors:[], sources:{}};
               for (const product of ['BTC-USD','ETH-USD']) {
                 const trace = window.__q7.traces[product] = [];
-                const es = new EventSource('/api/v36/stream?product='+encodeURIComponent(product));
+                const es = new \
+EventSource('/api/v36/stream?product='+encodeURIComponent(product));
                 window.__q7.sources[product] = es;
-                for (const type of ['source','snapshot','state','heartbeat','resync_required','stream_rotation']) {
+                for (const type of ['source','snapshot','state',\
+'heartbeat','resync_required','stream_rotation']) {
                   es.addEventListener(type, e => {
                     try {
                       const data = JSON.parse(e.data);
-                      if (trace.length < 800) trace.push({type, cursor:e.lastEventId||'', data});
+                      if (trace.length < 800) trace.push({type, cursor:\
+e.lastEventId||'', data});
                     } catch(err) { window.__q7.errors.push(type+':INVALID_JSON'); }
                   });
                 }
-                es.addEventListener('error', () => window.__q7.errors.push(product+':EVENTSOURCE_ERROR'));
+                es.addEventListener('error', () => \
+window.__q7.errors.push(product+':EVENTSOURCE_ERROR'));
               }
             }""")
             while time.monotonic() - started < seconds:

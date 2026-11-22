@@ -303,7 +303,8 @@ def replay_capture(root: Path, expected_manifest_sha256: str) -> ReplayDataset:
                                     }
                                 )
                                 del recent_trades[product][:-MAX_TRADES]
-                                # Startup trade snapshot is historical context, not a newly
+                                # Startup trade snapshot is historical context, not a
+                                # newly
                                 # observed trade flow event. Never include it in OHLCV.
                                 if event["type"] != "update":
                                     continue

@@ -1,4 +1,5 @@
-"""Measure existing local read-only BTC/ETH pipeline before considering new dependencies.
+"""Measure existing local read-only BTC/ETH pipeline before considering \
+new dependencies.
 
 No provider calls, no simulated market observations, no changes to input files.
 A real dataset must be registered to obtain market-data workload timings.

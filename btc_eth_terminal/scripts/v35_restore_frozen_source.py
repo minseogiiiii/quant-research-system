@@ -1,4 +1,5 @@
-"""Restore missing *code only* from the verified v34.1 ZIP into the existing staging tree.
+"""Restore missing *code only* from the verified v34.1 ZIP into the \
+existing staging tree.
 
 Never imports market archives or touches existing files. This is NOT a v35 service
 implementation or a complete deployment. Review conflicts before any release.

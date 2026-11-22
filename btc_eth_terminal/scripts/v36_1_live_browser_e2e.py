@@ -119,19 +119,25 @@ def audit_browser(
                         # a 1-second book update and create a false depth mismatch.
                         dom = page.evaluate("""() => {
                           const root=document.querySelector('main.v36-live-terminal');
-                          const top=root?.querySelector('[aria-label="Validated top of book"]');
-                          const depth=root?.querySelector('[aria-label="Live order book 10 levels"]');
+                          const \
+top=root?.querySelector('[aria-label="Validated top of book"]');
+                          const \
+depth=root?.querySelector('[aria-label="Live order book 10 levels"]');
                           const cards={};
                           for(const c of (top?.querySelectorAll('div')||[])){
-                            const label=c.querySelector(':scope > small')?.textContent?.trim()||'';
-                            const value=c.querySelector(':scope > strong')?.textContent?.trim();
+                            const label=c.querySelector(':scope > \
+small')?.textContent?.trim()||'';
+                            const value=c.querySelector(':scope > \
+strong')?.textContent?.trim();
                             if(label&&value!==undefined)cards[label]=value;
                           }
                           return {
                             status:root?.querySelector('[role="status"]')?.textContent||'',
-                            sourceHealth:root?.querySelector('[aria-label="Source health"]')?.textContent||'',
+                            sourceHealth:\
+root?.querySelector('[aria-label="Source health"]')?.textContent||'',
                             selected:root?.querySelector('button[aria-pressed="true"]')?.textContent||'',
-                            liveLabel:root?.querySelector('header + p > strong')?.textContent||'',
+                            liveLabel:root?.querySelector('header + p > \
+strong')?.textContent||'',
                             cards,
                             depth:Array.from(depth?.querySelectorAll('tbody tr')||[],
                               tr=>Array.from(tr.querySelectorAll('td'),td=>td.textContent?.trim()||'')),
