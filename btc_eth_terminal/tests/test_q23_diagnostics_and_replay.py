@@ -74,20 +74,38 @@ def _large_private_fixture(root: Path, updates_each: int = 10_010):
             for product in ("BTC-USD", "ETH-USD"):
                 when = t0 + timedelta(milliseconds=900 * seq)
                 stamp = when.isoformat(timespec="milliseconds").replace("+00:00", "Z")
-                updates = [
-                    {
-                        "side": "bid",
-                        "price_level": "70000" if product == "BTC-USD" else "2000",
-                        "new_quantity": "2" if i % 2 else "1",
-                        "event_time": stamp,
-                    },
-                    {
-                        "side": "offer",
-                        "price_level": "70001" if product == "BTC-USD" else "2001",
-                        "new_quantity": "2",
-                        "event_time": stamp,
-                    },
-                ]
+                base = 70000 if product == "BTC-USD" else 2000
+                if i == 0:
+                    # Production primary depth requires ten price levels on
+                    # BOTH sides. A two-level toy book would be rejected
+                    # before the state-history regression is reached.
+                    updates = [
+                        {
+                            "side": side,
+                            "price_level": str(
+                                base - j if side == "bid" else base + 1 + j
+                            ),
+                            "new_quantity": "2",
+                            "event_time": stamp,
+                        }
+                        for side in ("bid", "offer")
+                        for j in range(10)
+                    ]
+                else:
+                    updates = [
+                        {
+                            "side": "bid",
+                            "price_level": str(base),
+                            "new_quantity": "2" if i % 2 else "1",
+                            "event_time": stamp,
+                        },
+                        {
+                            "side": "offer",
+                            "price_level": str(base + 1),
+                            "new_quantity": "2",
+                            "event_time": stamp,
+                        },
+                    ]
                 event = {
                     "type": "snapshot" if i == 0 else "update",
                     "product_id": product,
