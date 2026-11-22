@@ -3,7 +3,9 @@ name: Q13 export changed public Python sources only (NO RAW MARKET DATA)
 on:
   push:
     branches: [remediation/q13-ruff-safe-autofix-20261121]
-    paths: ['.github/workflows/q13_export_public_python_patch.yml']
+    paths:
+      - '.github/workflows/q13_export_public_python_patch.yml'
+      - 'btc_eth_terminal/tests/test_v36_3_q6_frontend_isolation.py'
 permissions:
   contents: read
 jobs:
