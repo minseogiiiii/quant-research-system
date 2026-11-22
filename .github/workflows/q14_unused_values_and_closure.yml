@@ -1,0 +1,53 @@
+name: Q14 unused-bound-value and Coinbase closure regression (ISOLATED)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_unused_values_and_closure.yml']
+permissions:
+  contents: read
+jobs:
+  q14-unused:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - run: python -m pip install 'ruff==0.15.22'
+      - name: Confirm B007 B023 F841 zero with no ignore and compile all product source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+          ruff check . --select B007,B023,F841
+      - name: Test Coinbase archived-source, book auditing and package gate regressions
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_coinbase_source.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v19_maker_queue.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v10_soak.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_transport_gap.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_durable_archive_gate.py' -q
+          python .github/scripts/q7_static_cost_regression.py
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Expose remaining Ruff errors without claiming approval
+        run: |
+          python - <<'PY'
+          import subprocess,json,collections
+          p=subprocess.run(['ruff','check','.','--output-format','json'],capture_output=True,text=True)
+          assert p.returncode in (0,1)
+          a=json.loads(p.stdout)
+          print('Q14_RUFF_AFTER_UNUSED_REFACTOR',json.dumps({
+              'remaining':len(a),
+              'by_rule':dict(sorted(collections.Counter(x['code'] for x in a).items())),
+              'production_approved':False}))
+          PY
+# No alteration to frozen Q7 source manifest or real-ordering.
