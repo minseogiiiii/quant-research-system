@@ -114,8 +114,8 @@ jobs:
     timeout-minutes: 358
     env:
       PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
-      Q22_PRIVATE: ${{ runner.temp }}/q22_capture_${{ github.run_id }}
-      Q22_PUBLIC: ${{ runner.temp }}/q22_5h_public_${{ github.run_id }}
+      Q22_PRIVATE: /tmp/q22_capture_${{ github.run_id }}
+      Q22_PUBLIC: /tmp/q22_5h_public_${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -192,7 +192,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: q22-public-five-hour-gate-summary-only
-          path: ${{ runner.temp }}/q22_5h_public_${{ github.run_id }}/*.json
+          path: /tmp/q22_5h_public_${{ github.run_id }}/*.json
           retention-days: 7
           if-no-files-found: warn
       - name: Erase private raw capture and observer logs from ephemeral runner
