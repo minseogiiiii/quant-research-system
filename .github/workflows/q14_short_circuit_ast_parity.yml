@@ -29,6 +29,17 @@ jobs:
           import pathlib
           import subprocess
           class FuseEquivalentIf(ast.NodeTransformer):
+              def visit_BoolOp(self,node):
+                  self.generic_visit(node)
+                  if isinstance(node.op,ast.And):
+                      flat=[]
+                      for value in node.values:
+                          if isinstance(value,ast.BoolOp) and isinstance(value.op,ast.And):
+                              flat.extend(value.values)
+                          else:
+                              flat.append(value)
+                      node.values=flat
+                  return node
               def visit_If(self,node):
                   self.generic_visit(node)
                   while (
@@ -38,7 +49,9 @@ jobs:
                       and not node.body[0].orelse
                   ):
                       inner=node.body[0]
-                      node.test=ast.BoolOp(op=ast.And(), values=[node.test,inner.test])
+                      node.test=self.visit_BoolOp(
+                          ast.BoolOp(op=ast.And(), values=[node.test,inner.test])
+                      )
                       node.body=inner.body
                   return node
           previous='a702f6add2044826f301b91535ffa9dc166f6a3f'
