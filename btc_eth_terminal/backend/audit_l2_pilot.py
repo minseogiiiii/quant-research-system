@@ -86,7 +86,7 @@ def audit_session(folder: Path, *, allow_exact_trade_replays: bool = False) -> d
         or status.get("orders_enabled") is not False
     ):
         raise L2AuditError("Source or permissions mismatch")
-    counts = Counter()
+    _ = Counter()
     snapshot_counts = Counter()
     update_counts = Counter()
     trade_records = Counter()
