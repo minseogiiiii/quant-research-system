@@ -12,7 +12,6 @@ import unittest
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-
 HERE = Path(__file__).resolve().parents[2]
 SOURCE = HERE / "btc_eth_terminal/backend/v37_factor_lab.py"
 
