@@ -224,6 +224,8 @@ class IndependentParityNegativeTests(unittest.TestCase):
                 "source_books_final_sha256": {"BTC-USD": "a", "ETH-USD": "b"},
                 "rows": other,
             }
-            with patch.object(check, "independent_quotes", return_value=fake):
-                with self.assertRaisesRegex(ValueError, "discrepancy"):
-                    check.audit(root, report)
+            with (
+                patch.object(check, 'independent_quotes', return_value=fake),
+                self.assertRaisesRegex(ValueError, 'discrepancy'),
+            ):
+                check.audit(root, report)

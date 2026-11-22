@@ -281,9 +281,11 @@ class TestHTTPSResponseAdmission(unittest.TestCase):
             def read(self, *_):
                 return b"<html></html>"
 
-        with patch.object(coinbase, "urlopen", return_value=NotJSON()):
-            with self.assertRaisesRegex(coinbase.SourceError, "content type"):
-                coinbase.request_json("ETH-USD", START, END)
+        with (
+            patch.object(coinbase, 'urlopen', return_value=NotJSON()),
+            self.assertRaisesRegex(coinbase.SourceError, 'content type'),
+        ):
+            coinbase.request_json("ETH-USD", START, END)
 
 
 class TestCapturedProviderBoundary(unittest.TestCase):

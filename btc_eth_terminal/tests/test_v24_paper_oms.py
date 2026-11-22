@@ -639,9 +639,11 @@ class TestLifecycle(Base):
         import v24_paper_oms
 
         self.arm()
-        with patch.object(v24_paper_oms, "MAX_FIXTURE_EVENTS", 3):
-            with self.assertRaises(PaperReject):
-                self.buy()
+        with (
+            patch.object(v24_paper_oms, 'MAX_FIXTURE_EVENTS', 3),
+            self.assertRaises(PaperReject),
+        ):
+            self.buy()
         self.assertEqual(self.oms.snapshot()["event_count"], 3)
 
     def test_53_independent_audit_matches_primary_engine(self):

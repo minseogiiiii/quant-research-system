@@ -187,9 +187,11 @@ class V18MarkoutTests(unittest.TestCase):
             f.write_bytes(f.read_bytes().replace(b"BTC-USD", b"ETH-USD", 1))
             return result
 
-        with patch("post_quote_markout.evaluate", side_effect=tamper):
-            with self.assertRaisesRegex(MarkoutError, "mutated after first quote"):
-                self.check()
+        with (
+            patch('post_quote_markout.evaluate', side_effect=tamper),
+            self.assertRaisesRegex(MarkoutError, 'mutated after first quote'),
+        ):
+            self.check()
 
     def test_quarantined_archive_blocks_all_labels(self):
         manifest = json.loads((self.src / "manifest.json").read_text())

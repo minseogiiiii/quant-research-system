@@ -184,9 +184,11 @@ class DepthStressTests(unittest.TestCase):
             p.write_bytes(p.read_bytes().replace(b"BTC-USD", b"ETH-USD", 1))
             return result
 
-        with patch("static_depth_stress.evaluate", side_effect=tamper):
-            with self.assertRaisesRegex(DepthStressError, "Changed raw source"):
-                self.check()
+        with (
+            patch('static_depth_stress.evaluate', side_effect=tamper),
+            self.assertRaisesRegex(DepthStressError, 'Changed raw source'),
+        ):
+            self.check()
 
     def test_real_clean_source_uses_first_post_delay_quote(self):
         source = ROOT / "backend/data/live_v14_clean_120s/coinbase_btc_eth_soak_wsgXRy"

@@ -44,11 +44,11 @@ class V341SemanticInvariantTests(unittest.TestCase):
             pin["projection_sha256"] = digest
             (p / "projection.sha256.json").write_text(json.dumps(pin))
             with (
-                patch.object(l2, "OUT", p),
-                patch.object(l2, "PINNED_L2_SHA256", digest),
+                patch.object(l2, 'OUT', p),
+                patch.object(l2, 'PINNED_L2_SHA256', digest),
+                self.assertRaises(l2.L2APIError),
             ):
-                with self.assertRaises(l2.L2APIError):
-                    l2.load_l2()
+                l2.load_l2()
 
     def test_bid_total_inconsistent(self):
         self.check_invalid_repin(

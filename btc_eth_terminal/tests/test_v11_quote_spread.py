@@ -81,9 +81,11 @@ class QuoteSpreadTests(unittest.TestCase):
             source.write_bytes(source.read_bytes().replace(b"BTC-USD", b"ETH-USD", 1))
             return good
 
-        with patch("quote_spread_audit.audit", side_effect=alter_after_admission):
-            with self.assertRaisesRegex(ValueError, "changed after"):
-                inspect(self.folder, step_seconds=1)
+        with (
+            patch('quote_spread_audit.audit', side_effect=alter_after_admission),
+            self.assertRaisesRegex(ValueError, 'changed after'),
+        ):
+            inspect(self.folder, step_seconds=1)
 
     def test_valid_source_statistics(self):
         out = inspect(self.folder, step_seconds=1)

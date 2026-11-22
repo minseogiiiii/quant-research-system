@@ -164,9 +164,11 @@ class TakerEnvelopeTests(unittest.TestCase):
             p.write_bytes(p.read_bytes().replace(b"BTC-USD", b"ETH-USD", 1))
             return a
 
-        with patch("taker_quote_envelope.audit", side_effect=mutate_after_audit):
-            with self.assertRaisesRegex(EnvelopeError, "changed after admission"):
-                evaluate(self.src, self.intent(), self.params)
+        with (
+            patch('taker_quote_envelope.audit', side_effect=mutate_after_audit),
+            self.assertRaisesRegex(EnvelopeError, 'changed after admission'),
+        ):
+            evaluate(self.src, self.intent(), self.params)
 
     def test_zero_assumed_fee_requires_explicit_zero(self):
         p = Assumptions(1000, 4000, 3000, "0", "0", "1")

@@ -151,13 +151,17 @@ class FactorTests(unittest.TestCase):
             ("-0.000001", "0"),
             ("0", "-0.000001"),
         ):
-            with self.subTest(fee=fee, slippage=slip):
-                with self.assertRaises(FactorLabReject):
-                    static_walk(d, "BUY", "1", fee, slip)
+            with (
+                self.subTest(fee=fee, slippage=slip),
+                self.assertRaises(FactorLabReject),
+            ):
+                static_walk(d, "BUY", "1", fee, slip)
         for fraction in ("0", "-0.1", "1.00001"):
-            with self.subTest(fraction=fraction):
-                with self.assertRaises(FactorLabReject):
-                    static_walk(d, "BUY", "1", "0", "0", fraction)
+            with (
+                self.subTest(fraction=fraction),
+                self.assertRaises(FactorLabReject),
+            ):
+                static_walk(d, "BUY", "1", "0", "0", fraction)
         for side in ("BUY", "SELL"):
             with self.subTest(side=side):
                 x = static_walk(d, side, "1", "0", "0")
@@ -198,9 +202,12 @@ class FactorTests(unittest.TestCase):
             q = Path(td) / "report.sha256.json"
             p.write_bytes(DEST.read_bytes() + b" ")
             q.write_bytes(PIN.read_bytes())
-            with patch("v37_factor_lab.DEST", p), patch("v37_factor_lab.PIN", q):
-                with self.assertRaises(FactorLabReject):
-                    load_report()
+            with (
+                patch('v37_factor_lab.DEST', p),
+                patch('v37_factor_lab.PIN', q),
+                self.assertRaises(FactorLabReject),
+            ):
+                load_report()
 
     def test_pre_registration_is_not_blind_certificate(self):
         p = Path(__file__).resolve().parents[1] / "backend/q7_experiment_prereg.json"

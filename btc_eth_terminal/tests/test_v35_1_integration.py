@@ -180,12 +180,11 @@ class FrozenReplayContract(unittest.TestCase):
                     fp.write(b"\n")
                 return cert
 
-            with patch.object(m, "verify_capture", mutate_after_gate):
-                with self.assertRaisesRegex(
-                    StateRejected,
-                    "SOURCE_CHANGED_AFTER_ADMISSION|SOURCE_LENGTH_CHANGED_AFTER_ADMISSION",
-                ):
-                    replay_capture(clone, digest)
+            with (
+                patch.object(m, 'verify_capture', mutate_after_gate),
+                self.assertRaisesRegex(StateRejected, 'SOURCE_CHANGED_AFTER_ADMISSION|SOURCE_LENGTH_CHANGED_AFTER_ADMISSION'),
+            ):
+                replay_capture(clone, digest)
 
     def test_symlinked_chunk_substitution_rejected(self):
         import v35_replay_service as m
@@ -203,9 +202,11 @@ class FrozenReplayContract(unittest.TestCase):
                 target.symlink_to(target.with_suffix(".backup"))
                 return cert
 
-            with patch.object(m, "verify_capture", swap_after_gate):
-                with self.assertRaises(StateRejected):
-                    replay_capture(clone, digest)
+            with (
+                patch.object(m, 'verify_capture', swap_after_gate),
+                self.assertRaises(StateRejected),
+            ):
+                replay_capture(clone, digest)
 
 
 class RealHTTPContract(unittest.TestCase):

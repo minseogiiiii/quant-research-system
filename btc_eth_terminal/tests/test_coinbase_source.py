@@ -104,16 +104,18 @@ class CoinbaseDataSourceTests(unittest.TestCase):
                 src.export("ETH-USD", START * 1000, END * 1000, out, fixture)
 
     def test_register_only_with_bridge_data_root(self):
-        with tempfile.TemporaryDirectory() as td:
-            with self.assertRaisesRegex(src.SourceError, "backend/data"):
-                src.export(
-                    "BTC-USD",
-                    START * 1000,
-                    END * 1000,
-                    Path(td),
-                    fixture,
-                    register=True,
-                )
+        with (
+            tempfile.TemporaryDirectory() as td,
+            self.assertRaisesRegex(src.SourceError, 'backend/data'),
+        ):
+            src.export(
+                "BTC-USD",
+                START * 1000,
+                END * 1000,
+                Path(td),
+                fixture,
+                register=True,
+            )
 
     def test_multi_page_count_and_detects_duplicates(self):
         s = START

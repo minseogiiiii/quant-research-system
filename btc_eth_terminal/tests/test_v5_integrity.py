@@ -132,20 +132,20 @@ class TestCoinbaseRetry(unittest.TestCase):
 
     def test_http_404_is_not_retried(self):
         fail = HTTPError("https://api.coinbase.com/", 404, "not found", {}, None)
-        with patch.object(coinbase, "urlopen", side_effect=fail) as opened:
-            with self.assertRaisesRegex(coinbase.SourceError, "404"):
-                coinbase.request_json("BTC-USD", START, END)
+        with (
+            patch.object(coinbase, 'urlopen', side_effect=fail) as opened,
+            self.assertRaisesRegex(coinbase.SourceError, '404'),
+        ):
+            coinbase.request_json("BTC-USD", START, END)
         self.assertEqual(opened.call_count, 1)
 
     def test_retry_is_bounded_after_three_transient_failures(self):
         with (
-            patch.object(
-                coinbase, "urlopen", side_effect=URLError("offline")
-            ) as opened,
-            patch.object(coinbase.time, "sleep") as slept,
+            patch.object(coinbase, 'urlopen', side_effect=URLError('offline')) as opened,
+            patch.object(coinbase.time, 'sleep') as slept,
+            self.assertRaisesRegex(coinbase.SourceError, 'bounded retries'),
         ):
-            with self.assertRaisesRegex(coinbase.SourceError, "bounded retries"):
-                coinbase.request_json("ETH-USD", START, END)
+            coinbase.request_json("ETH-USD", START, END)
         self.assertEqual(opened.call_count, 3)
         self.assertEqual(slept.call_count, 2)
 
@@ -160,9 +160,11 @@ class TestCoinbaseRetry(unittest.TestCase):
             def read(self, *_):
                 return b"invalid json"
 
-        with patch.object(coinbase, "urlopen", return_value=Malformed()) as opened:
-            with self.assertRaisesRegex(coinbase.SourceError, "not JSON"):
-                coinbase.request_json("BTC-USD", START, END)
+        with (
+            patch.object(coinbase, 'urlopen', return_value=Malformed()) as opened,
+            self.assertRaisesRegex(coinbase.SourceError, 'not JSON'),
+        ):
+            coinbase.request_json("BTC-USD", START, END)
         self.assertEqual(opened.call_count, 1)
 
 
