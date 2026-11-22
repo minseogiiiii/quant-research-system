@@ -17,8 +17,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from independent_soak_replay import replay as independent_replay  # noqa: E402
-from v36_3_durable_archive_gate import BOUNDS, audit as durable_audit  # noqa: E402
+def _load_after_backend_path_setup():
+    from independent_soak_replay import replay as independent_replay
+    from v36_3_durable_archive_gate import BOUNDS, audit as durable_audit
+
+    return independent_replay, BOUNDS, durable_audit
+
+
+independent_replay, BOUNDS, durable_audit = _load_after_backend_path_setup()
+del _load_after_backend_path_setup
 
 SHA64 = re.compile(r"[a-f0-9]{64}\Z")
 
