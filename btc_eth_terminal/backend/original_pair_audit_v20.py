@@ -377,7 +377,7 @@ def main():
             "eligible_for_OOS": False,
         }
         args.output.write_text(json.dumps(result, indent=2) + "\n")
-        raise SystemExit(2)
+        raise SystemExit(2) from None
     args.output.write_text(json.dumps(result, indent=2) + "\n")
     print(
         json.dumps(
