@@ -1,0 +1,37 @@
+name: Q13 private fixture guard unit tests (NO PRIVATE DATA)
+on:
+  push:
+    branches: [staging/q7-readonly-qualification-20261119]
+    paths:
+      - '.github/scripts/q13_private_fixture_gate.py'
+      - '.github/scripts/test_q13_private_fixture_gate.py'
+      - '.github/workflows/q13_private_fixture_guard_selftest.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  q13-guard-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile and test private-release gate, without using any private source
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/q13_private_fixture_gate.py
+          python -m unittest discover -s .github/scripts -p 'test_q13_private_fixture_gate.py' -v
+      - name: Confirm manual private-run workflow never publishes raw fixtures
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          text=Path('.github/workflows/q13_private_full_node_fixture_gate.yml').read_text()
+          if 'workflow_dispatch:' not in text or 'Q13_PRIVATE_RELEASE_URL' not in text:
+              raise SystemExit('MISSING_MANUAL_PRIVATE_RELEASE_GATE')
+          if 'upload-artifact' in text or 'pull_request:' in text:
+              raise SystemExit('PRIVATE_ARCHIVE_EXPOSURE_RISK')
+          print('PASS_Q13_PRIVATE_ONLY_MANUAL_RUN_WITH_NO_UPLOAD')
+          PY
