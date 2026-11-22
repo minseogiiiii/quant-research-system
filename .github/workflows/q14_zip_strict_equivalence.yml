@@ -1,0 +1,90 @@
+name: Q14 B905 zip semantics-equivalence gate (ISOLATED)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_zip_strict_equivalence.yml']
+permissions:
+  contents: write
+jobs:
+  q14-zip:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - run: python -m pip install 'ruff==0.15.22'
+      - name: Add explicit builtin zip strict=False and prove AST-equivalence under default
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          import collections
+          import json
+          import pathlib
+          import subprocess
+          class NormalizeZipDefault(ast.NodeTransformer):
+              def visit_Call(self,node):
+                  self.generic_visit(node)
+                  if isinstance(node.func,ast.Name) and node.func.id=='zip':
+                      node.keywords=[
+                          k for k in node.keywords
+                          if not (k.arg=='strict' and isinstance(k.value,ast.Constant)
+                                  and k.value.value is False)
+                      ]
+                  return node
+          def normalized(path):
+              tree=ast.parse(path.read_text(encoding='utf-8'))
+              tree=NormalizeZipDefault().visit(tree)
+              return ast.dump(tree,include_attributes=False)
+          def violations(code):
+              r=subprocess.run(['ruff','check','btc_eth_terminal','--select',code,
+                  '--output-format','json'],capture_output=True,text=True)
+              if r.returncode not in (0,1):raise RuntimeError('RUFF_SCAN_FAILED')
+              return json.loads(r.stdout)
+          paths=[pathlib.Path(s) for s in subprocess.check_output(
+              ['git','ls-files','btc_eth_terminal'],text=True).splitlines()
+              if s.endswith('.py')]
+          before={str(p):normalized(p) for p in paths}
+          old=violations('B905')
+          if not old:raise RuntimeError('B905_NOT_PRESENT')
+          result=subprocess.run(['ruff','check','btc_eth_terminal','--select','B905',
+                  '--fix','--unsafe-fixes'],capture_output=True,text=True)
+          if result.returncode not in (0,1):raise RuntimeError(result.stderr[:400])
+          after=violations('B905')
+          if after:raise RuntimeError('B905_STILL_PRESENT:'+str(len(after)))
+          mismatch=[str(p) for p in paths if normalized(p)!=before[str(p)]]
+          if mismatch:raise RuntimeError('ZIP_SEMANTIC_NORMALIZATION_MISMATCH:'+str(mismatch[:8]))
+          print('Q14_ZIP_STRICT_DEFAULT_EQUIVALENCE',json.dumps({
+             'resolved_B905':len(old),'remaining_B905':len(after),
+             'builtin_zip_default_in_python312':False,
+             'all_changed_AST_equivalent_after_normalizing_strict_false':True}))
+          PY
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+      - name: Verify root and Q7 contracts before committing
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python .github/scripts/q7_static_cost_regression.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_durable_archive_gate.py' -q
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Commit on isolated branch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q14-import-order-20261122"
+          git diff --name-only | python -c 'import sys; a=[x.strip() for x in sys.stdin if x.strip()]; assert a and all(x.startswith("btc_eth_terminal/") and x.endswith(".py") for x in a)'
+          git add -u -- btc_eth_terminal
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Q14: explicit zip(strict=False) preserving Python default behavior'
+          git push origin HEAD:refs/heads/remediation/q14-import-order-20261122
