@@ -1,0 +1,61 @@
+name: Q14 exact-AST literal line-wrap remediation (ISOLATED)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths: ['.github/workflows/q14_literal_split_gate.yml']
+permissions:
+  contents: write
+jobs:
+  q14-literal-split:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
+      - run: python -m pip install 'ruff==0.15.22'
+      - name: Rewrite only literal E501 lines with exact AST-identity verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "remediation/q14-import-order-20261122"
+          python .github/scripts/q14_split_long_literals.py
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+          python - <<'PY'
+          import json
+          import subprocess
+          p=subprocess.run(['ruff','check','.','--output-format','json'],capture_output=True,text=True)
+          assert p.returncode in (0,1)
+          a=json.loads(p.stdout)
+          assert not any(x['code'] in ('E402','B905') for x in a)
+          print('Q14_RUFF_POST_LITERAL_TOTAL',len(a))
+          PY
+      - name: Full root pytest and selected Q7 fail-closed contracts
+        shell: bash
+        env:
+          PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+        run: |
+          set -euo pipefail
+          python .github/scripts/q7_static_cost_regression.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_transport_gap.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_durable_archive_gate.py' -q
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_live_health_reservation.py' -q
+          uv sync --locked --no-editable --default-index https://pypi.org/simple
+          .venv/bin/python -m pytest -q
+      - name: Commit tested AST-identical literal changes on candidate only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only | python -c 'import sys; a=[x.strip() for x in sys.stdin if x.strip()]; assert a and all(x.startswith("btc_eth_terminal/") and x.endswith(".py") for x in a)'
+          git add -u -- btc_eth_terminal
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Q14: split long literal tokens with exactly identical Python AST'
+          git push origin HEAD:refs/heads/remediation/q14-import-order-20261122
+
+# Draft staging, integration, main and raw Coinbase archive remain untouched.
