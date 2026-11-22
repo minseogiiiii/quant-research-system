@@ -58,7 +58,7 @@ export function makeResearchDraft(o: Observation, input: HypothesisInput): Resea
   if (!HYPOTHESIS_FEATURES.includes(input.feature) ||
       !['UP','DOWN'].includes(input.expectation) ||
       typeof input.threshold !== 'string' ||
-      !/^-?(?:\\d+)(?:\\.\\d{1,8})?$/.test(input.threshold.trim())) {
+      !/^-?(?:\d+)(?:\.\d{1,8})?$/.test(input.threshold.trim())) {
     throw new Error('INVALID_HYPOTHESIS');
   }
   const value = Number(input.threshold);
