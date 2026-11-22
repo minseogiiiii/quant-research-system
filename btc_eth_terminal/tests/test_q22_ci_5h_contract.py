@@ -256,11 +256,20 @@ class Q22SourceContinuity(unittest.TestCase):
         valid = evaluate_monitoring(rows, SMOKE_DURATION,
                                     [{"total_states": 80}], 1)
         self.assertEqual(valid["max_open_fds"], 25)
+        self.assertGreaterEqual(valid["cpu_cores_peak"], 0)
+        self.assertEqual(valid["rss_growth_bytes"], 0)
         self.assertTrue(valid["collector_pid_stable"])
         bad = [dict(v) for v in rows]
         bad[4]["collector_pid"] = 1234
         with self.assertRaises(Q22Rejected):
             evaluate_monitoring(bad, SMOKE_DURATION,
+                                [{"total_states": 80}], 1)
+
+    def test_monitor_rejects_decreasing_cpu_ticks(self):
+        rows = [good_sample(i) for i in range(19)]
+        rows[8]["cpu_ticks_total"] = 0
+        with self.assertRaises(Q22Rejected):
+            evaluate_monitoring(rows, SMOKE_DURATION,
                                 [{"total_states": 80}], 1)
 
     def test_monitor_detects_unobserved_gap(self):
