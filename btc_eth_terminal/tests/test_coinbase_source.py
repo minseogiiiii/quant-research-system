@@ -64,7 +64,7 @@ class CoinbaseDataSourceTests(unittest.TestCase):
         ):
             with self.subTest(change=change):
 
-                def bad(p, a, b):
+                def bad(p, a, b, change=change):
                     raw, obj = fixture(p, a, b)
                     obj["candles"][0].update(change)
                     return json.dumps(obj).encode(), obj
