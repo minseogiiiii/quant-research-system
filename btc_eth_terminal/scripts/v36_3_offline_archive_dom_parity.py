@@ -202,7 +202,8 @@ with sync_playwright() as pw:
         report["api_fetches"] = page.evaluate("window.__seenFetch")[:30]
         assert not report["page_errors"], report["page_errors"]
         # Deliberately tamper one metric while keeping authenticated book/session identical.
-        # This verifies the frozen release's client-side validation weakness, not genuine source quality.
+        # This verifies the frozen release's client-side validation weakness, not
+        # genuine source quality.
         old = (
             '"best_imbalance":"' + snapshots["BTC-USD"]["state"]["best_imbalance"] + '"'
         )

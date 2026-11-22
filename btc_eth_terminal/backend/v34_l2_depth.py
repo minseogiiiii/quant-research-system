@@ -222,7 +222,8 @@ def build(*, root: Path = BASE_ROOT, reference: Path = BASE_PROJECTION) -> dict:
         while next_sample < recv:
             emit_second(next_sample)
             next_sample += SAMPLE_MS
-        # A snapshot starts a product book; no previous snapshot is carried across disconnections.
+        # A snapshot starts a product book; no previous snapshot is carried across
+        # disconnections.
         try:
             books[product].apply(kind, updates)
         except (FeatureReject, KeyError, TypeError, ValueError) as exc:

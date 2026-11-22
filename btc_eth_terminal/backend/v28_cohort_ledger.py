@@ -211,7 +211,8 @@ def cohort_summary(
     records = []
     for rel, pin in pins:
         source, m, start, end = validate_pin(root, rel, pin)
-        # The only trusted source admission is software consistency; exchange-authenticity is unverified.
+        # The only trusted source admission is software consistency;
+        # exchange-authenticity is unverified.
         checked_chunk_count, checked_archive_bytes = verify_chunk_inventory(source, m)
         if rel in targets:
             a, b = replay_a(source), replay_b(source)

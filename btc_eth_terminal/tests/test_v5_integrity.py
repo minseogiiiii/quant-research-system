@@ -431,7 +431,9 @@ class TestMultiPageAndHTTP(unittest.TestCase):
                 self.assertEqual(len(json.load(response)["datasets"]), 2)
             url = (
                 addr
-                + f"/api/bars?symbol=BTC_COINBASE_SPOT&resolution=5&to={END * 1000}&countBack=2"
+                + f"/api/bars?symbol=BTC_COINBASE_SPOT&resolution=5&to={
+                    END * 1000
+                }&countBack=2"
             )
             with urlopen(url) as response:
                 self.assertEqual(len(json.load(response)["bars"]), 2)

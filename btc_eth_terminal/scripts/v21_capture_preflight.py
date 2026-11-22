@@ -61,7 +61,8 @@ def assess(root: Path, duration: int):
         records = []
         dns_status = "FAILED_DNS_LOOKUP"
         candidates.append("COINBASE_PUBLIC_DNS_UNAVAILABLE")
-    # Process supervision, actual clock sync, and long-run connection require external proof.
+    # Process supervision, actual clock sync, and long-run connection require
+    # external proof.
     candidates.extend(
         [
             "HOST_PROCESS_SUPERVISION_NOT_VERIFIED",

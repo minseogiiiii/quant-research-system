@@ -139,7 +139,8 @@ def capture(
             status["repeat_archive_directory"] = str(captured_again)
             status["repeat_primary_audit"] = repeat_primary
             status["repeat_independent_audit"] = repeat_independent
-            # Compare canonical candle sets. Original HTTP byte encodings/order may vary.
+            # Compare canonical candle sets. Original HTTP byte encodings/order may
+            # vary.
             pairs = ["BTC-USD", "ETH-USD"]
             status["same_provider_repeat_match"] = all(
                 primary["markets"][p]["sha256"]

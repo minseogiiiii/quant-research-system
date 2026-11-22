@@ -285,7 +285,8 @@ class V18MarkoutTests(unittest.TestCase):
             if i % 19 == 0:
                 self.assertEqual(fast.best("bid"), reference.best("bid"))
                 self.assertEqual(fast.best("offer"), reference.best("offer"))
-        # Removing top and restoring the exact same price must not create a stale duplicate.
+        # Removing top and restoring the exact same price must not create a stale
+        # duplicate.
         px = Decimal(100)
         fast.change("bid", px, Decimal(0))
         reference.change("bid", px, Decimal(0))

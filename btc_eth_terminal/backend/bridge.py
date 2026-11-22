@@ -104,7 +104,8 @@ def safe_path(relative: str, *, extension: str = ".csv") -> Path:
 
 def _read_bytes(relative: str, *, extension: str = ".csv") -> tuple[bytes, str]:
     p = safe_path(relative, extension=extension)
-    # One bytes snapshot drives BOTH checksum and parsing. Never hash file A and parse file B.
+    # One bytes snapshot drives BOTH checksum and parsing. Never hash file A
+    # and parse file B.
     with p.open("rb") as fp:
         raw = fp.read(MAX_BYTES + 1)
     if len(raw) > MAX_BYTES:

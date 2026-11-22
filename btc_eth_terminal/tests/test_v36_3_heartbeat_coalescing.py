@@ -39,7 +39,9 @@ class CoalescedSSEHeartbeat(unittest.TestCase):
         server = server_for_live(e)
         worker = Thread(target=server.serve_forever, daemon=True)
         worker.start()
-        url = f"http://127.0.0.1:{server.server_address[1]}/api/v36/stream?product=BTC-USD"
+        url = f"http://127.0.0.1:{
+            server.server_address[1]
+        }/api/v36/stream?product=BTC-USD"
         try:
             with urlopen(url, timeout=5) as stream:
 

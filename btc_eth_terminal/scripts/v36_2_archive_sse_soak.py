@@ -82,7 +82,9 @@ def read_stream(url, client, stop, result):
                                 or payload["session_id"] != session
                             ):
                                 raise AssertionError("CROSS_PRODUCT_OR_SESSION_STATE")
-                            expected_cursor = f"v36:{session}:{client['product']}:{payload['state_version']}"
+                            expected_cursor = f"v36:{session}:{client['product']}:{
+                                payload['state_version']
+                            }"
                             if cursor != expected_cursor:
                                 raise AssertionError("CURSOR_MISMATCH")
                             if payload["state_version"] <= last:
@@ -202,7 +204,9 @@ def main():
                 "intentionally_slow": slow,
                 "source_done": source_done,
             }
-            u = f"http://127.0.0.1:{server.server_address[1]}/api/v36/stream?product={product}"
+            u = f"http://127.0.0.1:{server.server_address[1]}/api/v36/stream?product={
+                product
+            }"
             t = threading.Thread(
                 target=read_stream, args=(u, config, stop, result), daemon=True
             )
@@ -244,7 +248,9 @@ def main():
         source_done.set()
         engine.transport_lost("EXPLICIT_ARCHIVE_REPLAY_TRANSPORT_LOSS")
         stats["last_health_after_fault"] = engine.health()["status"]
-        url = f"http://127.0.0.1:{server.server_address[1]}/api/v36/stream?product=BTC-USD"
+        url = f"http://127.0.0.1:{
+            server.server_address[1]
+        }/api/v36/stream?product=BTC-USD"
         try:
             urlopen(url, timeout=4)
             stats["post_gap_sse_status"] = 200

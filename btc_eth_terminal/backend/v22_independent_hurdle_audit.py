@@ -147,7 +147,8 @@ def verify(root: Path, report: dict) -> dict:
                         raise IndependentMismatch("Rejected quote generated economics")
                 else:
                     if e["side"] == "BUY":
-                        # Distinct ratio form, checking the original producer's cash difference.
+                        # Distinct ratio form, checking the original producer's cash
+                        # difference.
                         want = B * (
                             price / ref * (1 - fee) * (1 - slippage) - Decimal("1.001")
                         )

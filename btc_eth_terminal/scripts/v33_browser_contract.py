@@ -157,7 +157,8 @@ def run(output: Path):
             check(
                 "closed_legacy_separation", page.locator(".legacy-sandbox").count() == 0
             )
-            # Single causal clock across panels. At earliest diagnostic time no completed candle.
+            # Single causal clock across panels. At earliest diagnostic time no
+            # completed candle.
             page.get_by_role("combobox", name="Replay as-of time").select_option("0")
             page.wait_for_selector(".uni-empty-history", timeout=10000)
             check(
@@ -233,7 +234,8 @@ def run(output: Path):
                 path=str(output / "v33_actual_professional_terminal.png"),
                 full_page=True,
             )
-            # Narrow breakpoint: panels must stack and stay usable without white page errors.
+            # Narrow breakpoint: panels must stack and stay usable without white page
+            # errors.
             page.set_viewport_size({"width": 420, "height": 920})
             page.wait_for_timeout(160)
             check("responsive_narrow_view", page.locator(".pro-terminal").is_visible())

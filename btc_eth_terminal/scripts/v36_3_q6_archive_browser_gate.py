@@ -222,7 +222,8 @@ with sync_playwright() as pw:
         assert bad_page.get_by_role("region", name="Validated top of book").count() == 0
         report["negative_probes"] = {"best_imbalance_NaN_rejected": "PASS"}
         bad_page.close()
-        # Synthetic hung Health endpoint: render must fail closed without a new HTTP response.
+        # Synthetic hung Health endpoint: render must fail closed without a new
+        # HTTP response.
         hanging = browser.new_page(viewport={"width": 1200, "height": 900})
         hanging.on("pageerror", lambda exc: report["page_errors"].append(str(exc)))
         hanging.set_content(pagehtml, wait_until="domcontentloaded", timeout=15000)

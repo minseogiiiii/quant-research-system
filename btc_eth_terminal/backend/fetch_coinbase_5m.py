@@ -338,7 +338,8 @@ def export(
     base = PRODUCTS[product][0].lower() + "_5m"
     path = out_dir / f"{base}.csv"
     sidecar = out_dir / f"{base}.source.json"
-    # Fail on preexisting files to avoid silently overwriting a previously audited snapshot.
+    # Fail on preexisting files to avoid silently overwriting a previously
+    # audited snapshot.
     if path.exists() or sidecar.exists():
         raise SourceError(
             "Output exists. Preserve old source; choose a new output directory or archive existing data first."

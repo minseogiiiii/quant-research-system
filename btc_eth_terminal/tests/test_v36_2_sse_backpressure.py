@@ -81,7 +81,9 @@ class BoundedSSE(unittest.TestCase):
     def test_eight_client_limit_and_reclaim_after_disconnect(self):
         engine, _ = boot()
         server = self.serve(engine)
-        url = f"http://127.0.0.1:{server.server_address[1]}/api/v36/stream?product=BTC-USD"
+        url = f"http://127.0.0.1:{
+            server.server_address[1]
+        }/api/v36/stream?product=BTC-USD"
         opened = []
         try:
             for _ in range(8):
