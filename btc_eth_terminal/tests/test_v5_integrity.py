@@ -141,7 +141,9 @@ class TestCoinbaseRetry(unittest.TestCase):
 
     def test_retry_is_bounded_after_three_transient_failures(self):
         with (
-            patch.object(coinbase, 'urlopen', side_effect=URLError('offline')) as opened,
+            patch.object(
+                coinbase, 'urlopen', side_effect=URLError('offline')
+            ) as opened,
             patch.object(coinbase.time, 'sleep') as slept,
             self.assertRaisesRegex(coinbase.SourceError, 'bounded retries'),
         ):
