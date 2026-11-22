@@ -19,6 +19,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: latest-known
       - name: Install exact pinned JS parser toolchain
         working-directory: btc_eth_terminal/frontend
         run: npm ci --ignore-scripts --no-audit --no-fund
