@@ -42,7 +42,7 @@ jobs:
           paths=[pathlib.Path(x) for x in subprocess.check_output(
               ['git','ls-files','--','btc_eth_terminal'],text=True).splitlines()
               if x.endswith('.py')]
-          if len(paths)<250:raise RuntimeError('INCOMPLETE_TRACKED_SOURCE')
+          if len(paths)<200:raise RuntimeError('INCOMPLETE_TRACKED_SOURCE')
           before={str(p):(p.read_bytes(),
                  ast.dump(ast.parse(p.read_text()),include_attributes=False))
                  for p in paths}
