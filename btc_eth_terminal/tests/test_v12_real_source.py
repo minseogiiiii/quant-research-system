@@ -11,9 +11,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from audit_soak import SoakAuditError, audit
-from independent_soak_replay import replay
-from inspect_crashed_soak import inspect
+def _q14_load_after_path_setup_0():
+    from audit_soak import SoakAuditError, audit
+    from independent_soak_replay import replay
+    from inspect_crashed_soak import inspect
+    return SoakAuditError, audit, replay, inspect
+
+SoakAuditError, audit, replay, inspect = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 SOURCE = ROOT / "backend/data/live_disk_safe_180s_20261114/coinbase_btc_eth_soak_CWFeG3"
 

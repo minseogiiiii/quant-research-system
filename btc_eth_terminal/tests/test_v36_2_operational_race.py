@@ -15,10 +15,20 @@ from urllib.request import urlopen
 # Explicitly keep the local candidate overlay ahead of frozen imports.
 OVERLAY = str(Path(__file__).resolve().parents[1] / "backend")
 sys.path.insert(0, OVERLAY)
-from v36_live_engine import LiveMarketEngine
+def _q14_load_after_path_setup_0():
+    from v36_live_engine import LiveMarketEngine
+    return LiveMarketEngine
+
+LiveMarketEngine = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 sys.path.insert(0, OVERLAY)
-from v36_live_gateway import server_for_live
+def _q14_load_after_path_setup_1():
+    from v36_live_gateway import server_for_live
+    return server_for_live
+
+server_for_live = _q14_load_after_path_setup_1()
+del _q14_load_after_path_setup_1
 
 SESSION_A = "a" * 32
 SESSION_B = "b" * 32

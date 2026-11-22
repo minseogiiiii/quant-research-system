@@ -15,9 +15,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FE = ROOT / "frontend"
 sys.path.insert(0, str(ROOT / "backend"))
-from v34_frontend_integrity import verify_build as verify_old
-from v36_frontend_integrity import v36_asset
-from v37_frontend_integrity import DIST, MANIFEST, PINNED_MANIFEST_SHA256
+def _q14_load_after_path_setup_0():
+    from v34_frontend_integrity import verify_build as verify_old
+    from v36_frontend_integrity import v36_asset
+    from v37_frontend_integrity import DIST, MANIFEST, PINNED_MANIFEST_SHA256
+    return verify_old, v36_asset, DIST, MANIFEST, PINNED_MANIFEST_SHA256
+
+verify_old, v36_asset, DIST, MANIFEST, PINNED_MANIFEST_SHA256 = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 def digest(p):

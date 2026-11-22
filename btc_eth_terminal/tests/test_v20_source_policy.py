@@ -8,9 +8,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from audit_soak import SoakAuditError, audit
-from test_v10_soak import create_archive
-from test_v13_rolling import sample_policy
+def _q14_load_after_path_setup_0():
+    from audit_soak import SoakAuditError, audit
+    from test_v10_soak import create_archive
+    from test_v13_rolling import sample_policy
+    return SoakAuditError, audit, create_archive, sample_policy
+
+SoakAuditError, audit, create_archive, sample_policy = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class PolicyTests(unittest.TestCase):

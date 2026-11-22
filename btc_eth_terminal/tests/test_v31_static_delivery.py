@@ -18,8 +18,13 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-import bridge
-import v30_unified_api as api
+def _q14_load_after_path_setup_0():
+    import bridge
+    import v30_unified_api as api
+    return bridge, api
+
+bridge, api = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class V31StaticHTTP(unittest.TestCase):

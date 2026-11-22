@@ -12,7 +12,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from audit_soak import audit
+def _q14_load_after_path_setup_0():
+    from audit_soak import audit
+    return audit
+
+audit = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 @unittest.skipUnless(shutil.which("node"), "Node >=22 required")

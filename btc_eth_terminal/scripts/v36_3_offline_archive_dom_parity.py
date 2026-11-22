@@ -23,8 +23,13 @@ OUT = Path(
 OUT.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "scripts"))
-from v36_live_engine import LiveMarketEngine
-from v36_play_verified_archive import admitted_verified_chunks
+def _q14_load_after_path_setup_0():
+    from v36_live_engine import LiveMarketEngine
+    from v36_play_verified_archive import admitted_verified_chunks
+    return LiveMarketEngine, admitted_verified_chunks
+
+LiveMarketEngine, admitted_verified_chunks = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 capture = ROOT / "backend/data/live_v14_clean_120s/coinbase_btc_eth_soak_wsgXRy"
 pin = "8f2e0ec88a601a92ab4c7bcd0e04b20536fbe46bbd8b3c7f67ae3c1d075c28e5"

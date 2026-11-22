@@ -6,7 +6,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from v36_observe_existing_collector import capture_ready_for_research
+def _q14_load_after_path_setup_0():
+    from v36_observe_existing_collector import capture_ready_for_research
+    return capture_ready_for_research
+
+capture_ready_for_research = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 def clean_manifest():

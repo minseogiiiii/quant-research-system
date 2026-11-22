@@ -9,7 +9,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from audit_l2_pilot import L2AuditError, _decimal, _json, _utc, audit_session
+def _q14_load_after_path_setup_0():
+    from audit_l2_pilot import L2AuditError, _decimal, _json, _utc, audit_session
+    return L2AuditError, _decimal, _json, _utc, audit_session
+
+L2AuditError, _decimal, _json, _utc, audit_session = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class L2SourceAuditTests(unittest.TestCase):

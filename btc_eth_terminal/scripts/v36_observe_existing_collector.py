@@ -28,10 +28,15 @@ from threading import Thread
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from v35_replay_service import StateRejected
-from v36_live_engine import MAX_LINE, LiveMarketEngine
-from v36_live_gateway import server_for_live
-from v36_operator_monitor import server_for_operator
+def _q14_load_after_path_setup_0():
+    from v35_replay_service import StateRejected
+    from v36_live_engine import MAX_LINE, LiveMarketEngine
+    from v36_live_gateway import server_for_live
+    from v36_operator_monitor import server_for_operator
+    return StateRejected, MAX_LINE, LiveMarketEngine, server_for_live, server_for_operator
+
+StateRejected, MAX_LINE, LiveMarketEngine, server_for_live, server_for_operator = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 COLLECTOR = ROOT / "scripts/btc_eth_multiday_v20.mjs"
 

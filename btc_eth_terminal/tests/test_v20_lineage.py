@@ -10,8 +10,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from canonical_maker_v20 import build
-from reconcile_v19_lineages import reconcile
+def _q14_load_after_path_setup_0():
+    from canonical_maker_v20 import build
+    from reconcile_v19_lineages import reconcile
+    return build, reconcile
+
+build, reconcile = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class CanonicalMakerTests(unittest.TestCase):

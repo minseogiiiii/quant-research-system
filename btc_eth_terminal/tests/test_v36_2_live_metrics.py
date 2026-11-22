@@ -10,10 +10,20 @@ from urllib.request import urlopen
 
 root = str(Path(__file__).resolve().parents[1] / "backend")
 sys.path.insert(0, root)
-from v36_live_engine import LiveMarketEngine
+def _q14_load_after_path_setup_0():
+    from v36_live_engine import LiveMarketEngine
+    return LiveMarketEngine
+
+LiveMarketEngine = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 sys.path.insert(0, root)
-from v36_live_gateway import server_for_live
+def _q14_load_after_path_setup_1():
+    from v36_live_gateway import server_for_live
+    return server_for_live
+
+server_for_live = _q14_load_after_path_setup_1()
+del _q14_load_after_path_setup_1
 
 
 class LiveMetricsContract(unittest.TestCase):

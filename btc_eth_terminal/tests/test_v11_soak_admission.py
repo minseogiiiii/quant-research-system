@@ -10,8 +10,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "tests"))
-from audit_soak import SoakAuditError, audit
-from test_v10_soak import create_archive, stamp
+def _q14_load_after_path_setup_0():
+    from audit_soak import SoakAuditError, audit
+    from test_v10_soak import create_archive, stamp
+    return SoakAuditError, audit, create_archive, stamp
+
+SoakAuditError, audit, create_archive, stamp = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class V11AdmissionHardening(unittest.TestCase):

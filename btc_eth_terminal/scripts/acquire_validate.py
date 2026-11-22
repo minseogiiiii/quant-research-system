@@ -19,10 +19,15 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE / "backend"))
 
-import bridge
-import fetch_btc_eth
-import fetch_coinbase_5m as coinbase
-from independent_audit import audit_bundle_independently
+def _q14_load_after_path_setup_0():
+    import bridge
+    import fetch_btc_eth
+    import fetch_coinbase_5m as coinbase
+    from independent_audit import audit_bundle_independently
+    return bridge, fetch_btc_eth, coinbase, audit_bundle_independently
+
+bridge, fetch_btc_eth, coinbase, audit_bundle_independently = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 def dns_probe(host: str = "api.coinbase.com") -> dict:

@@ -11,7 +11,12 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from taker_sensitivity import SensitivityError, compare
+def _q14_load_after_path_setup_0():
+    from taker_sensitivity import SensitivityError, compare
+    return SensitivityError, compare
+
+SensitivityError, compare = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 INTENTS = json.loads((ROOT / "examples/v15_demo_intents.json").read_text())
 BASE = {

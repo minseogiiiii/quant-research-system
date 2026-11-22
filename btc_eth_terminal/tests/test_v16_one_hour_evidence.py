@@ -10,10 +10,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "tests"))
-from audit_soak import SoakAuditError, audit
-from audit_v16_one_hour import OneHourEvidenceError, audit_one_hour
-from independent_soak_replay import IndependentReplayError, replay
-from test_v10_soak import create_archive
+def _q14_load_after_path_setup_0():
+    from audit_soak import SoakAuditError, audit
+    from audit_v16_one_hour import OneHourEvidenceError, audit_one_hour
+    from independent_soak_replay import IndependentReplayError, replay
+    from test_v10_soak import create_archive
+    return SoakAuditError, audit, OneHourEvidenceError, audit_one_hour, IndependentReplayError, replay, create_archive
+
+SoakAuditError, audit, OneHourEvidenceError, audit_one_hour, IndependentReplayError, replay, create_archive = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class BookIndexAgreement(unittest.TestCase):

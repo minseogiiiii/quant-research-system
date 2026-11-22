@@ -6,7 +6,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from v36_observe_existing_collector import durable_policy_valid
+def _q14_load_after_path_setup_0():
+    from v36_observe_existing_collector import durable_policy_valid
+    return durable_policy_valid
+
+durable_policy_valid = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class StrictDurableCapturePolicy(unittest.TestCase):

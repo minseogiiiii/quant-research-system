@@ -6,7 +6,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from v36_observe_existing_collector import observer_source_complete
+def _q14_load_after_path_setup_0():
+    from v36_observe_existing_collector import observer_source_complete
+    return observer_source_complete
+
+observer_source_complete = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 def approved():

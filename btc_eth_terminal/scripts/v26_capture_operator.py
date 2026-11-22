@@ -21,8 +21,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "scripts"))
-from v25_capture_operator import COLLECTOR, exclusive_write, preflight, snapshot
-from v26_clock_trace import ZERO, canonical, record
+def _q14_load_after_path_setup_0():
+    from v25_capture_operator import COLLECTOR, exclusive_write, preflight, snapshot
+    from v26_clock_trace import ZERO, canonical, record
+    return COLLECTOR, exclusive_write, preflight, snapshot, ZERO, canonical, record
+
+COLLECTOR, exclusive_write, preflight, snapshot, ZERO, canonical, record = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 MAX_LOG_BYTES = 64 * 1024 * 1024
 INTERVAL = {"smoke": 20.0, "24h": 300.0}

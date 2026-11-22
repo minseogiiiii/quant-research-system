@@ -19,9 +19,14 @@ from threading import Thread
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from v35_archive_ingress import MAX_CHUNK_BYTES, ArchiveRejected, verify_capture
-from v36_live_engine import LiveMarketEngine
-from v36_live_gateway import server_for_live
+def _q14_load_after_path_setup_0():
+    from v35_archive_ingress import MAX_CHUNK_BYTES, ArchiveRejected, verify_capture
+    from v36_live_engine import LiveMarketEngine
+    from v36_live_gateway import server_for_live
+    return MAX_CHUNK_BYTES, ArchiveRejected, verify_capture, LiveMarketEngine, server_for_live
+
+MAX_CHUNK_BYTES, ArchiveRejected, verify_capture, LiveMarketEngine, server_for_live = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 def admitted_verified_chunks(capture: Path, pin: str):

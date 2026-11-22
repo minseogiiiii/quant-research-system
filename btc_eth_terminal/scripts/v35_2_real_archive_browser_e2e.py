@@ -17,8 +17,13 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from v35_replay_service import replay_capture
-from v35_unified_gateway import server_for
+def _q14_load_after_path_setup_0():
+    from v35_replay_service import replay_capture
+    from v35_unified_gateway import server_for
+    return replay_capture, server_for
+
+replay_capture, server_for = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 DEFAULT_ARCHIVE = ROOT / "backend/data/live_v14_clean_120s/coinbase_btc_eth_soak_wsgXRy"
 DEFAULT_PIN = "8f2e0ec88a601a92ab4c7bcd0e04b20536fbe46bbd8b3c7f67ae3c1d075c28e5"

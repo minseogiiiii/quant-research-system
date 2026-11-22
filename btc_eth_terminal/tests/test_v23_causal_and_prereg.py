@@ -11,21 +11,26 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from v23_causal_microstructure import (
-    FeatureReject,
-    create_report,
-    features_from_events,
-    ofi_delta,
-)
-from v23_prereg_guard import (
-    ProtocolReject,
-    evaluate_structural_rows,
-    lock_draft_once,
-    read_json,
-    utc_ms,
-    validate_protocol,
-    verify_lock,
-)
+def _q14_load_after_path_setup_0():
+    from v23_causal_microstructure import (
+        FeatureReject,
+        create_report,
+        features_from_events,
+        ofi_delta,
+    )
+    from v23_prereg_guard import (
+        ProtocolReject,
+        evaluate_structural_rows,
+        lock_draft_once,
+        read_json,
+        utc_ms,
+        validate_protocol,
+        verify_lock,
+    )
+    return FeatureReject, create_report, features_from_events, ofi_delta, ProtocolReject, evaluate_structural_rows, lock_draft_once, read_json, utc_ms, validate_protocol, verify_lock
+
+FeatureReject, create_report, features_from_events, ofi_delta, ProtocolReject, evaluate_structural_rows, lock_draft_once, read_json, utc_ms, validate_protocol, verify_lock = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 T = 1_800_000_000_000
 P = ROOT / "examples/v23_preregistration_DRAFT.json"

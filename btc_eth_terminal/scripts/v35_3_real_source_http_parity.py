@@ -11,9 +11,14 @@ from v35_3_sse_soak import CLEAN, endpoint, events, pin
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from v35_1_frontend_integrity import CANDIDATE_CSS, CANDIDATE_JS, candidate_asset
-from v35_replay_service import replay_capture
-from v35_unified_gateway import server_for
+def _q14_load_after_path_setup_0():
+    from v35_1_frontend_integrity import CANDIDATE_CSS, CANDIDATE_JS, candidate_asset
+    from v35_replay_service import replay_capture
+    from v35_unified_gateway import server_for
+    return CANDIDATE_CSS, CANDIDATE_JS, candidate_asset, replay_capture, server_for
+
+CANDIDATE_CSS, CANDIDATE_JS, candidate_asset, replay_capture, server_for = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 def run():

@@ -16,7 +16,12 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-import bridge
+def _q14_load_after_path_setup_0():
+    import bridge
+    return bridge
+
+bridge = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 MARKET_HASHES = {
     "BTC_COINBASE_SPOT": "9869f1833669492fa4156fb51ffd529cfd42a6c870a54215c238a3f9a12bb353",

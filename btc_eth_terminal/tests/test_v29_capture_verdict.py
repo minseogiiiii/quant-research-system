@@ -14,7 +14,12 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "scripts"))
-from v29_capture_verdict import evaluate
+def _q14_load_after_path_setup_0():
+    from v29_capture_verdict import evaluate
+    return evaluate
+
+evaluate = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class V29TerminalVerdict(TestCase):

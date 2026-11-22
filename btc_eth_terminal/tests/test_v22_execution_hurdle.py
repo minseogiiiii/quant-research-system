@@ -11,14 +11,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from v22_independent_hurdle_audit import IndependentMismatch, verify
-from v22_mid_exit_hurdle import (
-    EvidenceReject,
-    dec,
-    evaluate,
-    load,
-    policy_checked,
-)
+def _q14_load_after_path_setup_0():
+    from v22_independent_hurdle_audit import IndependentMismatch, verify
+    from v22_mid_exit_hurdle import (
+        EvidenceReject,
+        dec,
+        evaluate,
+        load,
+        policy_checked,
+    )
+    return IndependentMismatch, verify, EvidenceReject, dec, evaluate, load, policy_checked
+
+IndependentMismatch, verify, EvidenceReject, dec, evaluate, load, policy_checked = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class V22EvidenceTests(unittest.TestCase):

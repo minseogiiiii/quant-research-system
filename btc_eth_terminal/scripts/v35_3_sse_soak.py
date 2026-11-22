@@ -26,7 +26,12 @@ import psutil
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from v35_replay_service import replay_capture
+def _q14_load_after_path_setup_0():
+    from v35_replay_service import replay_capture
+    return replay_capture
+
+replay_capture = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 CLEAN = ROOT / "backend/data/live_v14_clean_120s/coinbase_btc_eth_soak_wsgXRy"
 SECOND = (

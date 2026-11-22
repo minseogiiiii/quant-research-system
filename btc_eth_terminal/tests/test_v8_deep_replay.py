@@ -16,8 +16,13 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE / "backend"))
-from audit_l2_deep import StrictL2Error, deep_replay
-from audit_l2_pilot import L2AuditError, audit_session
+def _q14_load_after_path_setup_0():
+    from audit_l2_deep import StrictL2Error, deep_replay
+    from audit_l2_pilot import L2AuditError, audit_session
+    return StrictL2Error, deep_replay, L2AuditError, audit_session
+
+StrictL2Error, deep_replay, L2AuditError, audit_session = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 FIXTURE = BASE / "backend" / "data" / "l2_pilot_20261113_205058UTC"
 SECOND = BASE / "backend" / "data" / "l2_pilot_second_35s_20261113"

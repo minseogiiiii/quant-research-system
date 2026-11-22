@@ -14,10 +14,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import acquire_validate
-import bridge
-import fetch_btc_eth
-from independent_audit import IndependentAuditError, audit_bundle_independently
+def _q14_load_after_path_setup_0():
+    import acquire_validate
+    import bridge
+    import fetch_btc_eth
+    from independent_audit import IndependentAuditError, audit_bundle_independently
+    return acquire_validate, bridge, fetch_btc_eth, IndependentAuditError, audit_bundle_independently
+
+acquire_validate, bridge, fetch_btc_eth, IndependentAuditError, audit_bundle_independently = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 START = int(datetime(2026, 11, 8, tzinfo=UTC).timestamp())
 END = START + 2 * 300

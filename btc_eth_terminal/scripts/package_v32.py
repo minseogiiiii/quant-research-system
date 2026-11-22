@@ -14,15 +14,20 @@ V31 = Path("/mnt/data/btc_eth_unified_terminal_v31.zip")
 FULL = Path("/mnt/data/btc_eth_unified_terminal_v32.zip")
 PATCH = Path("/mnt/data/btc_eth_unified_terminal_v32_patch.zip")
 sys.path.insert(0, str(ROOT / "scripts"))
-from apply_v32_patch import (
-    PARENT_SHA,
-    PATCH_META,
-    TARGET_MANIFEST,
-    collect,
-    reconstruct,
-    safe_name,
-    sha,
-)
+def _q14_load_after_path_setup_0():
+    from apply_v32_patch import (
+        PARENT_SHA,
+        PATCH_META,
+        TARGET_MANIFEST,
+        collect,
+        reconstruct,
+        safe_name,
+        sha,
+    )
+    return PARENT_SHA, PATCH_META, TARGET_MANIFEST, collect, reconstruct, safe_name, sha
+
+PARENT_SHA, PATCH_META, TARGET_MANIFEST, collect, reconstruct, safe_name, sha = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 def run():

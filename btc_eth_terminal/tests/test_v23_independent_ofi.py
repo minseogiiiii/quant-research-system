@@ -10,13 +10,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from decimal import Decimal
+def _q14_load_after_path_setup_0():
+    from decimal import Decimal
+    from v23_independent_microstructure_audit import (
+        IndependentOFIReject,
+        independent_delta,
+        independent_verify,
+    )
+    return Decimal, IndependentOFIReject, independent_delta, independent_verify
 
-from v23_independent_microstructure_audit import (
-    IndependentOFIReject,
-    independent_delta,
-    independent_verify,
-)
+Decimal, IndependentOFIReject, independent_delta, independent_verify = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class IndependentOFITests(unittest.TestCase):

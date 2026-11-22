@@ -13,8 +13,13 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "tests"))
-from taker_quote_envelope import Assumptions, EnvelopeError, evaluate
-from test_v10_soak import create_archive
+def _q14_load_after_path_setup_0():
+    from taker_quote_envelope import Assumptions, EnvelopeError, evaluate
+    from test_v10_soak import create_archive
+    return Assumptions, EnvelopeError, evaluate, create_archive
+
+Assumptions, EnvelopeError, evaluate, create_archive = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class TakerEnvelopeTests(unittest.TestCase):

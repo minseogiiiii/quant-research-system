@@ -13,7 +13,12 @@ from zipfile import ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from v26_original_pair_recovery import RecoveryError, recover
+def _q14_load_after_path_setup_0():
+    from v26_original_pair_recovery import RecoveryError, recover
+    return RecoveryError, recover
+
+RecoveryError, recover = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class RecoveryTests(TestCase):

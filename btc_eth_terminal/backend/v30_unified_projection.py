@@ -17,9 +17,14 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from audit_soak import audit as existing_archive_audit
-from independent_soak_replay import replay as independent_archive_audit
-from v21_source_evidence import iso_ms
+def _q14_load_after_path_setup_0():
+    from audit_soak import audit as existing_archive_audit
+    from independent_soak_replay import replay as independent_archive_audit
+    from v21_source_evidence import iso_ms
+    return existing_archive_audit, independent_archive_audit, iso_ms
+
+existing_archive_audit, independent_archive_audit, iso_ms = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 PRODS = ("BTC-USD", "ETH-USD")
 SCOPE = "COINBASE_PUBLIC_SPOT_BTC_ETH"

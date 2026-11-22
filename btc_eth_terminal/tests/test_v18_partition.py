@@ -10,11 +10,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from feature_label_partition import (
-    FeatureLabelPartitionError,
-    labels_visible_asof,
-    partition,
-)
+def _q14_load_after_path_setup_0():
+    from feature_label_partition import (
+        FeatureLabelPartitionError,
+        labels_visible_asof,
+        partition,
+    )
+    return FeatureLabelPartitionError, labels_visible_asof, partition
+
+FeatureLabelPartitionError, labels_visible_asof, partition = _q14_load_after_path_setup_0()
+del _q14_load_after_path_setup_0
 
 
 class PartitionTests(unittest.TestCase):
