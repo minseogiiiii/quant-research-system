@@ -1,0 +1,97 @@
+name: Q21 P0 persistent Linux host witness synthetic contract (NO HOST CERTIFICATION)
+on:
+  push:
+    branches: [p0/q21-persistent-host-witness-20261122]
+    paths:
+      - '.github/workflows/q21_persistent_host_witness_contract.yml'
+      - 'btc_eth_terminal/scripts/q21_host_witness.py'
+      - 'btc_eth_terminal/tests/test_q21_host_witness.py'
+      - 'docs/Q21_PERSISTENT_HOST_OPERATOR_RUNBOOK.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: q21-host-witness-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  q21-operator-witness-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Ensure immutable Q14 source and no live execution changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          m=json.loads(Path('.github/release-evidence/q14_candidate_source_git_blobs.json').read_bytes())
+          assert m['source_files']==278 and len(m['source_git_blobs'])==278
+          assert m['release_approved'] is False
+          assert m['merge_approved'] is False
+          assert m['real_orders_enabled'] is False
+          for path, pin in m['source_git_blobs'].items():
+              actual=subprocess.check_output(['git','hash-object',path],text=True).strip()
+              if actual!=pin:raise SystemExit('FROZEN_Q14_SOURCE_CHANGED:'+path)
+          allowed={
+              '.github/workflows/q21_persistent_host_witness_contract.yml',
+              'btc_eth_terminal/scripts/q21_host_witness.py',
+              'btc_eth_terminal/tests/test_q21_host_witness.py',
+              'docs/Q21_PERSISTENT_HOST_OPERATOR_RUNBOOK.md',
+          }
+          diff=set(subprocess.check_output(
+              ['git','diff','--name-only','d832110e8e3484e82fafa2533270a6d38bee0865','HEAD'],
+              text=True).splitlines())
+          assert diff<=allowed, 'Q21_UNREVIEWED_PRODUCT_FILE:'+str(sorted(diff-allowed))
+          print('PASS_Q21_Q14_278_SOURCE_PINS_UNCHANGED')
+          PY
+      - name: Strict Q21 lint and compile
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q21_host_witness.py btc_eth_terminal/tests/test_q21_host_witness.py
+          python -m py_compile btc_eth_terminal/scripts/q21_host_witness.py btc_eth_terminal/tests/test_q21_host_witness.py
+      - name: Private Unix monitoring protocol and adversarial replay regressions
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q21_host_witness.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_operator_monitor.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_systemd_launch.py' -v
+          echo 'PASS_Q21_SYNTHETIC_OPERATOR_WITNESS_CONTRACT_ONLY'
+      - name: Re-run existing P0 SSE overload, storage failure, reconnect and archive guards
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_sse_backpressure.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_storage_faults.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_2_transport_gap.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_durable_archive_gate.py' -v
+          echo 'PASS_Q21_P0_EPHEMERAL_FAULT_GUARDS_NOT_REAL_24H_RECOVERY'
+      - name: Enforce documented limits
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          script=Path('btc_eth_terminal/scripts/q21_host_witness.py').read_text()
+          launch=Path('btc_eth_terminal/scripts/v36_2_durable_launch.sh').read_text()
+          unit=Path('btc_eth_terminal/deployment/v36_2_btceth_live.service').read_text()
+          assert 'TARGET_WITNESS_SECONDS = 85_700' in script
+          assert 'MIN_WITNESS_SPAN_SECONDS = 85_200' in script
+          assert '--duration 86400' in launch
+          assert '--archive-budget-bytes 55000000000' in launch
+          assert '--disk-reserve-bytes 10737418240' in launch
+          assert 'MemoryMax=2G' in unit
+          assert 'Restart=always' in unit
+          print('PASS_Q21_EXISTING_DURABLE_LIMITS_AND_UNMODIFIED_SOURCE')
+          print('NOT_CERTIFIED: HOST_24H SOURCE_RECOVERY PRODUCTION RELEASE ORDER EXECUTION')
+          PY
