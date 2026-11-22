@@ -1,0 +1,204 @@
+name: Q22 P0 ARMED 5h LIVE Coinbase source only after exact Q18 PASS
+on:
+  push:
+    branches: [p0/q22-five-hour-gated-soak-20261122]
+    paths: ['.github/q22/arm_after_q18.json']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: q22-armed-five-hour-single-candidate
+  cancel-in-progress: false
+jobs:
+  q18-and-q22-preflight-exact-evidence-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    outputs:
+      source_approved: ${{ steps.accept.outputs.source_approved }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require exact Q22 preflight PASS, Q18 immutable run and no product delta
+        id: accept
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os,pathlib,subprocess,time,urllib.request
+          from urllib.error import HTTPError
+          repo=os.environ['GITHUB_REPOSITORY']
+          arm=json.loads(pathlib.Path('.github/q22/arm_after_q18.json').read_bytes())
+          expected_q18='d832110e8e3484e82fafa2533270a6d38bee0865'
+          if (arm.get('schema')!='q22_explicit_single_use_5h_arm_v1'
+              or arm.get('q18_run_id')!=45001633746
+              or arm.get('q18_head_sha')!=expected_q18
+              or arm.get('approval')!='CI_ONLY_NO_ORDERS'
+              or arm.get('real_orders_enabled') is not False):
+              raise SystemExit('Q22_INVALID_EXPLICIT_ARM_CONTRACT')
+          parent=subprocess.check_output(['git','rev-parse','HEAD^'],text=True).strip()
+          if arm.get('preflight_commit')!=parent:
+              raise SystemExit('Q22_ARM_NOT_IMMEDIATELY_AFTER_TESTED_SOURCE')
+          sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          assert len(sha)==40
+          manifest=json.loads(pathlib.Path('.github/release-evidence/q14_candidate_source_git_blobs.json').read_bytes())
+          assert len(manifest['source_git_blobs'])==278
+          assert manifest['release_approved'] is False and manifest['real_orders_enabled'] is False
+          for p,d in manifest['source_git_blobs'].items():
+              actual=subprocess.check_output(['git','hash-object',p],text=True).strip()
+              if actual!=d:raise SystemExit('PINNED_Q14_SOURCE_CHANGED:'+p)
+          allowed={
+            'btc_eth_terminal/scripts/q22_ci_long_observer.py',
+            'btc_eth_terminal/scripts/q22_ci_5h_supervisor.py',
+            'btc_eth_terminal/scripts/q22_ci_full_replay.py',
+            'btc_eth_terminal/tests/test_q22_ci_5h_contract.py',
+            '.github/workflows/q22_five_hour_preflight.yml',
+            '.github/workflows/q22_five_hour_after_q18.yml',
+            'docs/Q22_FIVE_HOUR_GATED_CI_RUNBOOK.md',
+            '.github/q22/arm_after_q18.json',
+          }
+          changed=set(subprocess.check_output(
+              ['git','diff','--name-only','61fa43a8e956fc4a88d206587bc98ce4d85623f8','HEAD'],
+              text=True).splitlines())
+          assert changed<=allowed, 'UNPINNED_DELTA:'+str(sorted(changed-allowed))
+          def get(route):
+              req=urllib.request.Request(
+                  'https://api.github.com/repos/'+repo+'/'+route,
+                  headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],
+                           'Accept':'application/vnd.github+json',
+                           'X-GitHub-Api-Version':'2022-11-28'})
+              with urllib.request.urlopen(req,timeout=12) as response:
+                  return json.load(response)
+          preflights=get('actions/runs?branch=p0%2Fq22-five-hour-gated-soak-20261122&per_page=40')['workflow_runs']
+          matches=[r for r in preflights
+              if r.get('name','').startswith('Q22 P0 five-hour source preflight')
+              and r.get('head_sha')==parent and r.get('conclusion')=='success'
+              and r.get('status')=='completed']
+          if not matches:raise SystemExit('EXACT_Q22_180S_REAL_SMOKE_PREFLIGHT_NOT_PASSED')
+          print('PASS_Q22_PREVIOUS_SOURCE_COMMIT_SMOKE:',parent,flush=True)
+          # This gate may wait while Q18 finishes; 5h source job cannot start
+          # from a failed, cancelled, skipped, pending or mismatched Q18 run.
+          for i in range(70):
+              q=get('actions/runs/45001633746')
+              if q.get('id')!=45001633746 or q.get('head_sha')!=expected_q18:
+                  raise SystemExit('Q18_UNEXPECTED_RUN_OR_SOURCE_SHA')
+              if q.get('name') != (
+                  'Q18 real 30m source and 26m segmented SSE with slot-drain safety'):
+                  raise SystemExit('Q18_WRONG_WORKFLOW_IDENTITY')
+              if q.get('status')=='completed':
+                  if q.get('conclusion')!='success':
+                      raise SystemExit('Q18_30MIN_NOT_GREEN:'+str(q.get('conclusion')))
+                  artifacts=get('actions/runs/45001633746/artifacts')
+                  valid=[a for a in artifacts.get('artifacts',[])
+                         if a.get('name')=='q18-public-30min-archive-and-segmented-sse-summary'
+                         and not a.get('expired') and a.get('size_in_bytes',0)>0]
+                  if not valid:
+                      raise SystemExit('Q18_RESULT_ARTIFACT_MISSING')
+                  print('PASS_EXACT_Q18_30MIN_8CLIENT_SEVEN_WINDOW_GATE',flush=True)
+                  break
+              if q.get('status') not in ('queued','in_progress','waiting','requested','pending'):
+                  raise SystemExit('Q18_UNEXPECTED_RUN_STATUS')
+              if i%5==0:print('Q18_PENDING_Q22_UNARMED_DURATION',i,flush=True)
+              time.sleep(55)
+          else:
+              raise SystemExit('Q18_NOT_COMPLETE_WITHIN_BOUNDED_GATE_WINDOW')
+          PY
+          echo 'source_approved=true' >> "$GITHUB_OUTPUT"
+
+  five-hour-real-coinbase-gate:
+    needs: q18-and-q22-preflight-exact-evidence-gate
+    if: needs.q18-and-q22-preflight-exact-evidence-gate.outputs.source_approved == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 358
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+      Q22_PRIVATE: ${{ runner.temp }}/q22_capture_${{ github.run_id }}
+      Q22_PUBLIC: ${{ runner.temp }}/q22_5h_public_${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Revalidate immutable source, true disk capacity and explicit 5h budget
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$Q22_PUBLIC"
+          python - <<'PY'
+          import shutil,sys
+          from q22_ci_long_observer import (
+              CI_DURATION,RAW_BUDGET,ARCHIVE_BUDGET,DISK_RESERVE,ci_source_policy
+          )
+          free=shutil.disk_usage('/tmp').free
+          if not ci_source_policy(CI_DURATION,RAW_BUDGET,ARCHIVE_BUDGET,DISK_RESERVE,free):
+              raise SystemExit('FAIL_Q22_RUNNER_DISK_OR_CI_POLICY_BEFORE_5H')
+          assert CI_DURATION==18000
+          assert ARCHIVE_BUDGET==6000000000
+          assert RAW_BUDGET==4000000000
+          assert DISK_RESERVE==4*1024**3
+          print('PASS_Q22_ACTUAL_5H_PRESTART_STORAGE',free)
+          PY
+      - name: Capture genuinely live BTC ETH for 18000s with early fail-fast source, SSE and resource checks
+        timeout-minutes: 311
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -u btc_eth_terminal/scripts/q22_ci_5h_supervisor.py \
+            --execute-public-capture --duration 18000 --port 8786 \
+            --private-workdir "$Q22_PRIVATE" --public-summary "$Q22_PUBLIC"
+          test -s "$Q22_PUBLIC/live_monitoring_summary.json"
+          test ! -e "$Q22_PUBLIC/fail_fast.json"
+      - name: Same-run SHA pinned large-archive gate and TWO independent BTC ETH final-book replays
+        timeout-minutes: 41
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -u btc_eth_terminal/scripts/q22_ci_full_replay.py \
+            --duration 18000 --private-workdir "$Q22_PRIVATE" \
+            --output-summary "$Q22_PUBLIC/full_archive_two_replays.json"
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ['Q22_PUBLIC'])
+          replay=json.loads((root/'full_archive_two_replays.json').read_text())
+          live=json.loads((root/'live_monitoring_summary.json').read_text())
+          assert replay['status']=='PASS'
+          assert replay['source_connections']==1 and replay['source_reconnects']==0
+          assert replay['source_monotonic_seconds']>=17995
+          assert replay['primary_independent_final_books_agree'] is True
+          assert live['windows_passed']==24 and live['source_session_stable'] is True
+          assert live['sample_span_seconds']>=17400
+          assert replay['real_orders_enabled'] is False
+          assert live['order_execution_enabled'] is False
+          (root/'five_hour_final_classification.json').write_text(
+              json.dumps({'schema':'q22_five_hour_ephemeral_ci_acceptance_v1',
+                          'status':'PASS_5H_EPHEMERAL_ENGINEERING_ONLY',
+                          'q18_exact_gate':'PASSED',
+                          'five_hour_live_source':True,
+                          'live_eight_client_windows':24,
+                          'full_archive_two_replays':'PASSED',
+                          '24h_host_certified':False,
+                          'oos_alpha_certified':False,
+                          'real_orders_enabled':False},sort_keys=True,indent=2)+'\n')
+          print('PASS_Q22_5H_SOURCE_SSE_RESOURCE_DUAL_REPLAY_NOT_24H_NO_ORDERS')
+          PY
+      - name: Upload ONLY public bounded JSON evidence, NEVER private Coinbase JSONL or logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q22-public-five-hour-gate-summary-only
+          path: ${{ runner.temp }}/q22_5h_public_${{ github.run_id }}/*.json
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Erase private raw capture and observer logs from ephemeral runner
+        if: always()
+        shell: bash
+        run: |
+          rm -rf -- "$Q22_PRIVATE" "$Q22_PRIVATE.observer_stdout.log" \
+            "$Q22_PRIVATE.observer_stderr.log"
+          echo 'Q22_PRIVATE_RAW_SOURCE_NOT_UPLOADED_AND_DELETED_IF_JOB_CLEANUP_EXECUTES'
