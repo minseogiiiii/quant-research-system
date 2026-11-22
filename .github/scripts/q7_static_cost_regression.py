@@ -4,6 +4,7 @@
 This is a partial source-contract check; not the full Q7 runtime or cost/OOS proof.
 The complete Q7 suite must independently import the released module with fixtures.
 """
+
 from __future__ import annotations
 
 import ast
@@ -54,9 +55,8 @@ class StaticCostSafetyTests(unittest.TestCase):
         for fee, slip in (("-10", "0"), ("0", "-100"),
                           ("-0.0000001", "0"), ("0", "-0.0000001"),
                           ("-10", "-200")):
-            with self.subTest(fee=fee, slip=slip):
-                with self.assertRaises(FactorLabReject):
-                    self.walk(book(), "BUY", "1", fee, slip)
+            with self.subTest(fee=fee, slip=slip), self.assertRaises(FactorLabReject):
+                self.walk(book(), "BUY", "1", fee, slip)
 
     def test_valid_zero_costs_and_displayed_book_walk(self):
         x = self.walk(book(), "BUY", "1", "0", "0")
@@ -69,9 +69,8 @@ class StaticCostSafetyTests(unittest.TestCase):
 
     def test_reject_invalid_depth_fraction_and_nonfinite(self):
         for fraction in ("0", "-0.1", "1.00001", "NaN", "Infinity"):
-            with self.subTest(fraction=fraction):
-                with self.assertRaises(FactorLabReject):
-                    self.walk(book(), "BUY", "1", "0", "0", fraction)
+            with self.subTest(fraction=fraction), self.assertRaises(FactorLabReject):
+                self.walk(book(), "BUY", "1", "0", "0", fraction)
 
     def test_censored_depth_does_not_invent_fill_or_cost(self):
         x = self.walk(book(), "BUY", "99", "10", "10")
