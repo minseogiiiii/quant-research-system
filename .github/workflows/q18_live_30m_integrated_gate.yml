@@ -1,4 +1,4 @@
-name: Q18 actual Coinbase 30m source and 26m segmented 8-client SSE acceptance
+name: Q18 real 30m source and 26m segmented SSE with slot-drain safety
 on:
   push:
     branches: [verification/q18-live-30m-integrated-20261122]
@@ -136,6 +136,39 @@ jobs:
               FANOUT_RC=2
               break
             fi
+            # The gateway deliberately allows only 8 concurrent SSE streams.
+            # The just-closed client sockets may not be released by the server
+            # until its next write. Never immediately oversubscribe the next 8.
+            if [ "$i" -lt 7 ]; then
+              python - "$i" "$PUBLIC/sse_cooldowns.jsonl" <<'PY'
+          import json,sys,time
+          from urllib.request import urlopen
+          start=time.monotonic()
+          deadline=start+25
+          last=None
+          while time.monotonic()<deadline:
+              try:
+                  with urlopen('http://127.0.0.1:8766/api/v36/metrics',timeout=3) as resp:
+                      last=json.load(resp)
+                  if (last.get('mode')=='LIVE_SOURCE' and
+                      last.get('source_healthy') is True and
+                      last.get('max_sse_clients')==8 and
+                      last.get('active_sse_connections')==0):
+                      with open(sys.argv[2],'a') as out:
+                          out.write(json.dumps({'after_window':int(sys.argv[1]),
+                              'sse_slots_released':True,
+                              'drain_seconds':round(time.monotonic()-start,3)},
+                              sort_keys=True)+'\\n')
+                      print('PASS_Q18_SSE_SLOTS_DRAINED',sys.argv[1],flush=True)
+                      break
+              except (OSError,ValueError,TimeoutError):
+                  pass
+              time.sleep(.3)
+          else:
+              raise SystemExit('SSE_SLOT_LEAK_OR_SOURCE_UNHEALTHY_AFTER_WINDOW_'+sys.argv[1])
+          PY
+              if [ "$?" -ne 0 ]; then FANOUT_RC=2; break; fi
+            fi
           done
           wait "$OBSERVER_PID"
           CAPTURE_RC=$?
@@ -192,6 +225,11 @@ jobs:
                   or report.get('trading_enabled') is not False
                   or report.get('certified_24h') is not False):
                   raise SystemExit('SSE_EIGHT_CLIENTS_OR_WINDOW_FAILURE:'+str(i))
+          drains=[json.loads(line) for line in (p/'sse_cooldowns.jsonl').read_text().splitlines()]
+          if len(drains)!=6 or [x['after_window'] for x in drains]!=list(range(1,7)):
+              raise SystemExit('SSE_COOLDOWN_INCOMPLETE')
+          if not all(x['sse_slots_released'] is True and x['drain_seconds']<=25 for x in drains):
+              raise SystemExit('SSE_SLOTS_NOT_RELEASED')
           boundaries=[json.loads(line) for line in (p/'session_boundaries.jsonl').read_text().splitlines()]
           if len(boundaries)!=14 or len({item['session_hash'] for item in boundaries})!=1:
               raise SystemExit('SOURCE_SESSION_CHANGED_ACROSS_WINDOWS')
