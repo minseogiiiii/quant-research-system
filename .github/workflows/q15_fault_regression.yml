@@ -1,0 +1,84 @@
+name: Q15 read-only failure-mode regression (NO PRIVATE ARCHIVE)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths:
+      - '.github/workflows/q15_fault_regression.yml'
+      - 'btc_eth_terminal/tests/test_v36_2_transport_gap.py'
+      - 'btc_eth_terminal/tests/test_v36_2_sse_backpressure.py'
+      - 'btc_eth_terminal/tests/test_v36_2_storage_faults.py'
+      - 'btc_eth_terminal/tests/test_v36_3_durable_capacity.py'
+      - 'btc_eth_terminal/tests/test_v36_3_heartbeat_coalescing.py'
+      - 'btc_eth_terminal/tests/test_v36_3_operator_monitor.py'
+      - 'btc_eth_terminal/tests/test_v36_3_systemd_launch.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fault-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require Ruff clean and source compiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install 'ruff==0.15.22'
+          ruff check .
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+
+      - name: Run independent transport, SSE, storage and operator-fault regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          modules = [
+              'test_v36_2_transport_gap.py',
+              'test_v36_2_sse_backpressure.py',
+              'test_v36_2_storage_faults.py',
+              'test_v36_3_durable_capacity.py',
+              'test_v36_3_heartbeat_coalescing.py',
+              'test_v36_3_operator_monitor.py',
+              'test_v36_3_systemd_launch.py',
+          ]
+          report={'schema':'q15_no_private_fault_regression_v1',
+                  'source_mode':'UNIT_AND_SYNTHETIC_FAULTS_ONLY',
+                  'modules':{},'all_passed':False,
+                  'live_coinbase_24h_proven':False,
+                  'real_orders_enabled':False,
+                  'release_approved':False}
+          for name in modules:
+              command=[sys.executable,'-m','unittest','discover',
+                       '-s','btc_eth_terminal/tests','-p',name,'-v']
+              r=subprocess.run(command,capture_output=True,text=True,timeout=135)
+              log=r.stdout+r.stderr
+              if r.returncode or 'FAILED (' in log or 'OK' not in log:
+                  print('Q15_FAULT_MODULE_FAILURE',name,log[-1800:])
+                  raise SystemExit(2)
+              report['modules'][name]={'status':'PASS','runner_returncode':0}
+              print('PASS_Q15_FAILURE_MODE_MODULE',name,flush=True)
+          report['all_passed']=True
+          out=Path(os.environ['RUNNER_TEMP'])/'q15_synthetic_fault_regression.json'
+          out.write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+          print('PASS_Q15_FAULT_SUITE',len(modules),'MODULES')
+          PY
+      - name: Upload only synthetic fault case summary, no market data
+        uses: actions/upload-artifact@v4
+        with:
+          name: q15-synthetic-fault-case-summary
+          path: ${{ runner.temp }}/q15_synthetic_fault_regression.json
+          if-no-files-found: error
+          retention-days: 7
+# This test must never be used as a substitute for 24h real host fault certification.
