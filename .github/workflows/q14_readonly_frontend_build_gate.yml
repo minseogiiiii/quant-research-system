@@ -1,0 +1,82 @@
+name: Q14 React Funnest pinned bundle integrity (READ ONLY)
+on:
+  push:
+    branches: [remediation/q14-import-order-20261122]
+    paths:
+      - '.github/workflows/q14_readonly_frontend_build_gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  frontend-immutable:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prove frozen Q7 browser source and immutable browser manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object btc_eth_terminal/frontend/src/FactorLabPanel.tsx)" = '4e2c9347dd90f2e9748eec52602ee250d228a261'
+          test "$(git hash-object btc_eth_terminal/frontend/src/main.tsx)" = 'b060ebd0e1340eaceec2ea667c6fbadeed1e0b19'
+          test "$(git hash-object btc_eth_terminal/frontend/src/unified.tsx)" = '8465ff6f97d0ddae4a63c1f88db2f0bc17481b63'
+          test "$(git hash-object btc_eth_terminal/frontend/src/style.css)" = '283a48be4a188fad484bac9d3ca9cebc61c289f5'
+          test "$(git hash-object btc_eth_terminal/frontend/v37_dist_integrity.json)" = 'e4b28a72ef15f772271236f7e047af4757fcc303'
+          test "$(git hash-object btc_eth_terminal/frontend/package-lock.json)" = 'f7e3d5cdc727a3c7f91f7b254cab90dafd7817b5'
+          echo 'PASS_Q14_UNCHANGED_FROZEN_REACT_SOURCE_HASHES'
+      - name: Install reviewed Funnest and React packages without postinstall scripts
+        working-directory: btc_eth_terminal/frontend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Type-check and rebuild pinned candidate into isolated review-only path
+        working-directory: btc_eth_terminal/frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/tsc --noEmit
+          ./node_modules/.bin/vite build --outDir .dist_q14_review
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          original=json.loads(Path('v37_dist_integrity.json').read_text())
+          root=Path('.dist_q14_review')
+          candidates={
+              p.relative_to(root).as_posix():p
+              for p in root.rglob('*') if p.is_file()
+          }
+          assert set(candidates)==set(original['files']), 'Q14_BUILD_ENTRY_SET_CHANGED'
+          for name,meta in original['files'].items():
+              contents=candidates[name].read_bytes()
+              assert len(contents)==meta['bytes'],f'Q14_BAD_BUNDLE_LENGTH:{name}'
+              assert hashlib.sha256(contents).hexdigest()==meta['sha256'],f'Q14_BAD_BUNDLE_SHA:{name}'
+          assert original['trading_enabled'] is False
+          print('PASS_Q14_EXACT_CANDIDATE_FRONTEND_BUILD_SHA',len(candidates))
+          PY
+      - name: Public contracts, explicitly report skip count without false release approval
+        working-directory: btc_eth_terminal/frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types --test tests/*.test.mjs > "$RUNNER_TEMP/q14_public_node.tap"
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+          text=(Path(os.environ['RUNNER_TEMP'])/'q14_public_node.tap').read_text()
+          metrics={}
+          for key in ('tests','pass','fail','skipped'):
+              matches=re.findall(r'(?m)^# '+key+r' (\d+)$',text)
+              assert len(matches)==1,'Q14_NODE_TAP_INCOMPLETE'
+              metrics[key]=int(matches[0])
+          assert metrics['fail']==0
+          assert metrics['tests']==metrics['pass']+metrics['skipped']
+          print('Q14_PUBLIC_NODE_CONTRACT_DIAGNOSTIC',metrics)
+          print('Q14_PRIVATE_FULL_FIXTURES_STILL_REQUIRED')
+          PY
+# No published build, no raw archive upload, no real orders.
