@@ -112,3 +112,5 @@ jobs:
 
 # Never publishes genuine market data or modifies production release assets.
 # The failing secure private-fixture gate remains a separate mandatory requirement.
+
+# Q17 revalidation: real Chromium DOM against exact shipped v36 under authenticated archive.
