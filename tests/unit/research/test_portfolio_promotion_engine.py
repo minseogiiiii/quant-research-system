@@ -177,7 +177,14 @@ def _evidence() -> tuple[CandidateEvidence, ...]:
             declared_turnover=Decimal("5"),
             declared_cost_to_gross_profit_ratio=Decimal("0.1"),
         )
-        for candidate_id, backtest_character, robustness_character, robustness_digest_character, statistical_character, statistical_digest_character in values
+        for (
+            candidate_id,
+            backtest_character,
+            robustness_character,
+            robustness_digest_character,
+            statistical_character,
+            statistical_digest_character,
+        ) in values
     )
 
 
