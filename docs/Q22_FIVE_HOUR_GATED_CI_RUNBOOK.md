@@ -15,7 +15,7 @@ summary evidence have all completed successfully.
    cannot change any of the 278 Q14 candidate Git blobs, production v36
    collector, archived v37 UI, 24h observer, or order-execution paths.
 3. The separate Q22 short preflight workflow runs Ruff, Python
-   compilation, 16 adversarial Q22 contracts, existing source/SSE/storage
+   compilation, 17 adversarial Q22 contracts, existing source/SSE/storage
    fault tests, Linux CLI contract tests, and an **actual 180-second**
    Coinbase public-source / 60-second eight-client SSE smoke plus full
    independent replay on an ephemeral Linux runner. No mock is labeled LIVE.
