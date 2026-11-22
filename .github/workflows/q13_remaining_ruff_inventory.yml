@@ -3,7 +3,9 @@ name: Q13 remaining Ruff inventory (ISOLATED REMEDIATION ONLY)
 on:
   push:
     branches: [remediation/q13-ruff-safe-autofix-20261121]
-    paths: ['.github/workflows/q13_remaining_ruff_inventory.yml']
+    paths:
+      - '.github/workflows/q13_remaining_ruff_inventory.yml'
+      - '.github/scripts/q7_partial_source_provenance.py'
   workflow_dispatch:
 
 permissions:
@@ -19,6 +21,10 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install 'ruff==0.15.22'
+      - name: Verify corrected review-only provenance helper syntax and line length
+        run: |
+          python -m py_compile .github/scripts/q7_partial_source_provenance.py
+          ruff check .github/scripts/q7_partial_source_provenance.py --select E501
       - name: Capture real residual Ruff diagnostics without modifying any source
         shell: bash
         run: |
