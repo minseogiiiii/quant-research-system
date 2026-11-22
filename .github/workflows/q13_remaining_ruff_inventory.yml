@@ -1,0 +1,61 @@
+name: Q13 remaining Ruff inventory (ISOLATED REMEDIATION ONLY)
+
+on:
+  push:
+    branches: [remediation/q13-ruff-safe-autofix-20261121]
+    paths: ['.github/workflows/q13_remaining_ruff_inventory.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'ruff==0.15.22'
+      - name: Capture real residual Ruff diagnostics without modifying any source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import collections
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          run=subprocess.run(['ruff','check','.','--output-format','json'],capture_output=True,text=True)
+          if run.returncode not in (0,1): raise RuntimeError(run.stderr[:400])
+          rows=json.loads(run.stdout)
+          rules=collections.Counter(item['code'] for item in rows)
+          files=collections.Counter(pathlib.Path(item['filename']).relative_to(pathlib.Path.cwd()).as_posix() for item in rows)
+          output=pathlib.Path(os.environ['RUNNER_TEMP'])
+          (output/'q13_remaining_ruff_issues.json').write_text(json.dumps(rows,indent=2))
+          summary={
+             'schema':'q13_remaining_ruff_inventory_v1',
+             'commit':os.environ['GITHUB_SHA'],
+             'total':len(rows),
+             'by_rule':dict(sorted(rules.items())),
+             'top_files':[{'file':path,'count':count} for path,count in files.most_common(100)],
+             'only_diagnostic':True,
+             'staging_untouched':True,
+             'production_ready':False
+          }
+          (output/'q13_remaining_ruff_summary.json').write_text(json.dumps(summary,indent=2,sort_keys=True))
+          print('Q13_REMAINING_LINT_SUMMARY',json.dumps({'total':len(rows),'top_rules':rules.most_common(6),'top_files':files.most_common(12)}))
+          PY
+      - name: Upload only Ruff diagnostics of reviewable public source
+        uses: actions/upload-artifact@v4
+        with:
+          name: q13-remediation-remaining-ruff-inventory
+          path: |
+            ${{ runner.temp }}/q13_remaining_ruff_issues.json
+            ${{ runner.temp }}/q13_remaining_ruff_summary.json
+          retention-days: 7
+          if-no-files-found: error
