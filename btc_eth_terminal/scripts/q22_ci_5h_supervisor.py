@@ -526,7 +526,7 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                 time.monotonic() - started, len(windows), fault_http,
             )
             (public / "q23_redacted_fault_receipt.json").write_text(
-                json.dumps(receipt, sort_keys=True, indent=2) + "\\n"
+                json.dumps(receipt, sort_keys=True, indent=2) + "\n"
             )
             (public / "fail_fast.json").write_text(json.dumps({
                 "schema": "q22_fail_fast_v1",
