@@ -6,6 +6,7 @@ on:
       - '.github/workflows/q7_ruff_delta_diagnostic.yml'
       - '.github/scripts/q12_ruff_compare.py'
       - '.github/scripts/test_q12_ruff_compare.py'
+      - '.github/scripts/q7_static_cost_regression.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +24,8 @@ jobs:
           python-version: '3.12'
       - name: Test diagnostic classifier before running on real repository
         run: python -m unittest discover -s .github/scripts -p 'test_q12_ruff_compare.py' -v
+      - name: Re-run pinned static cost safety regression without market fixtures
+        run: python .github/scripts/q7_static_cost_regression.py
       - name: Install the exact root-project Ruff version
         run: python -m pip install 'ruff==0.15.22'
       - name: Restore frozen R5 baseline in independent worktree
