@@ -136,7 +136,7 @@ class ThreeFaultRecovery(unittest.TestCase):
             done = [False]
             env = {
                 "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-                "SOAK_DURATION_SECONDS": "17",
+                "SOAK_DURATION_SECONDS": "35",
                 "SOAK_RAW_BUDGET_BYTES": "1000000000",
                 "SOAK_ARCHIVE_BUDGET_BYTES": "2000000000",
                 "SOAK_DISK_RESERVE_BYTES": "0",
