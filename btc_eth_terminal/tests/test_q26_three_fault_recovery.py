@@ -434,6 +434,82 @@ class ThreeFaultRecovery(unittest.TestCase):
     def test_heartbeat_only_l2_continues_with_synthetic_watchdog(self):
         self._record("HEARTBEAT_ONLY_SILENCE")
 
+    def test_without_watchdog_original_collector_never_rotates_heartbeat_only(self):
+        """Negative fixture: original any-frame watchdog cannot detect this."""
+        with tempfile.TemporaryDirectory(prefix="q26_native_gap_") as folder:
+            work = Path(folder)
+            private = work / "ws_trace.jsonl"
+            env = {
+                "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+                "SOAK_DURATION_SECONDS": "35",
+                "SOAK_RAW_BUDGET_BYTES": "1000000000",
+                "SOAK_ARCHIVE_BUDGET_BYTES": "2000000000",
+                "SOAK_DISK_RESERVE_BYTES": "0",
+                "SOAK_CHUNK_LIMIT_BYTES": "8000000",
+                "SOAK_TEST_FIXTURE": "1",
+                "SOAK_TEST_DISCONNECT_AFTER_MESSAGES": "0",
+                "Q26_TEST_SCENARIO": "HEARTBEAT_ONLY_SILENCE",
+                "Q24_WS_DIAG_PRIVATE_PATH": str(private),
+            }
+            proc = subprocess.Popen([
+                shutil.which("node"), "--import",
+                str(ROOT / "tests/q26_three_fault_coinbase_mock.mjs"),
+                "--import", str(ROOT / "scripts/q24_ws_close_probe.mjs"),
+                str(ROOT / "scripts/btc_eth_multiday_v20.mjs"),
+            ], cwd=work, env=env, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+            try:
+                # The mock continues valid L2 every 450 ms while no new
+                # heartbeat is delivered. Seven seconds is greater than
+                # the engine's separate 5s health threshold but less than
+                # the Node collector's 12s any-frame-idle watchdog.
+                time.sleep(7.2)
+                self.assertIsNone(
+                    proc.poll(), "Collector exited without native timeout"
+                )
+            finally:
+                if proc.poll() is None:
+                    proc.send_signal(signal.SIGTERM)
+                output, errors = proc.communicate(timeout=8)
+                del output, errors
+            source = next(
+                (work / "soak_evidence").glob("coinbase_btc_eth_soak_*")
+            )
+            manifest = json.loads((source / "manifest.json").read_bytes())
+            self.assertTrue(manifest["synthetic_fixture"])
+            self.assertFalse(manifest["ready_for_research"])
+            self.assertEqual(len(manifest["connections"]), 1)
+            self.assertEqual(manifest["total_reconnects"], 0)
+            self.assertEqual(manifest["faults"], [])
+            self.assertEqual(manifest["connections"][0]["heartbeat_count"], 2)
+            self.assertGreater(manifest["connections"][0]["messages"], 12)
+            trace = read_private_trace(private)
+            # The only close occurs because the test explicitly sends SIGTERM.
+            closes = [x for x in trace if x["event"] == "SOCKET_CLOSE"]
+            self.assertEqual(len(closes), 1)
+            self.assertTrue(closes[0]["local_close_requested"])
+            folder = os.environ.get("Q26_PUBLIC_SYNTHETIC_RECEIPTS")
+            if folder:
+                path = Path(folder) / (
+                    "q26_limitation_heartbeat_only_no_native_watchdog.json"
+                )
+                with path.open("x") as fp:
+                    json.dump({
+                        "schema": "q26_native_heartbeat_only_limitation_v1",
+                        "verdict": "EXPECTED_NEGATIVE_LIVENESS_GAP",
+                        "data_origin": "SYNTHETIC_LOCAL_WEBSOCKET_FIXTURE",
+                        "healthy_l2_continued_during_missing_heartbeat": True,
+                        "observed_heartbeat_count": 2,
+                        "observed_source_messages":
+                            manifest["connections"][0]["messages"],
+                        "native_collector_reconnects": 0,
+                        "original_heartbeat_only_watchdog_present": False,
+                        "test_terminated_collector_explicitly": True,
+                        "real_orders_enabled": False,
+                        "five_hour_certified": False,
+                    }, fp, indent=2, sort_keys=True)
+                    fp.write("\n")
+
 
 if __name__ == "__main__":
     unittest.main()
