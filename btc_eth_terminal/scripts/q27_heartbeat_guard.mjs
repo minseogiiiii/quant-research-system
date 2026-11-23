@@ -41,7 +41,7 @@ function write(event,s=null){
   socket_index:s?.index??null,
   elapsed_ms:t,
   socket_age_ms:s?Math.max(0,t-s.born):null,
-  last_heartbeat_age_ms:s?.lastHeartbeat===null?null:
+  last_heartbeat_age_ms:s==null||s.lastHeartbeat===null?null:
    Math.max(0,t-s.lastHeartbeat),
   heartbeat_count:s?.heartbeatCount??0,
   other_message_count:s?.otherMessageCount??0,
