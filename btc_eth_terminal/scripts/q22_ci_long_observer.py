@@ -292,7 +292,7 @@ def run(work: Path, seconds: int, port: int) -> int:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--workdir", type=Path, required=True)
-    p.add_argument("--duration", type=int, choices=[SMOKE_DURATION, CI_DURATION],
+    p.add_argument("--duration", type=int, choices=[SMOKE_DURATION, 1800, CI_DURATION],
                    required=True)
     p.add_argument("--port", type=int, default=8766)
     p.add_argument("--execute-public-capture", action="store_true", required=True)
