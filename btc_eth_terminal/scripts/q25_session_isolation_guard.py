@@ -90,8 +90,9 @@ class SourceEpochIsolatedEngine(LiveMarketEngine):
                     and self.last_l2[p] is None
                     and self.last_pub[p] is None
                     and self.ofi[p] == 0
-                    and not self.books[p].bids
-                    and not self.books[p].asks
+                    and not self.books[p].level["bid"]
+                    and not self.books[p].level["offer"]
+                    and not self.books[p].initialized
                     for p in PRODUCTS
                 ),
                 "q25_orders_enabled": False,
