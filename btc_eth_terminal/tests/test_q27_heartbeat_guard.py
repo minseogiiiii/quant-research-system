@@ -22,12 +22,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "backend"), str(ROOT / "scripts")]
 
+from q25_session_isolation_guard import SourceEpochIsolatedEngine  # noqa: E402
 from q27_heartbeat_receipt import (  # noqa: E402
     Q27TraceRejected,
     build_receipt,
     read_trace,
 )
-from q25_session_isolation_guard import SourceEpochIsolatedEngine  # noqa: E402
 from test_q26_three_fault_recovery import ThreeFaultRecovery  # noqa: E402
 from v36_observe_existing_collector import read_tap  # noqa: E402
 
