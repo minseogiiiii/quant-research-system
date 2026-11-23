@@ -39,7 +39,14 @@ def _nonnegative(value: object, max_value: int = 2_000_000_000) -> bool:
     return type(value) is int and 0 <= value <= max_value
 
 
-def read_trace(path: Path) -> list[dict]:
+def read_trace(
+    path: Path, *, preserve_crash_prefix: bool = False
+) -> list[dict]:
+    """Strict normal acceptance or incomplete committed-prefix forensics.
+
+    The forensic path is NEVER used as proof of source continuity.
+    Unknown fields and malformed complete records still fail closed.
+    """
     source = Path(path)
     st = source.lstat()
     if (
@@ -65,8 +72,14 @@ def read_trace(path: Path) -> list[dict]:
             raise Q27TraceRejected("PRIVATE_TRACE_CHANGED_DURING_READ")
         with os.fdopen(fd, "rb", closefd=False) as stream:
             raw = stream.read(MAX_BYTES + 1)
-        if len(raw) != st.st_size or not raw.endswith(b"\n"):
+        if len(raw) != st.st_size:
             raise Q27TraceRejected("PRIVATE_TRACE_PARTIAL_OR_MUTATED")
+        if not raw.endswith(b"\n"):
+            if not preserve_crash_prefix:
+                raise Q27TraceRejected("PRIVATE_TRACE_PARTIAL_OR_MUTATED")
+            raw = raw[:raw.rfind(b"\n") + 1]
+            if not raw:
+                raise Q27TraceRejected("NO_COMMITTED_GUARD_TRACE_EVENTS")
     finally:
         os.close(fd)
     if source.lstat().st_size != st.st_size:
@@ -148,7 +161,8 @@ def read_trace(path: Path) -> list[dict]:
         events.append(event)
     if (
         events[0]["event"] != "GUARD_START"
-        or events[-1]["event"] != "PROCESS_EXIT"
+        or not preserve_crash_prefix
+        and events[-1]["event"] != "PROCESS_EXIT"
         or not constructed
     ):
         raise Q27TraceRejected("PRIVATE_TRACE_MISSING_START_OR_EXIT")
