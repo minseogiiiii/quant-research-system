@@ -184,7 +184,18 @@ class ThreeFaultRecovery(unittest.TestCase):
             worker = None
             stream = None
             try:
-                sock, _ = listener.accept()
+                try:
+                    sock, _ = listener.accept()
+                except socket.timeout as exc:
+                    rc = proc.poll()
+                    if rc is not None and use_q27:
+                        _, stderr = proc.communicate(timeout=3)
+                        raise AssertionError(
+                            "Q27_SYNTHETIC_STARTUP_EXIT_CODE="
+                            + str(rc) + ":"
+                            + stderr.decode(errors="replace")[-1200:]
+                        ) from exc
+                    raise
                 worker = threading.Thread(
                     target=read_tap, args=(sock, engine, done), daemon=True
                 )
