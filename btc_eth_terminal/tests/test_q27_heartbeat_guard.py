@@ -220,7 +220,18 @@ class Q27OriginalCollectorContracts(unittest.TestCase):
                 stderr=subprocess.PIPE)
             reader = None
             try:
-                conn, _ = listener.accept()
+                try:
+                    conn, _ = listener.accept()
+                except socket.timeout as exc:
+                    rc = proc.poll()
+                    if rc is not None:
+                        _, stderr = proc.communicate(timeout=3)
+                        raise AssertionError(
+                            "Q27_SYNTHETIC_STARTUP_EXIT_CODE="
+                            + str(rc) + ":"
+                            + stderr.decode(errors="replace")[-1200:]
+                        ) from exc
+                    raise
                 reader = threading.Thread(
                     target=read_tap, args=(conn, engine, done), daemon=True
                 )
