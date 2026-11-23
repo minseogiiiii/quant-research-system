@@ -7,7 +7,11 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import signal
+import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -198,6 +202,83 @@ class CrashEvidenceTests(unittest.TestCase):
             "ABNORMAL_CLOSE_1006_WITHOUT_LOCAL_REQUEST",
         )
         self.assertFalse(report["network_root_cause_proven"])
+
+    def test_actual_node_sigkill_preserves_first_close_evidence(self):
+        """OS SIGKILL: Node cannot execute PROCESS_EXIT, committed prefix wins."""
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node not available")
+        project = Path(__file__).resolve().parents[1]
+        env = {
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "SOAK_TEST_FIXTURE": "1",
+            "SOAK_DURATION_SECONDS": "30",
+            "SOAK_TEST_DISCONNECT_AFTER_MESSAGES": "0",
+            "SOAK_RAW_BUDGET_BYTES": "1000000000",
+            "SOAK_ARCHIVE_BUDGET_BYTES": "2000000000",
+            "SOAK_DISK_RESERVE_BYTES": "0",
+            "SOAK_CHUNK_LIMIT_BYTES": "8000000",
+            "Q26_TEST_SCENARIO": "NETWORK_CLOSE",
+            "Q27_HEARTBEAT_GUARD_ENABLED": "1",
+            "Q24_WS_DIAG_PRIVATE_PATH": str(self.ws),
+            "Q27_HEARTBEAT_TRACE_PRIVATE": str(self.guard),
+        }
+        proc = subprocess.Popen([
+            node, "--import", str(
+                project / "tests/q26_three_fault_coinbase_mock.mjs"
+            ), "--import", str(project / "scripts/q27_heartbeat_guard.mjs"),
+            "--import", str(project / "scripts/q24_ws_close_probe.mjs"),
+            str(project / "scripts/btc_eth_multiday_v20.mjs"),
+        ], cwd=self.root, env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        try:
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                if proc.poll() is not None:
+                    _out, err = proc.communicate(timeout=2)
+                    self.fail(
+                        "Synthetic collector exited before SIGKILL: "
+                        + err.decode(errors="replace")[-700:]
+                    )
+                if self.ws.exists():
+                    try:
+                        events = read_private_trace(
+                            self.ws, preserve_crash_prefix=True
+                        )
+                        if any(
+                            e["event"] == "SOCKET_CONSTRUCTED"
+                            and e["connection_index"] == 1
+                            for e in events
+                        ):
+                            break
+                    except (Q24TraceRejected, OSError):
+                        pass
+                time.sleep(0.03)
+            else:
+                self.fail("No synthetic unexpected-close/reconnect evidence")
+            proc.kill()
+            proc.communicate(timeout=5)
+            self.assertEqual(proc.returncode, -signal.SIGKILL)
+            report = incident_receipt(self.ws, self.guard)
+            self.assertEqual(
+                report["observed_termination_class"],
+                "ABNORMAL_CLOSE_1006_WITHOUT_LOCAL_REQUEST",
+            )
+            self.assertTrue(
+                report["first_socket"]["second_socket_constructed"]
+            )
+            self.assertFalse(report["q24_process_exit_observed"])
+            self.assertFalse(report["q27_process_exit_observed"])
+            self.assertEqual(report["guard_interventions_observed"], 0)
+            self.assertGreater(report["q24_committed_events"], 4)
+            self.assertGreater(report["q27_committed_events"], 3)
+            self.assertFalse(report["source_continuity_certified"])
+            self.assertFalse(report["network_root_cause_proven"])
+            self.assertFalse(report["real_orders_enabled"])
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.communicate(timeout=5)
 
     def test_complete_normal_trace_is_still_classified_not_source_admitted(self):
         ws, guard = self.samples(guarded=False)
