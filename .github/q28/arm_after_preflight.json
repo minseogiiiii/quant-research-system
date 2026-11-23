@@ -1,0 +1,8 @@
+{
+  "schema": "q28_30m_exact_preflight_arm_v1",
+  "enabled": true,
+  "preflight_sha": "e951e585cb85c087d3b3d31e93207ac79a7bf3d7",
+  "requested_duration_seconds": 1800,
+  "read_only_source": true,
+  "real_orders_enabled": false
+}
