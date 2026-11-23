@@ -90,8 +90,10 @@ class IncidentEngine(SourceEpochIsolatedEngine):
             sanitized = reason.split(":", 1)[0]
             if sanitized not in {
                 "COLLECTOR_REPORTED_WEBSOCKET_SOURCE_GAP", "HEARTBEAT_STALE",
-                "SOURCE_ENVELOPE_REJECTED", "NO_COLLECTOR_MESSAGES_WITHIN_STALENESS_BUDGET",
-                "PRODUCT_L2_STALE_OR_CLOCK_ANOMALY", "COLLECTOR_OBSERVATION_SOCKET_CLOSED",
+                "SOURCE_ENVELOPE_REJECTED",
+                "NO_COLLECTOR_MESSAGES_WITHIN_STALENESS_BUDGET",
+                "PRODUCT_L2_STALE_OR_CLOCK_ANOMALY",
+                "COLLECTOR_OBSERVATION_SOCKET_CLOSED",
                 "SOURCE_STOPPED", "LIVE_ADMISSION_REJECTED", "SOURCE_TRANSPORT_LOST",
             }:
                 sanitized = "OTHER_REDACTED"
@@ -219,7 +221,9 @@ class ThreeFaultRecovery(unittest.TestCase):
                     self.assertEqual(status, 503)
                     self.assertIsNone(body["state"])
                     self.assertEqual(
-                        request(host + "/api/v36/candles?product=" + product)[1]["rows"],
+                        request(
+                            host + "/api/v36/candles?product=" + product
+                        )[1]["rows"],
                         [],
                     )
                 old_state = (
