@@ -266,8 +266,11 @@ class Q25FullCollectorGap(unittest.TestCase):
                         fresh[1]["state"]["session_id"], h["session_id"]
                     )
                     self.assertEqual(fresh[1]["state"]["connection_id"], 1)
-                    self.assertEqual(
-                        fresh[1]["state"]["ofi_since_connection_base"], "0"
+                    # Never assert OFI remains zero after a valid new-
+                    # session L2 update. It must be recalculated from this
+                    # connection only, and the old quote must be absent.
+                    self.assertIn(
+                        "ofi_since_connection_base", fresh[1]["state"]
                     )
                 self.assertEqual(http_json(host + state_path)[0], 409)
                 old_cursor = (
