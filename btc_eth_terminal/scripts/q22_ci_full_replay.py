@@ -222,7 +222,7 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--private-workdir", type=Path, required=True)
     p.add_argument("--output-summary", type=Path, required=True)
-    p.add_argument("--duration", type=int, choices=[180, 18000], default=18000)
+    p.add_argument("--duration", type=int, choices=[180, 1800, 18000], default=18000)
     args = p.parse_args(argv)
     try:
         result = audit(args.private_workdir, args.duration)
