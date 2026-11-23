@@ -186,7 +186,7 @@ class ThreeFaultRecovery(unittest.TestCase):
             try:
                 try:
                     sock, _ = listener.accept()
-                except socket.timeout as exc:
+                except TimeoutError as exc:
                     rc = proc.poll()
                     if rc is not None and use_q27:
                         _, stderr = proc.communicate(timeout=3)
