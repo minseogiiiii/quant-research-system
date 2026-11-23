@@ -225,6 +225,17 @@ def record_sample(work: Path, observer_pid: int, known_child: int | None,
     source = check_private_health(
         health, metrics, previous, health_http, metrics_http
     )
+    # Q25 CI-only enforcement. The live market gate remains strictly
+    # single-connection and zero-gap; the new guard does not authorize
+    # resumed sessions or change any release/trading policy.
+    q25_enabled = os.environ.get("Q25_SESSION_GUARD_ENABLED") == "1"
+    if q25_enabled and (
+        health.get("q25_isolation_schema") != "q25_source_epoch_isolation_v1"
+        or type(health.get("q25_revocations_total")) is not int
+        or health["q25_revocations_total"] != 0
+        or health.get("q25_orders_enabled") is not False
+    ):
+        raise Q22Rejected("Q25_SOURCE_EPOCH_GUARD_NOT_VERIFIED")
     child = child_process(observer_pid)
     if known_child is not None and child != known_child:
         raise Q22Rejected("COLLECTOR_RESTART_NOT_CONTINUOUS")
@@ -250,6 +261,7 @@ def record_sample(work: Path, observer_pid: int, known_child: int | None,
         "cpu_ticks_total": sum(p["cpu_ticks"] for p in proc),
         "disk_free_bytes": free,
         "trading_enabled": False,
+        "q25_epoch_guard_verified": q25_enabled,
     }, child
 
 
@@ -313,6 +325,9 @@ def evaluate_monitoring(samples: list[dict], seconds: int,
         "max_source_age_ms": max(x["source"]["staleness_ms"] for x in samples),
         "source_session_stable": True,
         "collector_pid_stable": True,
+        "q25_epoch_guard_verified": all(
+            x.get("q25_epoch_guard_verified") is True for x in samples
+        ),
         "windows_passed": len(windows),
         "sse_total_states": sum(x["total_states"] for x in windows),
         "real_orders_enabled": False,

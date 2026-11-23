@@ -25,6 +25,7 @@ from threading import Thread
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+from q25_session_isolation_guard import SourceEpochIsolatedEngine  # noqa: E402
 from v36_observe_existing_collector import (  # noqa: E402
     COLLECTOR,
     LiveMarketEngine,
@@ -138,7 +139,13 @@ def run(work: Path, seconds: int, port: int) -> int:
     os.chmod(tap, 0o600)
     listener.listen(1)
     listener.settimeout(2.0)
-    engine = LiveMarketEngine(
+    guard_flag = os.environ.get("Q25_SESSION_GUARD_ENABLED")
+    if guard_flag not in (None, "1"):
+        raise RuntimeError("Q25_SESSION_GUARD_FLAG_MUST_BE_EXPLICIT")
+    engine_type = (
+        SourceEpochIsolatedEngine if guard_flag == "1" else LiveMarketEngine
+    )
+    engine = engine_type(
         mode="LIVE_SOURCE", collector_runtime_verified=True,
         collector_script_sha256=script_hash,
     )
