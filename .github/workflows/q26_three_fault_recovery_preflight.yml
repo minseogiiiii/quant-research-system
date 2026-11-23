@@ -167,20 +167,27 @@ jobs:
           root=Path(sys.argv[1])
           expected={
              'network_close','sequence_gap',
-             'all_feed_silence','heartbeat_only_silence'
+             'all_feed_silence','heartbeat_only_silence',
+             'limitation_heartbeat_only_no_native_watchdog'
           }
           actual={p.stem.removeprefix('q26_') for p in root.glob('q26_*.json')}
           assert actual==expected, 'MISSING_Q26_FAULT_RECEIPT:'+str(expected-actual)
           for f in root.glob('q26_*.json'):
               x=json.loads(f.read_text())
-              assert x['verdict']=='PASS_SYNTHETIC_ONLY'
-              assert x['fresh_epoch_connection_id']==1
-              assert x['first_source_session_revoked'] is True
-              assert x['prior_sse_resync_required'] is True
-              assert x['partial_resnapshot_hidden'] is True
+              if x['verdict']=='EXPECTED_NEGATIVE_LIVENESS_GAP':
+                  assert x['original_heartbeat_only_watchdog_present'] is False
+                  assert x['healthy_l2_continued_during_missing_heartbeat'] is True
+                  assert x['native_collector_reconnects']==0
+                  assert x['test_terminated_collector_explicitly'] is True
+              else:
+                  assert x['verdict']=='PASS_SYNTHETIC_ONLY'
+                  assert x['fresh_epoch_connection_id']==1
+                  assert x['first_source_session_revoked'] is True
+                  assert x['prior_sse_resync_required'] is True
+                  assert x['partial_resnapshot_hidden'] is True
               assert x['real_orders_enabled'] is False
               assert x['five_hour_certified'] is False
-          print('PASS_Q26_FOUR_SYNTHETIC_FAULT_RECEIPTS_NO_ORDERS')
+          print('PASS_Q26_FOUR_SYNTHETIC_RECOVERIES_AND_NATIVE_HEARTBEAT_LIMITATION_NO_ORDERS')
           PY
           python -m unittest discover -s btc_eth_terminal/tests \
             -p 'test_v36_2_transport_gap.py' -v
