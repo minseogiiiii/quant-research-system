@@ -153,7 +153,7 @@ class Q27PrivacyContracts(unittest.TestCase):
             self.assertNotIn(b"invalid choice", out.stderr)
             self.assertIn(
                 b"Q22_CI_SOURCE_POLICY_OR_DISK_PREFLIGHT_FAILED",
-                out.stderr,
+                out.stdout,
             )
             self.assertFalse(source.exists())
 
