@@ -134,6 +134,29 @@ class Q27PrivacyContracts(unittest.TestCase):
         with self.assertRaises(Q27TraceRejected):
             read_trace(self.path)
 
+    def test_30m_observer_cli_parser_accepts_then_fails_without_opt_in(self):
+        """The 1800s opt-in must reach policy gate, not argparse failure."""
+        with tempfile.TemporaryDirectory(prefix="q27_30m_cli_") as folder:
+            source = Path(folder) / "unarmed_private_workdir"
+            env = {
+                "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+                "PYTHONPATH": str(ROOT / "backend") + os.pathsep
+                + str(ROOT / "scripts"),
+            }
+            out = subprocess.run([
+                sys.executable,
+                str(ROOT / "scripts/q22_ci_long_observer.py"),
+                "--duration", "1800", "--port", "8788",
+                "--workdir", str(source), "--execute-public-capture",
+            ], cwd=folder, env=env, capture_output=True, timeout=6)
+            self.assertNotEqual(out.returncode, 0)
+            self.assertNotIn(b"invalid choice", out.stderr)
+            self.assertIn(
+                b"Q22_CI_SOURCE_POLICY_OR_DISK_PREFLIGHT_FAILED",
+                out.stderr,
+            )
+            self.assertFalse(source.exists())
+
     def test_opt_in_mandatory_for_preload(self):
         node = shutil.which("node")
         if not node:
