@@ -93,10 +93,10 @@ class SyntheticWebSocket{
    [20,snap('BTC-USD',100),0],
    [80,ack,1],
    [110,hb(1),2],
-   [900,snap('ETH-USD',200),3],
-   [1050,update('BTC-USD',3),4],
-   [1150,update('ETH-USD',4),5],
-   [1300,hb(2),6],
+   [1700,snap('ETH-USD',200),3],
+   [1850,update('BTC-USD',3),4],
+   [1950,update('ETH-USD',4),5],
+   [2050,hb(2),6],
   ];
   for(const [delay,data,seq] of schedule)
    this.later(delay,()=>this.message(data,seq));
