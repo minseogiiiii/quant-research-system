@@ -30,7 +30,14 @@ heartbeat channel stalls. The frozen v36 engine can fail closed after 5
 seconds, but that does NOT establish that the original collector will
 autonomously reconnect.
 
-The fourth case is therefore a **synthetic, local proof-of-concept
+An independent **negative-control test without this watchdog** verifies
+that continuous L2 traffic keeps the original Node collector on one socket,
+even after the heartbeat channel has stopped. The test explicitly terminates
+the synthetic source after >7s, observes two heartbeats, many subsequent L2
+updates and zero native reconnects, and publishes only
+`EXPECTED_NEGATIVE_LIVENESS_GAP`.
+
+The fourth recoverable case is a **synthetic, local proof-of-concept
 remediation**, loaded by an explicit test-only Node preload. It is not a
 production fix or evidence of a successful real Coinbase heartbeat-only
 recovery. Any such rollout would need separate operator review and live
@@ -68,8 +75,12 @@ safety testing.
 
 - Frozen Q14 278 source Git blobs verified against an immutable manifest.
 - Q22/Q23/Q24/Q25 regressions remain green.
-- All four Q26 scenarios pass on an actual unchanged Node collector with a
-  mock socket; their four bounded fixture summaries must all exist.
+- All four Q26 recoverable scenarios pass on an actual unchanged Node
+  collector with a mock socket; their four bounded fixture summaries must
+  exist, plus one negative-control receipt proving native heartbeat-only
+  no-reconnect behavior. Synthetic `ARCHIVE_SIMULATION` does NOT exercise
+  LIVE_SOURCE's 5-second heartbeat-staleness timekeeper; the frozen 12s
+  collector timeout is independently measured from the Q24 trace.
 - Independent **genuine public Coinbase 180-second smoke** at the same SHA:
   8 SSE clients, Q24 private close diagnostics, Q25 epoch isolation, private
   archive pinning and two independent BTC/ETH final books match.
