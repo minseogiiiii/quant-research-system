@@ -36,6 +36,7 @@ from q23_redacted_diagnostics import (  # noqa: E402
     read_private_status,
 )
 from q24_ws_diagnostic_receipt import publish_receipt  # noqa: E402
+from q27_heartbeat_receipt import publish_receipt as publish_q27_receipt  # noqa: E402
 
 MONITOR_INTERVAL = 15
 MEMORY_CEILING = 2 * 1024**3
@@ -594,6 +595,34 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                         "uninterrupted_five_hour_source_certified": False,
                     }, sort_keys=True) + "\n")
                     print("FAIL_Q24_P0A_PRIVATE_TRACE_UNVERIFIED", flush=True)
+            if os.environ.get("Q27_HEARTBEAT_GUARD_ENABLED") == "1":
+                # Q27 is explicitly opted in and always accompanied by the
+                # Q25 erase-on-gap guard and Q24 close forensic trace.
+                public_target = public / "q27_redacted_heartbeat_guard.json"
+                try:
+                    guard = publish_q27_receipt(
+                        work / "q27_private_heartbeat_guard.jsonl",
+                        public_target,
+                    )
+                    print("Q27_HEARTBEAT_GUARD_EVIDENCE " + json.dumps({
+                        "sockets": guard["opened_sockets_constructed"],
+                        "heartbeats_seen":
+                            guard["last_heartbeat_count"],
+                        "interventions": guard["interventions_total"],
+                        "schema_verified": True,
+                        "real_orders_enabled": False,
+                    }, sort_keys=True), flush=True)
+                except (OSError, ValueError) as exc:
+                    public_target.write_text(json.dumps({
+                        "schema": "q27_heartbeat_guard_public_receipt_v1",
+                        "classification": "TRACE_UNAVAILABLE_OR_REJECTED",
+                        "trace_schema_verified": False,
+                        "error_class": type(exc).__name__,
+                        "real_orders_enabled": False,
+                        "continuous_5h_proven": False,
+                    }, sort_keys=True) + "\n")
+                    print("FAIL_Q27_HEARTBEAT_TRACE_NOT_VERIFIED",
+                          flush=True)
 
 
 def main(argv=None) -> int:
