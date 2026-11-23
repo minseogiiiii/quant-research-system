@@ -130,6 +130,28 @@ class CrashEvidenceTests(unittest.TestCase):
         self.assertFalse(report["network_root_cause_proven"])
         self.assertEqual(report["guard_interventions_observed"], 0)
 
+    def test_remote_close_before_local_cleanup_is_not_a_local_cause(self):
+        """Collector cleanup after close event must not change origin label."""
+        ws, guard = self.samples(guarded=False)
+        ws.append(q24_event(
+            4, "LOCAL_CLOSE_REQUEST", code=None, local=True
+        ))
+        self.write(self.ws, ws)
+        self.write(self.guard, guard)
+        report = incident_receipt(self.ws, self.guard)
+        self.assertEqual(
+            report["observed_termination_class"],
+            "ABNORMAL_CLOSE_1006_WITHOUT_LOCAL_REQUEST",
+        )
+        first = report["first_socket"]
+        self.assertFalse(
+            first["first_socket_local_close_request_observed"]
+        )
+        self.assertTrue(
+            first["first_socket_local_cleanup_after_close_observed"]
+        )
+        self.assertFalse(report["network_root_cause_proven"])
+
     def test_socket_error_prior_to_unrequested_close_is_classified(self):
         ws, guard = self.samples(guarded=False)
         ws.insert(3, q24_event(3, "SOCKET_ERROR"))
