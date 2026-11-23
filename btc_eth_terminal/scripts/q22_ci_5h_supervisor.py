@@ -35,6 +35,7 @@ from q23_redacted_diagnostics import (  # noqa: E402
     named_failures,
     read_private_status,
 )
+from q24_ws_diagnostic_receipt import publish_receipt  # noqa: E402
 
 MONITOR_INTERVAL = 15
 MEMORY_CEILING = 2 * 1024**3
@@ -549,6 +550,35 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                 if window_log is not None and not window_log.closed:
                     window_log.close()
             _shutdown(observer, child)
+            if os.environ.get("Q24_WS_DIAG_ENABLED") == "1":
+                # The probe remains in the 0700 source workdir. Read it only
+                # after collector shutdown to include the final close/exit
+                # event. Publish only schema-validated numeric counters.
+                target = public / "q24_redacted_ws_close_receipt.json"
+                try:
+                    receipt = publish_receipt(
+                        work / "q24_private_ws_close.jsonl", target
+                    )
+                    print("Q24_P0A_TRACE_CAPTURED " + json.dumps({
+                        "event_count": receipt["events_observed"],
+                        "sockets": receipt["observed_connections"],
+                        "close_events": receipt["close_events"],
+                        "error_events": receipt["websocket_error_events"],
+                        "root_cause_proven": False,
+                        "orders_enabled": False,
+                    }, sort_keys=True), flush=True)
+                except (OSError, ValueError) as exc:
+                    # Missing or malformed telemetry MUST NOT be promoted to
+                    # evidence of transport stability.
+                    target.write_text(json.dumps({
+                        "schema": "q24_p0a_public_close_forensics_v1",
+                        "classification": "TRACE_UNAVAILABLE_OR_REJECTED",
+                        "trace_schema_verified": False,
+                        "failure_class": type(exc).__name__,
+                        "real_orders_enabled": False,
+                        "uninterrupted_five_hour_source_certified": False,
+                    }, sort_keys=True) + "\n")
+                    print("FAIL_Q24_P0A_PRIVATE_TRACE_UNVERIFIED", flush=True)
 
 
 def main(argv=None) -> int:
