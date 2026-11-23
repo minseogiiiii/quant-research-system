@@ -7,7 +7,6 @@ The native WHATWG WebSocket API does NOT expose ping/pong frames.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import stat
