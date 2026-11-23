@@ -35,6 +35,7 @@ FAULTS = {
     "NETWORK_CLOSE": ("CLOSE:1006", 1006, False),
     "SEQUENCE_GAP": ("SOURCE:Error: SEQUENCE_GAP", 1000, True),
     "ALL_FEED_SILENCE": ("STALE_FEED", 1000, True),
+    "HEARTBEAT_ONLY_SILENCE": ("CLOSE:1000", 1000, True),
 }
 MAX_RECONNECT_MS = 4000
 MAX_RECOVERY_MS = 5000
@@ -147,13 +148,24 @@ class ThreeFaultRecovery(unittest.TestCase):
                 "Q26_TEST_SCENARIO": scenario,
                 "Q24_WS_DIAG_PRIVATE_PATH": str(private),
             }
-            proc = subprocess.Popen([
+            args = [
                 shutil.which("node"), "--import",
                 str(ROOT / "tests/q26_three_fault_coinbase_mock.mjs"),
+            ]
+            if scenario == "HEARTBEAT_ONLY_SILENCE":
+                args.extend([
+                    "--import", str(
+                        ROOT / "tests/q26_synthetic_heartbeat_watchdog.mjs"
+                    ),
+                ])
+            args.extend([
                 "--import", str(ROOT / "scripts/q24_ws_close_probe.mjs"),
                 str(ROOT / "scripts/btc_eth_multiday_v20.mjs"),
-            ], cwd=work, env=env, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
+            ])
+            proc = subprocess.Popen(
+                args, cwd=work, env=env, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
             worker = None
             stream = None
             try:
@@ -277,7 +289,14 @@ class ThreeFaultRecovery(unittest.TestCase):
                 server.server_close()
                 http_thread.join(timeout=4)
                 listener.close()
-                # Neither stdout nor stderr is ever put into a public receipt.
+                # Exactly one synthetic watchdog marker is required for
+                # heartbeat-only source silence, NEVER for other failures.
+                self.assertEqual(
+                    b"Q26_SYNTHETIC_HEARTBEAT_WATCHDOG_INTERVENED"
+                    in output,
+                    scenario == "HEARTBEAT_ONLY_SILENCE",
+                )
+                # Neither process log is ever copied to public receipts.
                 del output, errors
             self.assertFalse(worker and worker.is_alive())
             base = next(
@@ -339,6 +358,8 @@ class ThreeFaultRecovery(unittest.TestCase):
                     "NETWORK_CLOSE": "UNEXPECTED_WS_CLOSE_1006",
                     "SEQUENCE_GAP": "SOURCE_SEQUENCE_GAP",
                     "ALL_FEED_SILENCE": "ALL_SOURCE_FRAMES_STALE_FEED",
+                    "HEARTBEAT_ONLY_SILENCE":
+                        "HEARTBEAT_ONLY_SILENCE_SYNTHETIC_WATCHDOG_CLOSE",
                 }[scenario],
                 "collector_reported_expected_class": True,
                 "first_source_session_revoked": True,
@@ -359,6 +380,11 @@ class ThreeFaultRecovery(unittest.TestCase):
                     "reconnect_delay_ms"
                 ],
                 "native_ping_pong_observed": False,
+                "heartbeat_only_watchdog_synthetic": (
+                    scenario == "HEARTBEAT_ONLY_SILENCE"
+                ),
+                "original_collector_native_heartbeat_only_reconnect_proven":
+                    False,
                 "real_orders_enabled": False,
                 "five_hour_certified": False,
             }
@@ -387,6 +413,9 @@ class ThreeFaultRecovery(unittest.TestCase):
 
     def test_all_feed_heartbeat_silence_reconnect_after_native_timeout(self):
         self._record("ALL_FEED_SILENCE")
+
+    def test_heartbeat_only_l2_continues_with_synthetic_watchdog(self):
+        self._record("HEARTBEAT_ONLY_SILENCE")
 
 
 if __name__ == "__main__":
