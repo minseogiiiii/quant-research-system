@@ -123,6 +123,12 @@ def run(work: Path, seconds: int, port: int) -> int:
         raise RuntimeError("Q22_NODE_NOT_INSTALLED")
     script_hash = sha256(COLLECTOR.read_bytes()).hexdigest()
     work.mkdir(mode=0o700)
+    q24_enabled = os.environ.get("Q24_WS_DIAG_ENABLED") == "1"
+    if os.environ.get("Q24_WS_DIAG_ENABLED") not in (None, "1"):
+        raise RuntimeError("Q24_WS_DIAG_FLAG_MUST_BE_EXPLICIT")
+    q24_preload = ROOT / "scripts/q24_ws_close_probe.mjs"
+    if q24_enabled and not q24_preload.is_file():
+        raise RuntimeError("Q24_PRIVATE_DIAGNOSTIC_PRELOAD_MISSING")
     tap = work / "v36_observer.sock"
     monitor = work / "v36_monitor.sock"
     if max(len(os.fsencode(p)) for p in (tap, monitor)) > 100:
@@ -153,6 +159,14 @@ def run(work: Path, seconds: int, port: int) -> int:
         "SOAK_TEST_DISCONNECT_AFTER_MESSAGES": "0",
         "V36_LIVE_TAP_SOCKET": str(tap),
     }
+    if q24_enabled:
+        env["Q24_WS_DIAG_PRIVATE_PATH"] = str(
+            work.resolve() / "q24_private_ws_close.jsonl"
+        )
+    node_args = [shutil.which("node")]
+    if q24_enabled:
+        node_args.extend(["--import", str(q24_preload)])
+    node_args.append(str(COLLECTOR))
     done = [False]
     proc = None
     worker = None
@@ -164,7 +178,7 @@ def run(work: Path, seconds: int, port: int) -> int:
             (work / "collector_stderr.log").open("xb") as stderr,
         ):
             proc = subprocess.Popen(
-                [shutil.which("node"), str(COLLECTOR)],
+                node_args,
                 cwd=work, env=env, stdout=stdout, stderr=stderr,
                 start_new_session=True,
             )
