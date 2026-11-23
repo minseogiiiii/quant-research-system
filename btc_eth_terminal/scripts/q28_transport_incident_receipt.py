@@ -88,13 +88,28 @@ def _observed_class(ws: list[dict], guard: list[dict]) -> tuple[str, dict]:
         e for e in ws
         if e["event"] == "SOCKET_CLOSE" and e["connection_index"] == 0
     ), None)
+    # The original collector invokes ws.close() in its cleanup AFTER
+    # receiving an unexpected close, even when the peer/transport went away
+    # first. The first-close event sequence, not the eventual local-close
+    # flag, establishes which event came first.
+    close_seq = first_close["seq"] if first_close is not None else None
     errors = [
         e for e in ws
-        if e["event"] == "SOCKET_ERROR" and e["connection_index"] == 0
+        if e["event"] == "SOCKET_ERROR"
+        and e["connection_index"] == 0
+        and (close_seq is None or e["seq"] < close_seq)
     ]
     local = any(
         e["event"] == "LOCAL_CLOSE_REQUEST"
-        and e["connection_index"] == 0 for e in ws
+        and e["connection_index"] == 0
+        and (close_seq is None or e["seq"] < close_seq)
+        for e in ws
+    )
+    cleanup_after_first_close = any(
+        e["event"] == "LOCAL_CLOSE_REQUEST"
+        and e["connection_index"] == 0
+        and close_seq is not None and e["seq"] > close_seq
+        for e in ws
     )
     timeouts = [
         e for e in guard if e["socket_index"] == 0 and e["event"] in (
@@ -132,6 +147,8 @@ def _observed_class(ws: list[dict], guard: list[dict]) -> tuple[str, dict]:
             first_close["was_clean"] if first_close else None
         ),
         "first_socket_local_close_request_observed": local,
+        "first_socket_local_cleanup_after_close_observed":
+            cleanup_after_first_close,
         "first_socket_error_events": len(errors),
         "first_socket_q27_timeout_events": len(timeouts),
         "first_socket_q27_timeout_class": (
