@@ -37,6 +37,7 @@ from q23_redacted_diagnostics import (  # noqa: E402
 )
 from q24_ws_diagnostic_receipt import publish_receipt  # noqa: E402
 from q27_heartbeat_receipt import publish_receipt as publish_q27_receipt  # noqa: E402
+from q28_transport_incident_receipt import publish_incident  # noqa: E402
 
 MONITOR_INTERVAL = 15
 MEMORY_CEILING = 2 * 1024**3
@@ -389,6 +390,7 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
     preflight = None
     was_ready = False
     last_progress_slot = 0
+    failfast = False
     # Private logs live OUTSIDE the public summary artifact directory.
     with (
         Path(str(work) + ".observer_stdout.log").open("x") as out,
@@ -533,6 +535,7 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                                 if k != "sse_windows"}, sort_keys=True), flush=True)
             return result
         except (Q22Rejected, OSError, ValueError, KeyError) as exc:
+            failfast = True
             # Read the Unix operator even after HTTP 503, before the failure
             # handler terminates the private collector. Publish only fixed
             # enums, salted-by-origin session digest and numeric counters.
@@ -639,6 +642,25 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                     }, sort_keys=True) + "\n")
                     print("FAIL_Q27_HEARTBEAT_TRACE_NOT_VERIFIED",
                           flush=True)
+            if os.environ.get("Q28_FORENSICS_ENABLED") == "1":
+                # Evidence is collected AFTER termination. The normal Q24
+                # and Q27 acceptance still requires fully clean telemetry.
+                # On failure, Q28 may preserve only schema-validated,
+                # newline-committed prefixes. Never use for admission.
+                target = public / "q28_redacted_incident_receipt.json"
+                result = publish_incident(
+                    work / "q24_private_ws_close.jsonl",
+                    work / "q27_private_heartbeat_guard.jsonl",
+                    target,
+                    collector_failed=failfast,
+                )
+                print("Q28_TERMINATION_CLASSIFICATION " + json.dumps({
+                    "event_class": result["observed_termination_class"],
+                    "q24_committed": result["q24_committed_events"],
+                    "q27_committed": result["q27_committed_events"],
+                    "source_certified": False,
+                    "real_orders_enabled": False,
+                }, sort_keys=True), flush=True)
 
 
 def main(argv=None) -> int:
