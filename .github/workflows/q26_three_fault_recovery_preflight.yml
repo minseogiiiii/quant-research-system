@@ -170,7 +170,10 @@ jobs:
              'all_feed_silence','heartbeat_only_silence',
              'limitation_heartbeat_only_no_native_watchdog'
           }
-          actual={p.stem.removeprefix('q26_') for p in root.glob('q26_*.json')}
+          actual={
+              p.stem.removeprefix('q26_').removesuffix('_synthetic')
+              for p in root.glob('q26_*.json')
+          }
           assert actual==expected, 'MISSING_Q26_FAULT_RECEIPT:'+str(expected-actual)
           for f in root.glob('q26_*.json'):
               x=json.loads(f.read_text())
