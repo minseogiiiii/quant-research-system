@@ -404,7 +404,29 @@ class ThreeFaultRecovery(unittest.TestCase):
                 self.assertEqual(q27["close_failure_events"], 0)
                 self.assertGreater(q27["last_nonheartbeat_message_count"], 0)
                 self.assertFalse(q27["real_orders_enabled"])
+            q28 = None
+            if use_q27:
+                from q28_transport_incident_receipt import incident_receipt
+                q28 = incident_receipt(
+                    private, work / "private_q27_guard.jsonl",
+                    collector_failed=True,
+                )
+                self.assertEqual(
+                    q28["observed_termination_class"],
+                    "LOCAL_Q27_HEARTBEAT_GUARD_CLOSE_OBSERVED",
+                )
+                self.assertTrue(q28["first_socket"][
+                    "first_socket_local_close_request_observed"
+                ])
+                self.assertEqual(q28["guard_interventions_observed"], 1)
+                self.assertGreater(q28["q24_committed_events"], 1)
+                self.assertGreater(q28["q27_committed_events"], 1)
+                self.assertFalse(q28["source_continuity_certified"])
             return {
+                "q28_crash_resilient_first_close_class": (
+                    q28["observed_termination_class"] if q28 else None
+                ),
+                "q28_prior_source_continuity_certified": False,
                 "scenario": scenario,
                 "q27_real_source_compatible_preload_verified_synthetically":
                     q27 is not None,
