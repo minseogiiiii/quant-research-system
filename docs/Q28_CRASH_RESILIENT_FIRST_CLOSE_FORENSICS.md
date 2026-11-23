@@ -48,6 +48,15 @@ Q27 heartbeat policy, Q23 5-hour arming or real-order capability.
   into a narrow enumerated **observed** classification. It never
   treats close code 1006 as a peer-sent code or assumes the exchange
   caused a connection interruption.
+- **Event-order correction discovered in actual OS SIGKILL testing:** the
+  unchanged collector's `fail('CLOSE:1006')` handler calls `ws.close()`
+  to clean up after the remote-style close event was already emitted.
+  Q24 therefore also sees a local close request; interpreting its
+  eventual boolean as the ORIGINAL close cause was wrong. Q28 now checks
+  the strictly validated `seq` ordering. A local close request
+  **after** `SOCKET_CLOSE` is classified as cleanup, not a watchdog
+  intervention or evidence of local original causality. This is covered
+  by a dedicated synthetic negative test and a real OS SIGKILL test.
 - Strict failure scenario: source gap always remains a FAIL. Even if
   crash-prefix diagnostics parse, `source_continuity_certified=false`,
   `network_root_cause_proven=false` and `real_orders_enabled=false`.
