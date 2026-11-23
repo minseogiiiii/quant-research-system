@@ -1,0 +1,214 @@
+name: Q28 30-minute close-cause forensics after exact successful 180s
+on:
+  push:
+    branches: [p0/q28-durable-close-forensics-20261123]
+    paths:
+      - '.github/q28/arm_after_preflight.json'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: q28-30m-once-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify-gated-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      preflight_sha: ${{ steps.gate.outputs.preflight_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - id: gate
+        name: Verify one-file single-use arm and exact prior successful Q27 source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os,pathlib,subprocess,urllib.parse,urllib.request
+          repo=os.environ['GITHUB_REPOSITORY']
+          sha=os.environ['GITHUB_SHA']
+          parent=subprocess.check_output(
+              ['git','rev-parse','HEAD^'],text=True).strip()
+          changed=set(subprocess.check_output(
+              ['git','diff','--name-only','HEAD^','HEAD'],text=True
+          ).splitlines())
+          assert changed=={'.github/q28/arm_after_preflight.json'}, (
+              'Q27_SINGLE_USE_ARM_MUST_BE_ONLY_CHANGED_PATH')
+          arm=json.loads(pathlib.Path(
+              '.github/q28/arm_after_preflight.json').read_text())
+          assert set(arm)=={
+              'schema','enabled','preflight_sha','requested_duration_seconds',
+              'read_only_source','real_orders_enabled'
+          }
+          assert arm=={
+              'schema':'q28_30m_exact_preflight_arm_v1',
+              'enabled':True,
+              'preflight_sha':parent,
+              'requested_duration_seconds':1800,
+              'read_only_source':True,
+              'real_orders_enabled':False,
+          }, 'Q27_ARM_NOT_EXACT_OR_INVALID'
+          manifest=json.loads(pathlib.Path(
+              '.github/release-evidence/q14_candidate_source_git_blobs.json'
+          ).read_bytes())
+          pins=manifest['source_git_blobs']
+          assert manifest['source_files']==278 and len(pins)==278
+          assert manifest['real_orders_enabled'] is False
+          assert manifest['release_approved'] is False
+          for file, expected in pins.items():
+              actual=subprocess.check_output(
+                  ['git','hash-object',file],text=True).strip()
+              if actual!=expected:raise SystemExit(
+                  'Q27_FROZEN_PRODUCT_HASH_MISMATCH:'+file)
+          query=urllib.parse.urlencode({
+              'branch':'p0/q28-durable-close-forensics-20261123',
+              'head_sha':parent,'per_page':20,
+          })
+          endpoint=('https://api.github.com/repos/'+repo+
+              '/actions/workflows/q28_close_forensics_preflight.yml/runs?'
+              +query)
+          req=urllib.request.Request(endpoint,headers={
+              'Authorization':'Bearer '+os.environ['GH_TOKEN'],
+              'Accept':'application/vnd.github+json',
+              'User-Agent':'q27-p0d-immutable-preflight-gate',
+          })
+          with urllib.request.urlopen(req,timeout=15) as response:
+              data=json.load(response)
+          matching=[
+              run for run in data.get('workflow_runs',[])
+              if run.get('head_sha')==parent
+              and run.get('status')=='completed'
+              and run.get('conclusion')=='success'
+              and run.get('event')=='push'
+          ]
+          assert matching, 'NO_Q28_180S_SUCCESS_AT_EXACT_PARENT_SHA'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as stream:
+              stream.write('preflight_sha='+parent+'\n')
+          print('PASS_Q28_EXACT_PARENT_180S_SUCCESS_AND_FROZEN_278',parent)
+          PY
+  guarded-30m-public-source-and-three-sse-windows:
+    needs: verify-gated-preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Independently check read-only flag, pinned source, runner disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,pathlib,subprocess,shutil
+          a=json.loads(pathlib.Path(
+              '.github/q28/arm_after_preflight.json').read_text())
+          assert a['enabled'] and a['requested_duration_seconds']==1800
+          assert a['read_only_source'] is True
+          assert a['real_orders_enabled'] is False
+          m=json.loads(pathlib.Path(
+              '.github/release-evidence/q14_candidate_source_git_blobs.json'
+          ).read_bytes())
+          for path,pin in m['source_git_blobs'].items():
+              assert subprocess.check_output(
+                  ['git','hash-object',path],text=True).strip()==pin
+          from q22_ci_long_observer import (
+              CI_DURATION,RAW_BUDGET,ARCHIVE_BUDGET,DISK_RESERVE,
+              ci_source_policy
+          )
+          free=shutil.disk_usage('/tmp').free
+          assert ci_source_policy(
+              CI_DURATION,RAW_BUDGET,ARCHIVE_BUDGET,DISK_RESERVE,free)
+          print('PASS_Q28_30M_REAL_DISK_AND_278_PINNED_SOURCE_PREFLIGHT')
+          PY
+      - name: Exactly 1800s actual Coinbase public source + guarded heartbeat + 3 real SSE windows
+        timeout-minutes: 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          PRIVATE="$RUNNER_TEMP/q28_30m_private_${GITHUB_RUN_ID}"
+          PUBLIC="$RUNNER_TEMP/q28_30m_public"
+          mkdir -m 700 -p "$PUBLIC"
+          trap 'rm -rf -- "$PRIVATE" "$PRIVATE.observer_stdout.log" "$PRIVATE.observer_stderr.log"' EXIT
+          Q27_30M_SOAK_ENABLED=1 Q27_HEARTBEAT_GUARD_ENABLED=1 \
+          Q24_WS_DIAG_ENABLED=1 Q25_SESSION_GUARD_ENABLED=1 Q28_FORENSICS_ENABLED=1 \
+            python -u btc_eth_terminal/scripts/q22_ci_5h_supervisor.py \
+              --execute-public-capture --duration 1800 --port 8788 \
+              --private-workdir "$PRIVATE" --public-summary "$PUBLIC"
+          python -u btc_eth_terminal/scripts/q22_ci_full_replay.py \
+              --duration 1800 --private-workdir "$PRIVATE" \
+              --output-summary "$PUBLIC/q28_30m_two_replay_summary.json"
+          python - "$PUBLIC" <<'PY'
+          import json,sys
+          from pathlib import Path
+          root=Path(sys.argv[1])
+          source=json.loads((root/'live_monitoring_summary.json').read_text())
+          replay=json.loads((root/'q28_30m_two_replay_summary.json').read_text())
+          q24=json.loads((root/'q24_redacted_ws_close_receipt.json').read_text())
+          q27=json.loads((root/'q27_redacted_heartbeat_guard.json').read_text())
+          q28=json.loads((root/'q28_redacted_incident_receipt.json').read_text())
+          assert source['status']=='PASS'
+          assert source['capture_target_seconds']==1800
+          assert source['sample_span_seconds']>=1700
+          assert source['source_session_stable'] is True
+          assert source['collector_pid_stable'] is True
+          assert source['q25_epoch_guard_verified'] is True
+          assert source['q27_30m_guarded_only'] is True
+          assert source['windows_passed']==3
+          assert len(source['sse_windows'])==3
+          assert all(x['status']=='PASS' for x in source['sse_windows'])
+          assert source['sse_total_states']>0
+          assert source['real_orders_enabled'] is False
+          assert replay['status']=='PASS'
+          assert replay['expected_source_seconds']==1800
+          assert replay['source_connections']==1
+          assert replay['source_reconnects']==0
+          assert replay['primary_independent_final_books_agree'] is True
+          assert replay['real_orders_enabled'] is False
+          assert q24['trace_schema_verified'] is True
+          assert q24['observed_connections']==1
+          assert q24['websocket_error_events']==0
+          assert q27['schema']=='q27_heartbeat_guard_public_receipt_v1'
+          assert q27['trace_schema_verified'] is True
+          assert q27['synthetic_fixture'] is False
+          assert q27['opened_sockets_constructed']==1
+          assert q27['sockets_with_first_heartbeat']==1
+          assert q27['interventions_total']==0
+          assert q27['close_failure_events']==0
+          assert q27['last_heartbeat_count']>0
+          assert q27['real_orders_enabled'] is False
+          assert q27['continuous_5h_proven'] is False
+          assert q28['schema']=='q28_public_termination_incident_v1'
+          assert q28['q24_trace_validation']=='COMMITTED_PREFIX_SCHEMA_VALID'
+          assert q28['q27_trace_validation']=='COMMITTED_PREFIX_SCHEMA_VALID'
+          assert q28['q24_process_exit_observed'] is True
+          assert q28['q27_process_exit_observed'] is True
+          assert q28['known_supervisor_failfast'] is False
+          assert q28['first_socket']['second_socket_constructed'] is False
+          assert q28['guard_interventions_observed']==0
+          assert q28['network_root_cause_proven'] is False
+          assert q28['real_orders_enabled'] is False
+          print('PASS_Q28_30M_THREE_WINDOWS_DUAL_REPLAY_AND_CLOSE_FORENSICS_NO_ORDERS')
+          PY
+      - name: Publish bounded, redacted summaries only; never raw archive
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q28-30m-close-cause-redacted-summary-only
+          path: ${{ runner.temp }}/q27_30m_public/*.json
+          if-no-files-found: warn
+          retention-days: 7
