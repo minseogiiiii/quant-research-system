@@ -342,8 +342,20 @@ class ThreeFaultRecovery(unittest.TestCase):
                 engine.ready_time_ns[1] - initial_incident["monotonic_ns"]
             ) // 1_000_000
             if scenario == "ALL_FEED_SILENCE":
-                # The engine's 5s heartbeat stale state precedes the original
-                # 12s collector any-message watchdog, so measure both clocks.
+                # This mock is ARCHIVE_SIMULATION, never authenticated
+                # LIVE_SOURCE. The engine's live 5s timeout is intentionally
+                # not simulated by falsifying its source proof. Instead,
+                # confirm the original collector's 12s no-frame timeout
+                # through the independent Q24 WebSocket close clock.
+                self.assertIsNotNone(
+                    first_close["last_heartbeat_age_ms"]
+                )
+                self.assertGreaterEqual(
+                    first_close["last_heartbeat_age_ms"], 12000
+                )
+                self.assertGreaterEqual(
+                    first_close["last_message_age_ms"], 12000
+                )
                 collector_gap = next(x for x in engine.incidents if (
                     x["kind"] == "COLLECTOR_REPORTED_WEBSOCKET_SOURCE_GAP"
                 ))
@@ -351,7 +363,6 @@ class ThreeFaultRecovery(unittest.TestCase):
                     engine.ready_time_ns[1] - collector_gap["monotonic_ns"]
                 ) // 1_000_000
                 self.assertLessEqual(collector_restore_ms, MAX_RECOVERY_MS)
-                self.assertGreaterEqual(recovered_ms, 6000)
             else:
                 collector_restore_ms = recovered_ms
                 self.assertLessEqual(recovered_ms, MAX_RECOVERY_MS)
@@ -383,6 +394,8 @@ class ThreeFaultRecovery(unittest.TestCase):
                 "websocket_reconnect_delay_ms": constructed[1][
                     "reconnect_delay_ms"
                 ],
+                "original_live_engine_5s_staleness_verified_by_this_fixture":
+                    False,
                 "native_ping_pong_observed": False,
                 "heartbeat_only_watchdog_synthetic": (
                     scenario == "HEARTBEAT_ONLY_SILENCE"
