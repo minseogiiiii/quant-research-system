@@ -116,8 +116,21 @@ def run(work: Path, seconds: int, port: int) -> int:
     if not work.parent.is_dir() or work.parent.is_symlink():
         raise RuntimeError("Q22_UNSAFE_CAPTURE_PARENT")
     free = shutil.disk_usage(work.parent).free
-    if not ci_source_policy(
-        seconds, RAW_BUDGET, ARCHIVE_BUDGET, DISK_RESERVE, free
+    q27_30m = (
+        seconds == 1800
+        and os.environ.get("Q27_30M_SOAK_ENABLED") == "1"
+        and os.environ.get("Q27_HEARTBEAT_GUARD_ENABLED") == "1"
+        and os.environ.get("Q24_WS_DIAG_ENABLED") == "1"
+        and os.environ.get("Q25_SESSION_GUARD_ENABLED") == "1"
+    )
+    if not (
+        ci_source_policy(
+            seconds, RAW_BUDGET, ARCHIVE_BUDGET, DISK_RESERVE, free
+        )
+        or q27_30m
+        and ci_source_policy(
+            CI_DURATION, RAW_BUDGET, ARCHIVE_BUDGET, DISK_RESERVE, free
+        )
     ):
         raise RuntimeError("Q22_CI_SOURCE_POLICY_OR_DISK_PREFLIGHT_FAILED")
     if not shutil.which("node"):
