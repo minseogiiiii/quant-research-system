@@ -222,7 +222,7 @@ class Q27OriginalCollectorContracts(unittest.TestCase):
             try:
                 try:
                     conn, _ = listener.accept()
-                except socket.timeout as exc:
+                except TimeoutError as exc:
                     rc = proc.poll()
                     if rc is not None:
                         _, stderr = proc.communicate(timeout=3)
