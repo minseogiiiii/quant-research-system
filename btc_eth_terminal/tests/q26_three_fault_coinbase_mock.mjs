@@ -9,7 +9,8 @@
  */
 const scenario=process.env.Q26_TEST_SCENARIO;
 const choices=new Set([
- 'NETWORK_CLOSE','SEQUENCE_GAP','ALL_FEED_SILENCE','HEARTBEAT_ONLY_SILENCE'
+ 'NETWORK_CLOSE','SEQUENCE_GAP','ALL_FEED_SILENCE',
+ 'HEARTBEAT_ONLY_SILENCE','NO_INITIAL_HEARTBEAT'
 ]);
 if(!choices.has(scenario)||process.env.SOAK_TEST_FIXTURE!=='1')
  throw Error('Q26_SYNTHETIC_FIXTURE_MUST_BE_EXPLICIT');
@@ -81,7 +82,13 @@ class SyntheticWebSocket{
    throw Error('UNSAFE_SYNTHETIC_SUBSCRIPTION');
   if(++this.sent!==3)return;
   const first=this.id===0;
-  const schedule=first?[
+  const schedule=first&&scenario==='NO_INITIAL_HEARTBEAT'?[
+   [20,snap('BTC-USD',100),0],
+   [45,snap('ETH-USD',200),1],
+   [70,ack,2],
+   [110,update('BTC-USD',1),3],
+   [140,update('ETH-USD',2),4],
+  ]:first?[
    [20,snap('BTC-USD',100),0],
    [45,snap('ETH-USD',200),1],
    [70,ack,2],

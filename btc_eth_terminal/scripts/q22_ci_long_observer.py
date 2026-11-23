@@ -116,8 +116,21 @@ def run(work: Path, seconds: int, port: int) -> int:
     if not work.parent.is_dir() or work.parent.is_symlink():
         raise RuntimeError("Q22_UNSAFE_CAPTURE_PARENT")
     free = shutil.disk_usage(work.parent).free
-    if not ci_source_policy(
-        seconds, RAW_BUDGET, ARCHIVE_BUDGET, DISK_RESERVE, free
+    q27_30m = (
+        seconds == 1800
+        and os.environ.get("Q27_30M_SOAK_ENABLED") == "1"
+        and os.environ.get("Q27_HEARTBEAT_GUARD_ENABLED") == "1"
+        and os.environ.get("Q24_WS_DIAG_ENABLED") == "1"
+        and os.environ.get("Q25_SESSION_GUARD_ENABLED") == "1"
+    )
+    if not (
+        ci_source_policy(
+            seconds, RAW_BUDGET, ARCHIVE_BUDGET, DISK_RESERVE, free
+        )
+        or q27_30m
+        and ci_source_policy(
+            CI_DURATION, RAW_BUDGET, ARCHIVE_BUDGET, DISK_RESERVE, free
+        )
     ):
         raise RuntimeError("Q22_CI_SOURCE_POLICY_OR_DISK_PREFLIGHT_FAILED")
     if not shutil.which("node"):
@@ -128,6 +141,13 @@ def run(work: Path, seconds: int, port: int) -> int:
     if os.environ.get("Q24_WS_DIAG_ENABLED") not in (None, "1"):
         raise RuntimeError("Q24_WS_DIAG_FLAG_MUST_BE_EXPLICIT")
     q24_preload = ROOT / "scripts/q24_ws_close_probe.mjs"
+    q27_flag = os.environ.get("Q27_HEARTBEAT_GUARD_ENABLED")
+    if q27_flag not in (None, "1"):
+        raise RuntimeError("Q27_GUARD_FLAG_MUST_BE_EXPLICIT")
+    q27_enabled = q27_flag == "1"
+    q27_preload = ROOT / "scripts/q27_heartbeat_guard.mjs"
+    if q27_enabled and (not q24_enabled or not q27_preload.is_file()):
+        raise RuntimeError("Q27_REQUIRES_Q24_FORENSIC_AND_GUARD_PRELOAD")
     if q24_enabled and not q24_preload.is_file():
         raise RuntimeError("Q24_PRIVATE_DIAGNOSTIC_PRELOAD_MISSING")
     tap = work / "v36_observer.sock"
@@ -142,6 +162,8 @@ def run(work: Path, seconds: int, port: int) -> int:
     guard_flag = os.environ.get("Q25_SESSION_GUARD_ENABLED")
     if guard_flag not in (None, "1"):
         raise RuntimeError("Q25_SESSION_GUARD_FLAG_MUST_BE_EXPLICIT")
+    if q27_enabled and guard_flag != "1":
+        raise RuntimeError("Q27_REQUIRES_Q25_SOURCE_EPOCH_ISOLATION")
     engine_type = (
         SourceEpochIsolatedEngine if guard_flag == "1" else LiveMarketEngine
     )
@@ -170,7 +192,14 @@ def run(work: Path, seconds: int, port: int) -> int:
         env["Q24_WS_DIAG_PRIVATE_PATH"] = str(
             work.resolve() / "q24_private_ws_close.jsonl"
         )
+    if q27_enabled:
+        env["Q27_HEARTBEAT_GUARD_ENABLED"] = "1"
+        env["Q27_HEARTBEAT_TRACE_PRIVATE"] = str(
+            work.resolve() / "q27_private_heartbeat_guard.jsonl"
+        )
     node_args = [shutil.which("node")]
+    if q27_enabled:
+        node_args.extend(["--import", str(q27_preload)])
     if q24_enabled:
         node_args.extend(["--import", str(q24_preload)])
     node_args.append(str(COLLECTOR))
@@ -263,7 +292,7 @@ def run(work: Path, seconds: int, port: int) -> int:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--workdir", type=Path, required=True)
-    p.add_argument("--duration", type=int, choices=[SMOKE_DURATION, CI_DURATION],
+    p.add_argument("--duration", type=int, choices=[SMOKE_DURATION, 1800, CI_DURATION],
                    required=True)
     p.add_argument("--port", type=int, default=8766)
     p.add_argument("--execute-public-capture", action="store_true", required=True)

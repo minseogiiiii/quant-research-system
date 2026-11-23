@@ -36,6 +36,7 @@ from q23_redacted_diagnostics import (  # noqa: E402
     read_private_status,
 )
 from q24_ws_diagnostic_receipt import publish_receipt  # noqa: E402
+from q27_heartbeat_receipt import publish_receipt as publish_q27_receipt  # noqa: E402
 
 MONITOR_INTERVAL = 15
 MEMORY_CEILING = 2 * 1024**3
@@ -328,6 +329,10 @@ def evaluate_monitoring(samples: list[dict], seconds: int,
         "q25_epoch_guard_verified": all(
             x.get("q25_epoch_guard_verified") is True for x in samples
         ),
+        "q27_30m_guarded_only": (
+            os.environ.get("Q27_30M_SOAK_ENABLED") == "1"
+            and os.environ.get("Q27_HEARTBEAT_GUARD_ENABLED") == "1"
+        ),
         "windows_passed": len(windows),
         "sse_total_states": sum(x["total_states"] for x in windows),
         "real_orders_enabled": False,
@@ -348,18 +353,28 @@ def _shutdown(observer: subprocess.Popen, collector: int | None):
 
 
 def run(work: Path, public: Path, seconds: int, port: int) -> dict:
-    if seconds not in (CI_DURATION, SMOKE_DURATION):
+    guarded_30m = (
+        seconds == 1800
+        and os.environ.get("Q27_30M_SOAK_ENABLED") == "1"
+        and os.environ.get("Q27_HEARTBEAT_GUARD_ENABLED") == "1"
+        and os.environ.get("Q24_WS_DIAG_ENABLED") == "1"
+        and os.environ.get("Q25_SESSION_GUARD_ENABLED") == "1"
+    )
+    if seconds not in (CI_DURATION, SMOKE_DURATION) and not guarded_30m:
         raise Q22Rejected("UNSUPPORTED_CI_DURATION")
     if work.exists() or work.is_symlink():
         raise Q22Rejected("CI_CAPTURE_WORKDIR_MUST_BE_NEW")
     if not public.is_dir() or public.is_symlink():
         raise Q22Rejected("CI_PUBLIC_SUMMARY_DIRECTORY_MISSING")
     smoke = seconds == SMOKE_DURATION
-    window_count = 1 if smoke else Q22_WINDOWS
-    window_duration = 60 if smoke else Q22_WINDOW_SECONDS
-    first_window = Q22_SMOKE_FIRST_WINDOW if smoke else Q22_FIRST_WINDOW
-    period = 720 if not smoke else 120
-    preflight_time = 40 if smoke else 300
+    window_count = 1 if smoke else 3 if guarded_30m else Q22_WINDOWS
+    window_duration = 60 if smoke else 120 if guarded_30m else Q22_WINDOW_SECONDS
+    first_window = (
+        Q22_SMOKE_FIRST_WINDOW if smoke
+        else 310 if guarded_30m else Q22_FIRST_WINDOW
+    )
+    period = 120 if smoke else 500 if guarded_30m else 720
+    preflight_time = 40 if smoke else 180 if guarded_30m else 300
     interval = 5 if smoke else MONITOR_INTERVAL
     child = None
     samples = []
@@ -499,6 +514,8 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
             result = evaluate_monitoring(samples, seconds, windows, window_count)
             if seconds == CI_DURATION and result["sample_span_seconds"] < 17400:
                 raise Q22Rejected("HOST_SAMPLE_SPAN_SHORTER_THAN_FIVE_HOUR_SOURCE")
+            if guarded_30m and result["sample_span_seconds"] < 1700:
+                raise Q22Rejected("Q27_HOST_SAMPLE_SPAN_SHORTER_THAN_30M_SOURCE")
             result.update({
                 "schema": "q22_live_ci_source_sse_resource_v1",
                 "status": "PASS",
@@ -594,6 +611,34 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                         "uninterrupted_five_hour_source_certified": False,
                     }, sort_keys=True) + "\n")
                     print("FAIL_Q24_P0A_PRIVATE_TRACE_UNVERIFIED", flush=True)
+            if os.environ.get("Q27_HEARTBEAT_GUARD_ENABLED") == "1":
+                # Q27 is explicitly opted in and always accompanied by the
+                # Q25 erase-on-gap guard and Q24 close forensic trace.
+                public_target = public / "q27_redacted_heartbeat_guard.json"
+                try:
+                    guard = publish_q27_receipt(
+                        work / "q27_private_heartbeat_guard.jsonl",
+                        public_target,
+                    )
+                    print("Q27_HEARTBEAT_GUARD_EVIDENCE " + json.dumps({
+                        "sockets": guard["opened_sockets_constructed"],
+                        "heartbeats_seen":
+                            guard["last_heartbeat_count"],
+                        "interventions": guard["interventions_total"],
+                        "schema_verified": True,
+                        "real_orders_enabled": False,
+                    }, sort_keys=True), flush=True)
+                except (OSError, ValueError) as exc:
+                    public_target.write_text(json.dumps({
+                        "schema": "q27_heartbeat_guard_public_receipt_v1",
+                        "classification": "TRACE_UNAVAILABLE_OR_REJECTED",
+                        "trace_schema_verified": False,
+                        "error_class": type(exc).__name__,
+                        "real_orders_enabled": False,
+                        "continuous_5h_proven": False,
+                    }, sort_keys=True) + "\n")
+                    print("FAIL_Q27_HEARTBEAT_TRACE_NOT_VERIFIED",
+                          flush=True)
 
 
 def main(argv=None) -> int:
@@ -601,7 +646,8 @@ def main(argv=None) -> int:
     p.add_argument("--private-workdir", type=Path, required=True)
     p.add_argument("--public-summary", type=Path, required=True)
     p.add_argument("--port", type=int, default=8766)
-    p.add_argument("--duration", type=int, choices=[SMOKE_DURATION, CI_DURATION],
+    p.add_argument("--duration", type=int,
+                   choices=[SMOKE_DURATION, 1800, CI_DURATION],
                    default=CI_DURATION)
     p.add_argument("--execute-public-capture", action="store_true", required=True)
     args = p.parse_args(argv)

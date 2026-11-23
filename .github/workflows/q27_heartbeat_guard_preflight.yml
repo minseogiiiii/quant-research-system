@@ -1,0 +1,312 @@
+name: Q27 P0-D protected public heartbeat live smoke and recovery preflight
+on:
+  push:
+    branches: [p0/q27-heartbeat-guard-and-recovery-20261123]
+    paths:
+      - '.github/workflows/q22_five_hour_preflight.yml'
+      - '.github/workflows/q22_five_hour_after_q18.yml'
+      - 'btc_eth_terminal/scripts/q22_ci_long_observer.py'
+      - 'btc_eth_terminal/scripts/q22_ci_5h_supervisor.py'
+      - 'btc_eth_terminal/scripts/q22_ci_full_replay.py'
+      - 'btc_eth_terminal/tests/test_q22_ci_5h_contract.py'
+      - 'docs/Q22_FIVE_HOUR_GATED_CI_RUNBOOK.md'
+      - 'btc_eth_terminal/scripts/q23_redacted_diagnostics.py'
+      - 'btc_eth_terminal/scripts/q23_isolated_replay_worker.py'
+      - 'btc_eth_terminal/tests/test_q23_diagnostics_and_replay.py'
+      - 'docs/Q23_P0_FAILURE_REMEDIATION.md'
+      - '.github/workflows/q23_remediation_preflight.yml'
+      - '.github/workflows/q23_five_hour_after_preflight.yml'
+      - '.github/workflows/q24_p0a_close_forensics_preflight.yml'
+      - 'btc_eth_terminal/scripts/q24_ws_close_probe.mjs'
+      - 'btc_eth_terminal/scripts/q24_ws_diagnostic_receipt.py'
+      - 'btc_eth_terminal/tests/q24_ws_close_probe.test.mjs'
+      - 'btc_eth_terminal/tests/test_q24_ws_close_forensics.py'
+      - 'docs/Q24_P0A_WEBSOCKET_CLOSE_FORENSICS.md'
+      - '.github/workflows/q25_session_gap_isolation_preflight.yml'
+      - 'btc_eth_terminal/scripts/q25_session_isolation_guard.py'
+      - 'btc_eth_terminal/tests/q25_staged_reconnect_coinbase_mock.mjs'
+      - 'btc_eth_terminal/tests/test_q25_session_gap_isolation.py'
+      - 'docs/Q25_P0B_SOURCE_GAP_ISOLATION.md'
+      - '.github/workflows/q26_three_fault_recovery_preflight.yml'
+      - 'btc_eth_terminal/tests/q26_three_fault_coinbase_mock.mjs'
+      - 'btc_eth_terminal/tests/q26_synthetic_heartbeat_watchdog.mjs'
+      - 'btc_eth_terminal/tests/test_q26_three_fault_recovery.py'
+      - 'docs/Q26_P0C_THREE_FAULT_ACCEPTANCE.md'
+      - '.github/workflows/q27_heartbeat_guard_preflight.yml'
+      - 'btc_eth_terminal/scripts/q27_heartbeat_guard.mjs'
+      - 'btc_eth_terminal/scripts/q27_heartbeat_receipt.py'
+      - 'btc_eth_terminal/tests/test_q27_heartbeat_guard.py'
+      - 'docs/Q27_P0D_HEARTBEAT_GUARD_AND_30M_SOAK.md'
+      - '.github/workflows/q27_guarded_30m_after_preflight.yml'
+      - '.github/q27/arm_after_preflight.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: q27-p0d-preflight-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  preflight-contract-and-real-source-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 28
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Frozen source manifest, strict readonly diff, and storage preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,pathlib,subprocess
+          m=json.loads(pathlib.Path('.github/release-evidence/q14_candidate_source_git_blobs.json').read_bytes())
+          pins=m['source_git_blobs']
+          assert m['source_files']==278 and len(pins)==278
+          assert m['real_orders_enabled'] is False
+          assert m['release_approved'] is False and m['merge_approved'] is False
+          for p, sha in pins.items():
+              actual=subprocess.check_output(['git','hash-object',p],text=True).strip()
+              if actual!=sha:raise SystemExit('Q22_MUTATED_FROZEN_PRODUCT_SOURCE:'+p)
+          allowed={
+              'btc_eth_terminal/scripts/q22_ci_long_observer.py',
+              'btc_eth_terminal/scripts/q22_ci_5h_supervisor.py',
+              'btc_eth_terminal/scripts/q22_ci_full_replay.py',
+              'btc_eth_terminal/tests/test_q22_ci_5h_contract.py',
+              '.github/workflows/q22_five_hour_preflight.yml',
+              '.github/workflows/q22_five_hour_after_q18.yml',
+              'docs/Q22_FIVE_HOUR_GATED_CI_RUNBOOK.md',
+              '.github/q22/arm_after_q18.json',
+              'btc_eth_terminal/scripts/q23_redacted_diagnostics.py',
+              'btc_eth_terminal/scripts/q23_isolated_replay_worker.py',
+              'btc_eth_terminal/tests/test_q23_diagnostics_and_replay.py',
+              'docs/Q23_P0_FAILURE_REMEDIATION.md',
+              '.github/workflows/q23_remediation_preflight.yml',
+              '.github/workflows/q23_five_hour_after_preflight.yml',
+              '.github/q23/arm_after_q23.json',
+              '.github/workflows/q24_p0a_close_forensics_preflight.yml',
+              'btc_eth_terminal/scripts/q24_ws_close_probe.mjs',
+              'btc_eth_terminal/scripts/q24_ws_diagnostic_receipt.py',
+              'btc_eth_terminal/tests/q24_ws_close_probe.test.mjs',
+              'btc_eth_terminal/tests/test_q24_ws_close_forensics.py',
+              'docs/Q24_P0A_WEBSOCKET_CLOSE_FORENSICS.md',
+              '.github/workflows/q25_session_gap_isolation_preflight.yml',
+              'btc_eth_terminal/scripts/q25_session_isolation_guard.py',
+              'btc_eth_terminal/tests/q25_staged_reconnect_coinbase_mock.mjs',
+              'btc_eth_terminal/tests/test_q25_session_gap_isolation.py',
+              'docs/Q25_P0B_SOURCE_GAP_ISOLATION.md',
+              '.github/workflows/q26_three_fault_recovery_preflight.yml',
+              'btc_eth_terminal/tests/q26_three_fault_coinbase_mock.mjs',
+              'btc_eth_terminal/tests/q26_synthetic_heartbeat_watchdog.mjs',
+              'btc_eth_terminal/tests/test_q26_three_fault_recovery.py',
+              'docs/Q26_P0C_THREE_FAULT_ACCEPTANCE.md',
+              '.github/workflows/q27_heartbeat_guard_preflight.yml',
+              'btc_eth_terminal/scripts/q27_heartbeat_guard.mjs',
+              'btc_eth_terminal/scripts/q27_heartbeat_receipt.py',
+              'btc_eth_terminal/tests/test_q27_heartbeat_guard.py',
+              'docs/Q27_P0D_HEARTBEAT_GUARD_AND_30M_SOAK.md',
+              '.github/workflows/q27_guarded_30m_after_preflight.yml',
+              '.github/q27/arm_after_preflight.json',
+          }
+          changed=set(subprocess.check_output(
+              ['git','diff','--name-only','61fa43a8e956fc4a88d206587bc98ce4d85623f8','HEAD'],
+              text=True).splitlines())
+          assert changed<=allowed, 'Q22_UNREVIEWED_PRODUCT_DELTA:'+str(sorted(changed-allowed))
+          import shutil
+          from q22_ci_long_observer import (
+              CI_DURATION,RAW_BUDGET,ARCHIVE_BUDGET,DISK_RESERVE,ci_source_policy
+          )
+          free=shutil.disk_usage('/tmp').free
+          assert ci_source_policy(CI_DURATION,RAW_BUDGET,ARCHIVE_BUDGET,DISK_RESERVE,free), (
+              'Q22_DEFAULT_RUNNER_CANNOT_FIT_5H_ARCHIVE_BUDGET')
+          print('PASS_Q22_PINNED_278_SOURCE_AND_ACTUAL_CI_DISK_PREFLIGHT',free)
+          PY
+      - name: All Q22 to Q26 regressions, plus Q27 live-compatible synthetic guard and privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q27_heartbeat_receipt.py \
+            btc_eth_terminal/tests/test_q27_heartbeat_guard.py \
+            btc_eth_terminal/tests/test_q26_three_fault_recovery.py \
+            btc_eth_terminal/scripts/q25_session_isolation_guard.py \
+            btc_eth_terminal/tests/test_q25_session_gap_isolation.py \
+            btc_eth_terminal/scripts/q24_ws_diagnostic_receipt.py \
+            btc_eth_terminal/tests/test_q24_ws_close_forensics.py \
+            btc_eth_terminal/scripts/q22_ci_long_observer.py \
+            btc_eth_terminal/scripts/q22_ci_5h_supervisor.py \
+            btc_eth_terminal/scripts/q22_ci_full_replay.py \
+            btc_eth_terminal/scripts/q23_redacted_diagnostics.py \
+            btc_eth_terminal/scripts/q23_isolated_replay_worker.py \
+            btc_eth_terminal/tests/test_q22_ci_5h_contract.py \
+            btc_eth_terminal/tests/test_q23_diagnostics_and_replay.py
+          python -m py_compile btc_eth_terminal/scripts/q27_heartbeat_receipt.py \
+            btc_eth_terminal/tests/test_q27_heartbeat_guard.py \
+            btc_eth_terminal/tests/test_q26_three_fault_recovery.py \
+            btc_eth_terminal/scripts/q25_session_isolation_guard.py \
+            btc_eth_terminal/tests/test_q25_session_gap_isolation.py \
+            btc_eth_terminal/scripts/q24_ws_diagnostic_receipt.py \
+            btc_eth_terminal/tests/test_q24_ws_close_forensics.py \
+            btc_eth_terminal/scripts/q22_ci_long_observer.py \
+            btc_eth_terminal/scripts/q22_ci_5h_supervisor.py \
+            btc_eth_terminal/scripts/q22_ci_full_replay.py \
+            btc_eth_terminal/scripts/q23_redacted_diagnostics.py \
+            btc_eth_terminal/scripts/q23_isolated_replay_worker.py \
+            btc_eth_terminal/tests/test_q22_ci_5h_contract.py \
+            btc_eth_terminal/tests/test_q23_diagnostics_and_replay.py
+          node --check btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs
+          node --check btc_eth_terminal/scripts/q24_ws_close_probe.mjs
+          node --check btc_eth_terminal/tests/q25_staged_reconnect_coinbase_mock.mjs
+          node --check btc_eth_terminal/tests/q26_three_fault_coinbase_mock.mjs
+          node --check btc_eth_terminal/tests/q26_synthetic_heartbeat_watchdog.mjs
+          node --check btc_eth_terminal/scripts/q27_heartbeat_guard.mjs
+          node --test btc_eth_terminal/tests/q24_ws_close_probe.test.mjs
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_q22_ci_5h_contract.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_q23_diagnostics_and_replay.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_q24_ws_close_forensics.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_q25_session_gap_isolation.py' -v
+          mkdir -p "$RUNNER_TEMP/q26_synthetic_public"
+          Q26_PUBLIC_SYNTHETIC_RECEIPTS="$RUNNER_TEMP/q26_synthetic_public" \
+            python -m unittest discover -s btc_eth_terminal/tests \
+              -p 'test_q26_three_fault_recovery.py' -v
+          python - "$RUNNER_TEMP/q26_synthetic_public" <<'PY'
+          import json,sys
+          from pathlib import Path
+          root=Path(sys.argv[1])
+          expected={
+             'network_close','sequence_gap',
+             'all_feed_silence','heartbeat_only_silence',
+             'limitation_heartbeat_only_no_native_watchdog'
+          }
+          actual={
+              p.stem.removeprefix('q26_').removesuffix('_synthetic')
+              for p in root.glob('q26_*.json')
+          }
+          assert actual==expected, 'MISSING_Q26_FAULT_RECEIPT:'+str(expected-actual)
+          for f in root.glob('q26_*.json'):
+              x=json.loads(f.read_text())
+              if x['verdict']=='EXPECTED_NEGATIVE_LIVENESS_GAP':
+                  assert x['original_heartbeat_only_watchdog_present'] is False
+                  assert x['healthy_l2_continued_during_missing_heartbeat'] is True
+                  assert x['native_collector_reconnects']==0
+                  assert x['test_terminated_collector_explicitly'] is True
+              else:
+                  assert x['verdict']=='PASS_SYNTHETIC_ONLY'
+                  assert x['fresh_epoch_connection_id']==1
+                  assert x['first_source_session_revoked'] is True
+                  assert x['prior_sse_resync_required'] is True
+                  assert x['partial_resnapshot_hidden'] is True
+              assert x['real_orders_enabled'] is False
+              assert x['five_hour_certified'] is False
+          print('PASS_Q26_FOUR_SYNTHETIC_RECOVERIES_AND_NATIVE_HEARTBEAT_LIMITATION_NO_ORDERS')
+          PY
+          mkdir -p "$RUNNER_TEMP/q27_synthetic_public"
+          Q27_PUBLIC_SYNTHETIC_RECEIPTS="$RUNNER_TEMP/q27_synthetic_public" \
+            python -m unittest discover -s btc_eth_terminal/tests \
+              -p 'test_q27_heartbeat_guard.py' -v
+          python - "$RUNNER_TEMP/q27_synthetic_public" <<'PY'
+          import json,sys
+          from pathlib import Path
+          folder=Path(sys.argv[1])
+          files=list(folder.glob('*.json'))
+          expected={
+              'q27_heartbeat_only_recovery_synthetic.json',
+              'q27_initial_heartbeat_timeout_synthetic.json'
+          }
+          assert {x.name for x in files}==expected, 'Q27_MISSING_GUARD_CASE'
+          for file in files:
+              x=json.loads(file.read_text())
+              assert x['verdict']=='PASS_SYNTHETIC_ONLY'
+              assert x['real_orders_enabled'] is False
+              assert x['five_hour_certified'] is False
+          print('PASS_Q27_BOTH_REAL_COMPATIBLE_GUARD_SYNTHETIC_CASES_NO_ORDERS')
+          PY
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_v36_2_transport_gap.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_v36_3_operator_monitor.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_q21_host_witness.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_v36_2_sse_backpressure.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_v36_2_storage_faults.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_v36_3_durable_archive_gate.py' -v
+      - name: Genuine 180s Q27 heartbeat guard, 8 SSE, Q24 and Q25 plus 2 replays
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          PRIVATE="$RUNNER_TEMP/q22_smoke_$GITHUB_RUN_ID"
+          PUBLIC="$RUNNER_TEMP/q22_smoke_public"
+          mkdir -p "$PUBLIC"
+          trap 'rm -rf -- "$PRIVATE" "$PRIVATE.observer_stdout.log" "$PRIVATE.observer_stderr.log"' EXIT
+          Q24_WS_DIAG_ENABLED=1 Q25_SESSION_GUARD_ENABLED=1 Q27_HEARTBEAT_GUARD_ENABLED=1 python -u btc_eth_terminal/scripts/q22_ci_5h_supervisor.py \
+            --execute-public-capture \
+            --duration 180 --port 8786 \
+            --private-workdir "$PRIVATE" --public-summary "$PUBLIC"
+          python -u btc_eth_terminal/scripts/q22_ci_full_replay.py \
+            --duration 180 --private-workdir "$PRIVATE" \
+            --output-summary "$PUBLIC/real_180s_independent_replay.json"
+          python - "$PUBLIC" <<'PY'
+          import json,sys
+          from pathlib import Path
+          p=Path(sys.argv[1])
+          r=json.loads((p/'real_180s_independent_replay.json').read_text())
+          m=json.loads((p/'live_monitoring_summary.json').read_text())
+          assert r['status']=='PASS' and r['expected_source_seconds']==180
+          assert r['primary_independent_final_books_agree'] is True
+          assert m['status']=='PASS' and m['windows_passed']==1
+          assert m['q25_epoch_guard_verified'] is True
+          assert m['sse_total_states']>0 and m['order_execution_enabled'] is False
+          diag=json.loads((p/'q24_redacted_ws_close_receipt.json').read_text())
+          assert diag['schema']=='q24_p0a_public_close_forensics_v1'
+          assert diag['trace_schema_verified'] is True
+          assert diag['opened_connections']==1
+          assert diag['observed_connections']==1
+          assert diag['websocket_error_events']==0
+          assert diag['last_reported_heartbeat_count']>0
+          assert diag['probe_exited'] is True
+          assert diag['native_ping_pong_control_frame_observation_available'] is False
+          assert diag['root_network_cause_proven'] is False
+          assert diag['real_orders_enabled'] is False
+          q27=json.loads((p/'q27_redacted_heartbeat_guard.json').read_text())
+          assert q27['schema']=='q27_heartbeat_guard_public_receipt_v1'
+          assert q27['trace_schema_verified'] is True
+          assert q27['synthetic_fixture'] is False
+          assert q27['opened_sockets_constructed']==1
+          assert q27['sockets_with_first_heartbeat']==1
+          assert q27['interventions_total']==0
+          assert q27['first_heartbeat_timeout_events']==0
+          assert q27['established_heartbeat_stale_events']==0
+          assert q27['close_failure_events']==0
+          assert q27['collector_stop_observed'] is True
+          assert q27['last_heartbeat_count']>0
+          assert q27['last_nonheartbeat_message_count']>0
+          assert q27['native_ping_pong_control_frames_available'] is False
+          assert q27['real_orders_enabled'] is False
+          print('PASS_Q27_REAL_PUBLIC_180S_HEARTBEAT_GUARD_SAFE_DUAL_BOOK_NO_ORDERS')
+          PY
+      - name: Publish ONLY bounded source and replay JSON summaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q27-p0d-180s-real-guard-and-7-synthetic-evidence
+          path: |
+            ${{ runner.temp }}/q22_smoke_public/*.json
+            ${{ runner.temp }}/q26_synthetic_public/*.json
+            ${{ runner.temp }}/q27_synthetic_public/*.json
+          if-no-files-found: warn
+          retention-days: 7

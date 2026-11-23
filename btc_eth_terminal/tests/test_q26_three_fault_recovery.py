@@ -116,9 +116,11 @@ class ThreeFaultRecovery(unittest.TestCase):
         if not shutil.which("node"):
             raise unittest.SkipTest("Node 22 unavailable")
 
-    def run_scenario(self, scenario: str):
+    def run_scenario(self, scenario: str, *, use_q27=False):
         if scenario not in FAULTS:
             raise AssertionError("UNKNOWN_TEST_SCENARIO")
+        if use_q27 and scenario != "HEARTBEAT_ONLY_SILENCE":
+            raise AssertionError("Q27_REQUIRES_HEARTBEAT_ONLY_FAULT")
         expected_reason, expected_code, expected_local = FAULTS[scenario]
         with tempfile.TemporaryDirectory(prefix="q26_fault_") as directory:
             work = Path(directory)
@@ -154,7 +156,18 @@ class ThreeFaultRecovery(unittest.TestCase):
                 shutil.which("node"), "--import",
                 str(ROOT / "tests/q26_three_fault_coinbase_mock.mjs"),
             ]
-            if scenario == "HEARTBEAT_ONLY_SILENCE":
+            if use_q27:
+                env.update({
+                    "Q27_HEARTBEAT_GUARD_ENABLED": "1",
+                    "Q27_HEARTBEAT_TRACE_PRIVATE": str(
+                        work / "private_q27_guard.jsonl"
+                    ),
+                })
+                args.extend([
+                    "--import",
+                    str(ROOT / "scripts/q27_heartbeat_guard.mjs"),
+                ])
+            elif scenario == "HEARTBEAT_ONLY_SILENCE":
                 args.extend([
                     "--import", str(
                         ROOT / "tests/q26_synthetic_heartbeat_watchdog.mjs"
@@ -171,7 +184,18 @@ class ThreeFaultRecovery(unittest.TestCase):
             worker = None
             stream = None
             try:
-                sock, _ = listener.accept()
+                try:
+                    sock, _ = listener.accept()
+                except TimeoutError as exc:
+                    rc = proc.poll()
+                    if rc is not None and use_q27:
+                        _, stderr = proc.communicate(timeout=3)
+                        raise AssertionError(
+                            "Q27_SYNTHETIC_STARTUP_EXIT_CODE="
+                            + str(rc) + ":"
+                            + stderr.decode(errors="replace")[-1200:]
+                        ) from exc
+                    raise
                 worker = threading.Thread(
                     target=read_tap, args=(sock, engine, done), daemon=True
                 )
@@ -298,7 +322,7 @@ class ThreeFaultRecovery(unittest.TestCase):
                 self.assertEqual(
                     b"Q26_SYNTHETIC_HEARTBEAT_WATCHDOG_INTERVENED"
                     in output,
-                    scenario == "HEARTBEAT_ONLY_SILENCE",
+                    scenario == "HEARTBEAT_ONLY_SILENCE" and not use_q27,
                 )
                 # Neither process log is ever copied to public receipts.
                 del output, errors
@@ -366,8 +390,28 @@ class ThreeFaultRecovery(unittest.TestCase):
             else:
                 collector_restore_ms = recovered_ms
                 self.assertLessEqual(recovered_ms, MAX_RECOVERY_MS)
+            q27 = None
+            if use_q27:
+                from q27_heartbeat_receipt import build_receipt
+                q27 = build_receipt(work / "private_q27_guard.jsonl")
+                self.assertTrue(q27["trace_schema_verified"])
+                self.assertTrue(q27["synthetic_fixture"])
+                self.assertEqual(q27["interventions_total"], 1)
+                self.assertEqual(
+                    q27["established_heartbeat_stale_events"], 1
+                )
+                self.assertEqual(q27["first_heartbeat_timeout_events"], 0)
+                self.assertEqual(q27["close_failure_events"], 0)
+                self.assertGreater(q27["last_nonheartbeat_message_count"], 0)
+                self.assertFalse(q27["real_orders_enabled"])
             return {
                 "scenario": scenario,
+                "q27_real_source_compatible_preload_verified_synthetically":
+                    q27 is not None,
+                "q27_injected_guard_stale_events": (
+                    q27["established_heartbeat_stale_events"]
+                    if q27 else None
+                ),
                 "data_origin": "SYNTHETIC_LOCAL_WEBSOCKET_FIXTURE",
                 "observed_fault_class": {
                     "NETWORK_CLOSE": "UNEXPECTED_WS_CLOSE_1006",
@@ -398,7 +442,7 @@ class ThreeFaultRecovery(unittest.TestCase):
                     False,
                 "native_ping_pong_observed": False,
                 "heartbeat_only_watchdog_synthetic": (
-                    scenario == "HEARTBEAT_ONLY_SILENCE"
+                    scenario == "HEARTBEAT_ONLY_SILENCE" and not use_q27
                 ),
                 "original_collector_native_heartbeat_only_reconnect_proven":
                     False,
