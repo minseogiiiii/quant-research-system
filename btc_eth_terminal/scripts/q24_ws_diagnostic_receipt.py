@@ -39,7 +39,16 @@ def _optional_int(value, bound=259_200_000):
     )
 
 
-def read_private_trace(path: Path) -> list[dict]:
+def read_private_trace(
+    path: Path, *, preserve_crash_prefix: bool = False
+) -> list[dict]:
+    """Strict normal parse, or forensic-only committed-line prefix.
+
+    A signal may terminate Node before PROCESS_EXIT or during a final append.
+    In that case only complete newline-committed records are considered.
+    The forensic caller MUST label the resulting trace as incomplete and
+    cannot use it for normal source or release acceptance.
+    """
     path = Path(path)
     st = path.lstat()
     if (
@@ -65,8 +74,14 @@ def read_private_trace(path: Path) -> list[dict]:
             raise Q24TraceRejected("TRACE_REPLACED_DURING_OPEN")
         with os.fdopen(fd, "rb", closefd=False) as stream:
             raw = stream.read(MAX_TRACE_BYTES + 1)
-        if len(raw) != st.st_size or not raw.endswith(b"\n"):
+        if len(raw) != st.st_size:
             raise Q24TraceRejected("TRUNCATED_PRIVATE_WS_TRACE")
+        if not raw.endswith(b"\n"):
+            if not preserve_crash_prefix:
+                raise Q24TraceRejected("TRUNCATED_PRIVATE_WS_TRACE")
+            raw = raw[:raw.rfind(b"\n") + 1]
+            if not raw:
+                raise Q24TraceRejected("NO_COMMITTED_WS_TRACE_EVENTS")
     finally:
         os.close(fd)
     if path.lstat().st_size != st.st_size:
