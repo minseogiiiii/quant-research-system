@@ -1,0 +1,18 @@
+name: Fincept F4 observed depth contracts
+on:
+  push:
+    branches: ['integration/fincept-f4-depth-20261124']
+permissions:
+  contents: read
+jobs:
+  depth-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: btc_eth_terminal/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_f4_depth_buckets.py' -v
