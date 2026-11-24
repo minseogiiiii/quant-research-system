@@ -152,6 +152,10 @@ class Publisher:
     def _loop(self):
         while not self.stop.is_set():
             try:
+                with self.lock:
+                    revoked = self.revoked_generation
+                if revoked >= 0 and hasattr(self.route, "invalidate"):
+                    self.route.invalidate(revoked)
                 body = self.route.read()
                 # Persist transition before exposing its state to any client.
                 self.ledger.commit(body)
