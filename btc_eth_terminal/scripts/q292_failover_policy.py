@@ -69,10 +69,10 @@ class Arbiter:
             raise ValueError("FAILOVER_INVALID_SOURCE")
         self.last_ns = now_ns
         # Source observations must not be aliases of the same collector.
-        if primary is not None and secondary is not None:
-            if (primary.session == secondary.session
-                    or primary.provenance == secondary.provenance):
-                disagreement = True
+        if (primary is not None and secondary is not None
+                and (primary.session == secondary.session
+                     or primary.provenance == secondary.provenance)):
+            disagreement = True
         valid = {}
         for name, item in raw.items():
             if (disagreement or item is None or item.name != name
