@@ -1,0 +1,95 @@
+name: Q29.3 C1 gated five-hour clean dual baseline
+on:
+  push:
+    branches: ['p0/q293-c1-5h-clean-20261124']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: q293-c1-five-hour
+  cancel-in-progress: false
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm frozen source, duration and resource limits
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, pathlib, subprocess
+          m=json.loads(pathlib.Path('.github/release-evidence/q14_candidate_source_git_blobs.json').read_text())
+          assert len(m['source_git_blobs'])==278
+          assert all(m[k] is False for k in ('real_orders_enabled','release_approved','merge_approved'))
+          for p,sha in m['source_git_blobs'].items():
+              assert subprocess.check_output(['git','hash-object',p],text=True).strip()==sha,p
+          PY
+          python -m py_compile btc_eth_terminal/scripts/q293_c1_dual_18000s.py btc_eth_terminal/scripts/q293_c1_transport.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q293_c1_contract.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q293_long_contracts.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q293_b4_diagnostics.py' -v
+      - name: Verify exact B5 immutable evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python btc_eth_terminal/scripts/q293_c1_transport.py --prior --directory "$RUNNER_TEMP/c1_prior"
+  live-c1:
+    if: github.event.head_commit.message == 'Q29.3-C1: arm gated five-hour clean dual baseline'
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify immutable B5 prerequisite again on capture host
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python btc_eth_terminal/scripts/q293_c1_transport.py --prior --directory "$RUNNER_TEMP/c1_prior"
+      - name: Real clean dual source capture and independent replay
+        id: capture
+        timeout-minutes: 350
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          mkdir -m 700 "$RUNNER_TEMP/c1_public"
+          python -u btc_eth_terminal/scripts/q293_c1_dual_18000s.py --execute-real-public-c1 --workdir "$RUNNER_TEMP/c1_private" --output "$RUNNER_TEMP/c1_public/c1.json"
+          echo "digest=$(sha256sum "$RUNNER_TEMP/c1_public/c1.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: q293-c1-dual-18000s-baseline
+          path: ${{ runner.temp }}/c1_public/c1.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Exact C1 artifact roundtrip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
+          RECEIPT_SHA: ${{ steps.capture.outputs.digest }}
+        run: python btc_eth_terminal/scripts/q293_c1_transport.py --id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --receipt-sha "$RECEIPT_SHA" --directory "$RUNNER_TEMP/c1_downloaded"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: q293-c1-failure
+          path: ${{ runner.temp }}/c1_public/c1.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Delete private capture
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/c1_private"
