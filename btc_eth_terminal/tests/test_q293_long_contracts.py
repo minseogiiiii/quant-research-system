@@ -22,7 +22,8 @@ def wire_line(cid, seq, channel, events):
                       "timestamp": utc, "events": events})
     return (json.dumps({"connection_id": cid, "raw_text": raw,
                         "received_utc": utc, "local_monotonic_ns": str(seq + 1),
-                        "sha256": hashlib.sha256(raw.encode()).hexdigest()}) + "\n").encode()
+                        "sha256": hashlib.sha256(raw.encode()).hexdigest()})
+            + "\n").encode()
 
 
 def fixture(root):
@@ -73,7 +74,8 @@ class LongContracts(unittest.TestCase):
         thread.join()
         try:
             sample = process_sample(os.getpid())
-            self.assertTrue(any(pid == children[0].pid for pid, _ in sample["identity"]))
+            self.assertTrue(any(pid == children[0].pid
+                                for pid, _ in sample["identity"]))
             self.assertGreaterEqual(sample["process_count"], 2)
             self.assertGreater(sample["rss_bytes"], 0)
         finally:

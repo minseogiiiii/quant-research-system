@@ -6,6 +6,7 @@ verified to its last sealed record is not proof of a complete capture.
 from __future__ import annotations
 
 import hashlib
+import heapq
 import json
 import os
 import re
@@ -157,8 +158,6 @@ class Epoch:
                     need(len(levels) == len(shadow[side]) <= MAX_LEVELS,
                          "EPOCH_DEPTH_DIVERGENCE")
                     if len(main.heap[side]) > 3 * len(levels) + 1024:
-                        import heapq
-
                         main.heap[side] = [
                             -px if side == "bid" else px for px in levels]
                         heapq.heapify(main.heap[side])
