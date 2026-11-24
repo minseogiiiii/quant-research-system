@@ -42,7 +42,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python btc_eth_terminal/scripts/q293_c1_transport.py --prior --directory "$RUNNER_TEMP/c1_prior"
   live-c1:
-    if: github.event.head_commit.message == 'Q29.3-C1: arm gated five-hour clean dual baseline'
+    if: >-
+      github.event.head_commit.message == 'Q29.3-C1: arm gated five-hour clean dual baseline'
     needs: preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 360
