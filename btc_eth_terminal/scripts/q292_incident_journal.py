@@ -311,7 +311,7 @@ class JournalProcess:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
         fd = os.open(self.public, flags, 0o600)
         with os.fdopen(fd, "wb") as stream:
-            stream.write(canonical(result) + b"\\n")
+            stream.write(canonical(result) + b"\n")
             stream.flush()
             os.fsync(stream.fileno())
         self.result = result

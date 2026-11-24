@@ -45,3 +45,7 @@ jobs:
           set -euo pipefail
           ruff check btc_eth_terminal/scripts/q292_incident_journal.py btc_eth_terminal/tests/test_q292_incident_journal.py btc_eth_terminal/scripts/q22_ci_5h_supervisor.py
           python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_incident_journal.py' -v
+      - name: Conservative dual source selection policy (synthetic)
+        run: |
+          ruff check btc_eth_terminal/scripts/q292_failover_policy.py btc_eth_terminal/tests/test_q292_failover_policy.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_failover_policy.py' -v
