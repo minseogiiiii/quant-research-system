@@ -1,0 +1,28 @@
+name: Fincept F4 historical heatmap candidate
+on:
+  push:
+    branches: ['integration/fincept-f4-depth-20261124']
+permissions:
+  contents: read
+jobs:
+  heatmap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts --prefix btc_eth_terminal/frontend
+      - working-directory: btc_eth_terminal/frontend
+        run: |
+          npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/heatmap-compiled src/heatmap/contract.ts
+          node --test tests/heatmap.test.mjs
+          npx --no-install tsc --noEmit
+          npx --no-install vite build --config vite.heatmap.config.ts
+      - run: python -m pip install playwright==1.51.0
+      - run: python -m playwright install --with-deps chromium
+      - run: python btc_eth_terminal/scripts/f4_heatmap_browser.py
