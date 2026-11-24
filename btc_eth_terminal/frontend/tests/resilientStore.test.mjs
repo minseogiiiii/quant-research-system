@@ -54,3 +54,45 @@ test('mutable payload cannot change admitted data',()=>{
  assert.equal(s.getSnapshot().frame.states['BTC-USD'].best_bid,'100');
  assert.equal(Object.isFrozen(s.getSnapshot().frame.states['BTC-USD']),true);
 });
+
+import {ResilientGatewayClient} from './compiled/datahub/resilientClient.js';
+class FakeStream{
+ listeners=new Map();closed=false;onerror=null;
+ addEventListener(name,fn){this.listeners.set(name,fn);}
+ close(){this.closed=true;}
+ emit(name,f){this.listeners.get(name)?.({data:JSON.stringify(f),lastEventId:cursor(f)});}
+}
+const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const jsonResponse=f=>new Response(JSON.stringify(f),{headers:{'content-type':'application/json'}});
+async function until(fn){for(let i=0;i<100;i++){if(fn())return;await wait(20);}throw Error('TEST_TIMEOUT');}
+test('transport shares one stream, invalidates on resync and ignores old events',async()=>{
+ let f=frame(),streams=[],fetches=0,mono=0;
+ const client=new ResilientGatewayClient({
+   fetch:async(path)=>{assert.equal(path,'/q292/snapshot');fetches++;return jsonResponse(f);},
+   stream:path=>{assert.equal(path,'/q292/events');const x=new FakeStream();streams.push(x);return x;},
+   wall:()=>now,mono:()=>++mono});
+ try{
+   client.start();client.start();
+   await until(()=>streams.length===1);
+   assert.equal(fetches,1);assert.equal(client.store.getSnapshot().status,'READY');
+   const old=streams[0];old.emit('snapshot',f);
+   f=frame(2,'e'.repeat(32));old.emit('resync_required',f);
+   assert.equal(client.store.getSnapshot().frame,null);assert.ok(old.closed);
+   old.emit('snapshot',frame());assert.equal(client.store.getSnapshot().frame,null);
+   await until(()=>streams.length===2);
+   assert.equal(client.store.getSnapshot().frame.generation,2);
+   old.emit('snapshot',frame());assert.equal(client.store.getSnapshot().frame.generation,2);
+   streams[1].onerror();assert.equal(client.store.getSnapshot().frame,null);
+ }finally{client.stop();}
+ assert.ok(streams.every(s=>s.closed));
+});
+test('stopping during HTTP handshake cannot publish delayed results',async()=>{
+ let complete,started=false,streamCount=0;
+ const client=new ResilientGatewayClient({
+   fetch:()=>{started=true;return new Promise(resolve=>{complete=resolve;});},
+   stream:()=>{streamCount++;return new FakeStream();},
+   wall:()=>now,mono:()=>1});
+ client.start();assert.ok(started);client.stop();
+ complete(jsonResponse(frame()));await wait(30);
+ assert.equal(streamCount,0);assert.equal(client.store.getSnapshot().frame,null);
+});

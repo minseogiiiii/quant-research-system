@@ -28,7 +28,17 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: |
           set -euo pipefail
-          npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/compiled src/datahub/resilientStore.ts
+          npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/compiled src/datahub/resilientStore.ts src/datahub/resilientClient.ts
           node --test tests/resilientStore.test.mjs
           npx --no-install tsc --noEmit
           npx --no-install vite build --config vite.fincept.config.ts
+  analytics-qualification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check numpy==2.2.6 pandas==2.2.3
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_fincept_qualification.py' -v
