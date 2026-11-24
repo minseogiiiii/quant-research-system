@@ -129,7 +129,8 @@ class ManagedSource:
         # the same IPC stream; retire immediately, not after absence timeout.
         terminal = getattr(self.worker, "last_reason", None) in {
             "LIVE_ADMISSION_REJECTED", "COLLECTOR_OBSERVATION_SOCKET_CLOSED",
-            "LOCAL_OBSERVER_BACKPRESSURE_EXCEEDED", "INVALID_OBSERVER_TRANSPORT_CONTROL",
+            "LOCAL_OBSERVER_BACKPRESSURE_EXCEEDED",
+            "INVALID_OBSERVER_TRANSPORT_CONTROL",
             "INDEPENDENT_SOURCE_WITNESS_FAILED", "OBSERVER_SOCKET_FAILURE",
             "COLLECTOR_EXITED", "DUAL_IPC_FAILED",
         }
