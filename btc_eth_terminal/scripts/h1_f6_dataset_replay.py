@@ -10,8 +10,10 @@ from independent_soak_replay import strict_json
 from f6_liquidity_recovery import project
 def need(ok,reason):
     if not ok:raise ValueError("H1_F6_"+reason)
-def replay_dataset(root,pin,product,*,fixture=False,projector=project):
-    root=Path(root);r=strict_json((root/"dataset.json").read_bytes())
+def replay_dataset(root,pin,product,*,fixture=False,projector=project,receipt_pin=None):
+    root=Path(root);raw=(root/"dataset.json").read_bytes()
+    if receipt_pin is not None:need(hashlib.sha256(raw).hexdigest()==receipt_pin,"RECEIPT_PIN")
+    r=strict_json(raw)
     need(r["schema"]=="h1_historical_dataset_v1" and r["source_manifest_sha256"]==pin and r["epoch"]==pin+":0"
          and r["independent_replay_parity"] is True and r["execution_authorized"] is False and r["alpha_confirmed"] is False,"CONTRACT")
     need((r["source_kind"]=="SYNTHETIC_TEST_ONLY" and r["research_eligible"] is False) if fixture else
@@ -37,4 +39,5 @@ def replay_dataset(root,pin,product,*,fixture=False,projector=project):
     finally:db.close()
     need(count==r["source_messages"]==expected["rows"] and h.hexdigest()==expected["canonical_rows_sha256"]
          and digest(f)==expected["file_sha256"],"ROW_PARITY")
+    need((root/"dataset.json").read_bytes()==raw,"RECEIPT_CHANGED")
     return result
