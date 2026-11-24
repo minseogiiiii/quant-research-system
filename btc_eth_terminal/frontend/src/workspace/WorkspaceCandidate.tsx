@@ -1,5 +1,4 @@
 import React,{useEffect,useMemo,useState,useSyncExternalStore} from 'react';
-import {createRoot} from 'react-dom/client';
 import {ResilientGatewayClient} from '../datahub/resilientClient';
 import {workspaces,widgets,initial,decode,move,toggle,resize,commands,parseCommand} from './model';
 import type {Workspace,Widget,Layout} from './model';
@@ -9,7 +8,7 @@ import SourceCandleChart from './SourceCandleChart';
 const key=(w:Workspace)=>'fincept.workspace.v1.'+w;
 function load(w:Workspace){try{return decode(localStorage.getItem(key(w)),w);}catch{return initial(w);}}
 function save(w:Workspace,l:Layout){try{localStorage.setItem(key(w),JSON.stringify(l));return true;}catch{return false;}}
-function App(){
+export default function WorkspaceCandidate(){
  const client=useMemo(()=>new ResilientGatewayClient(),[]);
  const view=useSyncExternalStore(client.store.subscribe,client.store.getSnapshot);
  const [w,setW]=useState<Workspace>('Market'),[layout,setLayout]=useState<Layout>(()=>load('Market'));
@@ -48,4 +47,4 @@ function App(){
  {!layout.panels.length&&<p>No qualified widgets connected. Add an available widget or open Market. Existing Funnest routes remain separate.</p>}
  </main>;
 }
-createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
+

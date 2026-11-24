@@ -1,0 +1,32 @@
+name: Fincept unified microstructure candidate
+on:
+  push:
+    branches: ['integration/fincept-microstructure-20261124']
+permissions:
+  contents: read
+jobs:
+  integrated:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts:btc_eth_terminal/tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_f4_*.py' -v
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_f3_candle_bundle.py' -v
+      - run: npm ci --ignore-scripts --prefix btc_eth_terminal/frontend
+      - working-directory: btc_eth_terminal/frontend
+        run: |
+          npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/micro-compiled src/microstructure/pair.ts
+          node --test tests/microstructure.test.mjs
+          npx --no-install tsc --noEmit
+          npx --no-install vite build --config vite.microstructure.config.ts
+          npx --no-install vite build --config vite.workspace.config.ts
+          npx --no-install vite build --config vite.heatmap.config.ts
+          npx --no-install vite build --config vite.orderflow.config.ts
