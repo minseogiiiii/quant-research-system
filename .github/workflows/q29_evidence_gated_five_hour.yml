@@ -366,8 +366,6 @@ jobs:
       manifest_sha: ${{ steps.seal.outputs.manifest_sha }}
     env:
       PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
-      Q29_PRIVATE: ${{ runner.temp }}/q29_1800_private
-      Q29_PUBLIC: ${{ runner.temp }}/q29_1800_public
     steps:
       - uses: actions/checkout@v4
         with:
@@ -395,6 +393,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          Q29_PRIVATE="$RUNNER_TEMP/q29_1800_private"
+          Q29_PUBLIC="$RUNNER_TEMP/q29_1800_public"
+          printf 'Q29_PRIVATE=%s\nQ29_PUBLIC=%s\n' "$Q29_PRIVATE" "$Q29_PUBLIC" >> "$GITHUB_ENV"
           mkdir -m 700 "$Q29_PUBLIC"
           python - <<'PY'
           import json,pathlib,shutil,subprocess
@@ -485,8 +486,6 @@ jobs:
       manifest_sha: ${{ steps.seal.outputs.manifest_sha }}
     env:
       PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
-      Q29_PRIVATE: ${{ runner.temp }}/q29_18000_private
-      Q29_PUBLIC: ${{ runner.temp }}/q29_18000_public
     steps:
       - uses: actions/checkout@v4
         with:
@@ -526,6 +525,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          Q29_PRIVATE="$RUNNER_TEMP/q29_18000_private"
+          Q29_PUBLIC="$RUNNER_TEMP/q29_18000_public"
+          printf 'Q29_PRIVATE=%s\nQ29_PUBLIC=%s\n' "$Q29_PRIVATE" "$Q29_PUBLIC" >> "$GITHUB_ENV"
           mkdir -m 700 "$Q29_PUBLIC"
           python - <<'PY'
           import json,pathlib,shutil,subprocess
