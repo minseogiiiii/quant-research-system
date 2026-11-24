@@ -22,7 +22,7 @@ def need(ok,msg):
 def load():
     inventory=json.loads((VENDOR/"UPSTREAM.json").read_text())
     need(inventory["commit"]==PIN and inventory["license"]=="AGPL-3.0","VENDOR_PIN")
-    root=VENDOR.parents[1]
+    root=VENDOR.parents[2]
     for e in inventory["files"]:
         path=root/e["local"]
         raw=path.read_bytes()
