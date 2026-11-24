@@ -6,6 +6,8 @@ on:
       - '.github/workflows/q29_1_artifact_transport_smoke.yml'
       - 'btc_eth_terminal/scripts/q29_artifact_transport.py'
       - 'btc_eth_terminal/tests/test_q29_artifact_transport.py'
+      - '.github/workflows/q29_evidence_gated_five_hour.yml'
+      - 'docs/Q29_1_ARTIFACT_TRANSPORT.md'
 permissions:
   contents: read
   actions: read
