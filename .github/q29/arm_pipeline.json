@@ -1,0 +1,11 @@
+{
+  "schema": "q29_one_shot_pipeline_v1",
+  "source_parent_sha": "3a90129b6b7170c48500a4f082b54d36778053b5",
+  "durations": [
+    180,
+    1800,
+    18000
+  ],
+  "real_orders_enabled": false,
+  "approval": "CI_READ_ONLY_ONLY"
+}
