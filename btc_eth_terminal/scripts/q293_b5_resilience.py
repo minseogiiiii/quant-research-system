@@ -42,7 +42,7 @@ def validate(body, synthetic):
         need(row["product"] == p and row["session_id"] == body["source_session"]
              and row["execution_authorized"] is False
              and row["trading_enabled"] is False
-             and row["live_feed"] is not synthetic
+             and row["live_feed"] is (not synthetic)
              and row["mode"] == ("ARCHIVE_SIMULATION" if synthetic else "LIVE_SOURCE")
              and 0 <= time.time_ns() // 1_000_000 -
              row["source_last_l2_receiver_ms"] <= 3500, "B5_STALE_OR_EPOCH")
@@ -152,7 +152,8 @@ def stale_cursor_rejected(url, old):
 def both_ready(body):
     return (body["states"] is not None
             and set(body.get("checkpoint_comparison", {})) == set(PRODUCTS)
-            and set(body["checkpoint_comparison"].values()) <= {"MATCH", "NOT_COMPARABLE"})
+            and set(body["checkpoint_comparison"].values())
+            <= {"MATCH", "NOT_COMPARABLE"})
 
 
 def process_quiescent(identities):
@@ -171,7 +172,8 @@ def process_quiescent(identities):
 def run(root, output, synthetic):
     duration = 90 if synthetic else 1800
     schedule = (15, 45) if synthetic else (300, 900)
-    need(shutil.disk_usage(root.parent).free >= admission(180 if synthetic else 1800, 1),
+    required = admission(180 if synthetic else 1800, 1)
+    need(shutil.disk_usage(root.parent).free >= required,
          "B5_DISK_PREFLIGHT")
     root.mkdir(mode=0o700)
     report = {"schema": "q293_b5_resilience_v1", "status": "FAIL",
@@ -186,6 +188,7 @@ def run(root, output, synthetic):
     identities = set()
     failure = None
     pending = None
+    baseline = None
     recovered = []
     retired = set()
     samples = unavailable = 0
@@ -210,7 +213,6 @@ def run(root, output, synthetic):
         url = "http://127.0.0.1:" + str(server.server_address[1])
         clients = Clients(url, synthetic)
         # Start streaming only after the first valid route exists.
-        baseline = None
         expected = {"primary": 1, "secondary": 1}
         while time.monotonic() - start < duration:
             now = time.monotonic()
