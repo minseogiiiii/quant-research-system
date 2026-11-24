@@ -1,0 +1,23 @@
+name: H1 historical contract and streaming parquet
+on:
+  push:
+    branches: ['research/h1-large-archive-20261124']
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts:btc_eth_terminal/tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyarrow==19.0.1 duckdb==1.2.2
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_v36_3_durable_archive_gate.py' -v
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h1_*.py' -v
