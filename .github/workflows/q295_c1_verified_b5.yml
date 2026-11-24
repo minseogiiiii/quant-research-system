@@ -1,0 +1,85 @@
+name: Q295 C1 exact verified B5 continuation
+on:
+  push:
+    branches: ['p0/q295-c1-verified-b5-20261124']
+    paths: ['.github/workflows/q295_c1_verified_b5.yml']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: q293-c1-five-hour
+  cancel-in-progress: false
+jobs:
+  live-c1:
+    if: >-
+      github.event.head_commit.message == 'Q295: arm C1 from exact successful B5 with unchanged runtime'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact prior B5 and unchanged complete runtime tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          python - <<'PY'
+          import os, subprocess
+          from pathlib import Path
+          from q29_artifact_transport import fetch_bytes, extract
+          from q293_b5_transport import validate
+          sha='f11f48cb222f2849f8f71e80970fbea844d4b78a'
+          changed=subprocess.check_output(['git','diff','--name-only',sha,'HEAD'],text=True).splitlines()
+          assert set(changed)=={'.github/workflows/q295_c1_verified_b5.yml','docs/Q295_C1_HANDOFF_REPAIR.md'}, changed
+          raw=fetch_bytes(os.environ['GITHUB_REPOSITORY'],os.environ['GH_TOKEN'],
+              artifact_id=14937832180,name='q293-b5-live-resilience',run_id=45423373926,
+              sha=sha,zip_sha='5a95db6a1b53327ee3c6de57f178d4ba43fd12fd1d9746c34d0d74c799396b7f')
+          extract(raw,Path(os.environ['RUNNER_TEMP'])/'c1_prior',{'b5.json'},
+              lambda root:validate(root,'7c2d3b6f210af17c863c5afa41033680ebe8b0b58d9ef165fb51c50f249fccd5',sha,45423373926))
+          print('Q295_C1_PRIOR_B5_EXACT_RUNTIME_PASS')
+          PY
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_q293_c1_contract.py' -v
+      - name: Real clean dual source capture and independent replay
+        id: capture
+        timeout-minutes: 350
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          mkdir -m 700 "$RUNNER_TEMP/c1_public"
+          python -u btc_eth_terminal/scripts/q293_c1_dual_18000s.py --execute-real-public-c1 --workdir "$RUNNER_TEMP/c1_private" --output "$RUNNER_TEMP/c1_public/c1.json"
+          echo "digest=$(sha256sum "$RUNNER_TEMP/c1_public/c1.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: q293-c1-dual-18000s-baseline
+          path: ${{ runner.temp }}/c1_public/c1.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Exact C1 artifact roundtrip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
+          RECEIPT_SHA: ${{ steps.capture.outputs.digest }}
+        run: python btc_eth_terminal/scripts/q293_c1_transport.py --id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --receipt-sha "$RECEIPT_SHA" --directory "$RUNNER_TEMP/c1_downloaded"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: q293-c1-failure
+          path: ${{ runner.temp }}/c1_public/c1.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Delete private capture
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/c1_private"
