@@ -9,13 +9,17 @@ import sys
 import tempfile
 import threading
 import time
-from http.server import BaseHTTPRequestHandler
 import unittest
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from unittest.mock import patch
 
 from q292_incident_journal import (
-    Journal, JournalProcess, audit, read_journal, safe_source,
+    Journal,
+    JournalProcess,
+    audit,
+    read_journal,
+    safe_source,
 )
 
 

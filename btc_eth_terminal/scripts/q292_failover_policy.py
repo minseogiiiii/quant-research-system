@@ -6,8 +6,8 @@ This module does not merge books or certify missing source intervals.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
