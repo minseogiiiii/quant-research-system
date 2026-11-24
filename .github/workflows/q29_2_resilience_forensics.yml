@@ -100,3 +100,19 @@ jobs:
           python -m pip install --disable-pip-version-check ruff==0.15.22
           ruff check btc_eth_terminal/scripts/q292_dual_gateway.py btc_eth_terminal/scripts/q292_parent_bound_exec.py btc_eth_terminal/scripts/q292_isolated_observer.py btc_eth_terminal/tests/test_q292_isolated_observer.py
           python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_isolated_observer.py' -v
+  durable-stream-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Durable transitions and bounded SSE
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q292_stream_gateway.py btc_eth_terminal/tests/test_q292_stream_gateway.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_stream_gateway.py' -v
