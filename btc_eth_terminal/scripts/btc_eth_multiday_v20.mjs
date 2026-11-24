@@ -189,7 +189,7 @@ function connect(){if(stopped)return;c={id:meta.connections.length,state:'CONNEC
  if(!['subscriptions','heartbeats','l2_data','market_trades'].includes(m.channel)||!Array.isArray(m.events))throw Error('CHANNEL');
  const pendingSnapshots={...c.snapshots};const pendingUpdates={...c.updates};
  if(m.channel==='l2_data')for(const e of m.events){if(!products.includes(e.product_id)||!Array.isArray(e.updates)||!['snapshot','update'].includes(e.type))throw Error('BAD_BOOK_EVENT');
- if(e.type==='snapshot'){if(pendingSnapshots[e.product_id])throw Error('DUP_SNAPSHOT');pendingSnapshots[e.product_id]=true;}
+ if(e.type==='snapshot'){if(pendingSnapshots[e.product_id]){c.duplicate_snapshot_receipt={schema:'q294_dup_snapshot_v1',connection_id:c.id,sequence:seq,previous_committed_sequence:c.last_sequence,product:e.product_id,event_index:m.events.indexOf(e),event_count:m.events.length,level_count:e.updates.length,already_committed_snapshot:c.snapshots[e.product_id],prior_updates:c.updates[e.product_id],raw_sha256:hash(raw),same_socket:true,root_cause_proven:false};throw Error('DUP_SNAPSHOT');}pendingSnapshots[e.product_id]=true;}
  else {if(!pendingSnapshots[e.product_id])throw Error('UPDATE_BEFORE_SNAPSHOT');pendingUpdates[e.product_id]++;}}
  const nextHeartbeatCount=c.heartbeat_count+(m.channel==='heartbeats'?1:0);
  append(raw,seq,received,mono);c.snapshots=pendingSnapshots;c.updates=pendingUpdates;c.heartbeat_count=nextHeartbeatCount;c.last_sequence=seq;c.last_received_utc=received;lastEventMs=Date.now();
