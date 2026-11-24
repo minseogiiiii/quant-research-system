@@ -1,0 +1,37 @@
+name: H1 private real Parquet replay gate
+on:
+  push:
+    branches: ['research/h1-large-archive-20261124']
+    paths: ['btc_eth_terminal/scripts/h1_private_real_gate.py','btc_eth_terminal/scripts/h1_streaming_parquet.py','.github/workflows/h1_private_real.yml']
+permissions:
+  contents: read
+jobs:
+  real:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts:.github/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyarrow==19.0.1 duckdb==1.2.2
+      - name: Fetch frozen previously authorized source
+        env:
+          Q13_PRIVATE_RELEASE_URL: ${{ secrets.Q13_PRIVATE_RELEASE_URL }}
+          Q13_GITHUB_ARCHIVE_TOKEN: ${{ secrets.Q13_GITHUB_ARCHIVE_TOKEN }}
+        run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/h1-private" "$RUNNER_TEMP/h1-report"
+          python .github/scripts/q16_secure_private_archive_download.py --output "$RUNNER_TEMP/h1-private/q7.zip"
+      - run: python btc_eth_terminal/scripts/h1_private_real_gate.py --release-zip "$RUNNER_TEMP/h1-private/q7.zip" --output "$RUNNER_TEMP/h1-report/receipt.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: h1-real-replay-receipt
+          path: ${{ runner.temp }}/h1-report/receipt.json
+          if-no-files-found: error
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/h1-private"
