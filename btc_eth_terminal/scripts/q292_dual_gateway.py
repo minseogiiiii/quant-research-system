@@ -28,6 +28,7 @@ from pathlib import Path
 from independent_soak_replay import price, strict_json
 from q25_session_isolation_guard import SourceEpochIsolatedEngine
 from q292_failover_policy import Arbiter, Source
+from q293_long_policy import DISK_RESERVE, budgets
 from v36_live_engine import StateRejected
 from v36_observe_existing_collector import COLLECTOR, read_tap
 
@@ -205,12 +206,13 @@ class Collector:
             os.chmod(tap, 0o600)
             self.listener.listen(1)
             self.listener.settimeout(.25)
+            raw_budget, archive_budget = budgets(duration)
             env = {
                 "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
                 "SOAK_DURATION_SECONDS": str(duration),
-                "SOAK_RAW_BUDGET_BYTES": str(300_000_000),
-                "SOAK_ARCHIVE_BUDGET_BYTES": str(500_000_000),
-                "SOAK_DISK_RESERVE_BYTES": str(1024**3),
+                "SOAK_RAW_BUDGET_BYTES": str(raw_budget),
+                "SOAK_ARCHIVE_BUDGET_BYTES": str(archive_budget),
+                "SOAK_DISK_RESERVE_BYTES": str(DISK_RESERVE),
                 "SOAK_CHUNK_LIMIT_BYTES": "8000000",
                 "SOAK_TEST_FIXTURE": "1" if synthetic else "0",
                 "SOAK_TEST_DISCONNECT_AFTER_MESSAGES": "0",

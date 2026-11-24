@@ -20,6 +20,7 @@ from q292_dual_gateway import PRODUCTS
 from q292_failover_policy import Arbiter
 from q292_isolated_observer import ObserverProcess
 from q292_stream_gateway import BoundedServer, Publisher, TransitionLedger
+from q293_long_policy import remaining
 
 MAX_RESTARTS = 3
 STARTUP_LIMIT = 12
@@ -67,9 +68,13 @@ def compare(a, b):
 class ManagedSource:
     """Restart isolated observer into a unique archive, never reuse IPC."""
 
-    def __init__(self, name, root, duration, synthetic, factory=ObserverProcess):
+    def __init__(self, name, root, duration, synthetic, factory=ObserverProcess,
+                 *, deadline=None, max_restarts=MAX_RESTARTS):
         self.name, self.root, self.duration = name, Path(root), duration
         self.synthetic, self.factory = synthetic, factory
+        if type(max_restarts) is not int or not 0 <= max_restarts <= MAX_RESTARTS:
+            raise ValueError("INVALID_RESTART_BUDGET")
+        self.deadline, self.max_restarts = deadline, max_restarts
         self.root.mkdir(mode=0o700)
         self.worker = None
         self.attempts = 0
@@ -99,7 +104,10 @@ class ManagedSource:
             elif self.retiring:
                 return None
         if self.worker is None:
-            if self.attempts > MAX_RESTARTS or now < self.next_start:
+            if self.attempts > self.max_restarts or now < self.next_start:
+                return None
+            duration = remaining(self.deadline, self.duration)
+            if duration < 15:
                 return None
             self.attempts += 1
             self.started = now
@@ -108,7 +116,7 @@ class ManagedSource:
             try:
                 self.worker = self.factory(
                     self.name, self.root / f"attempt_{self.attempts:02d}",
-                    self.duration, self.synthetic)
+                    duration, self.synthetic)
             except (OSError, ValueError):
                 self.next_start = now + min(2 ** (self.attempts - 1), 8)
                 return None
@@ -138,10 +146,11 @@ class ManagedSource:
 class ResilientRoute:
     """Single poll owner; sticky active source; re-admission needs fresh proof."""
 
-    def __init__(self, primary, secondary):
+    def __init__(self, primary, secondary, *, source_ledger=None):
         if primary.synthetic != secondary.synthetic:
             raise ValueError("MIXED_SOURCE_MODE")
         self.sources = (primary, secondary)
+        self.source_ledger = source_ledger
         self.run = secrets.token_hex(16)
         self.arbiter = Arbiter()
         self.last_invalidation = -1
@@ -163,6 +172,8 @@ class ResilientRoute:
             ) in self.arbiter.retired:
                 self.sources[index].retire()
                 observations[index] = None
+        if self.source_ledger is not None:
+            self.source_ledger.observe(self.sources, observations)
         checks = compare(*observations)
         divergent = "DIVERGENCE" in checks.values()
         before = self.arbiter.active

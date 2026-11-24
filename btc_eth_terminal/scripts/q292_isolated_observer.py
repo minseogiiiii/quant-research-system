@@ -215,9 +215,12 @@ def main():
     modes.add_argument("--synthetic", action="store_true")
     modes.add_argument("--execute-public-pilot", action="store_true")
     args = parser.parse_args()
-    if (not 15 <= args.duration <= 180
+    if args.worker:
+        if not 15 <= args.duration <= 18000:
+            parser.error("worker duration outside bounded policy")
+    elif (not 15 <= args.duration <= 180
             or args.execute_public_pilot and args.duration != 180):
-        parser.error("only bounded pilot permitted")
+        parser.error("only bounded direct pilot permitted")
     if args.worker:
         if args.fd is None or args.name is None:
             parser.error("worker requires private capability and source name")
