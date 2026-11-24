@@ -4,6 +4,7 @@ on:
     branches: [p0/q29-2-resilience-forensics-20261123]
 permissions:
   contents: read
+  actions: read
 jobs:
   synthetic-regression:
     runs-on: ubuntu-24.04
@@ -154,3 +155,55 @@ jobs:
           python -m pip install --disable-pip-version-check ruff==0.15.22
           ruff check btc_eth_terminal/scripts/q292_stream_gateway.py btc_eth_terminal/scripts/q292_dual_gateway.py btc_eth_terminal/tests/test_q292_integrated_stress.py
           python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_integrated_stress.py' -v
+  live-dual-180s:
+    # Run once on the explicitly armed pilot commit, never on routine pushes.
+    if: github.event.head_commit.message == 'Q29.3-A: arm gated real dual 180s baseline'
+    needs: [synthetic-regression, journal-failover-contracts, dual-collector-integration, independent-observer-integration, durable-stream-integration, managed-source-integration, integrated-stress]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Real public dual pilot and independent archive gates
+        id: capture
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          mkdir -m 700 "$RUNNER_TEMP/q293_public"
+          python -u btc_eth_terminal/scripts/q293_dual_180s.py --execute-real-public-180s --workdir "$RUNNER_TEMP/q293_private" --output "$RUNNER_TEMP/q293_public/dual_180s.json"
+          echo "digest=$(sha256sum "$RUNNER_TEMP/q293_public/dual_180s.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Upload only redacted verified receipt
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: q293-dual-180s-baseline
+          path: ${{ runner.temp }}/q293_public/dual_180s.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Download by immutable artifact ID and verify exact receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
+          RECEIPT_SHA: ${{ steps.capture.outputs.digest }}
+        run: |
+          set -euo pipefail
+          python btc_eth_terminal/scripts/q293_pilot_transport.py --id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --receipt-sha "$RECEIPT_SHA" --directory "$RUNNER_TEMP/q293_downloaded"
+      - name: Preserve redacted failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q293-dual-180s-failure
+          path: ${{ runner.temp }}/q293_public/dual_180s.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Remove private market payloads
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/q293_private"
