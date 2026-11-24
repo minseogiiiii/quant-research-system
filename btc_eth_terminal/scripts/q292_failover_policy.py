@@ -64,8 +64,10 @@ class Arbiter:
             raise ValueError("FAILOVER_CLOCK_REGRESSION")
         if type(disagreement) is not bool:
             raise ValueError("FAILOVER_INVALID_DISAGREEMENT")
-        self.last_ns = now_ns
         raw = {"primary": primary, "secondary": secondary}
+        if any(x is not None and not isinstance(x, Source) for x in raw.values()):
+            raise ValueError("FAILOVER_INVALID_SOURCE")
+        self.last_ns = now_ns
         # Source observations must not be aliases of the same collector.
         if primary is not None and secondary is not None:
             if (primary.session == secondary.session
@@ -73,8 +75,6 @@ class Arbiter:
                 disagreement = True
         valid = {}
         for name, item in raw.items():
-            if item is not None and not isinstance(item, Source):
-                raise ValueError("FAILOVER_INVALID_SOURCE")
             if (disagreement or item is None or item.name != name
                     or not item.admissible(now_ns, self.max_age_ns)
                     or (name, item.session) in self.retired):

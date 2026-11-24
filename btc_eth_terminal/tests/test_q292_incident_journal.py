@@ -3,10 +3,13 @@ import errno
 import json
 import os
 import signal
+import socketserver
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+from http.server import BaseHTTPRequestHandler
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -139,6 +142,72 @@ class JournalContracts(unittest.TestCase):
             if p.process.poll() is None:
                 p.process.kill()
                 p.process.wait()
+
+    def test_independent_process_observes_actual_unix_http_epoch_change(self):
+        work = self.root / "capture"
+        work.mkdir(mode=0o700)
+        public = self.root / "public"
+        public.mkdir()
+        state = {"connection": 0}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                c = state["connection"]
+                common = {"trading_enabled": False, "execution_authorized": False}
+                if self.path == "/api/v36/health":
+                    body = {**common, "mode": "LIVE_SOURCE", "status": "HEALTHY",
+                            "operationally_healthy": True, "live_feed": True,
+                            "q25_isolation_schema": "q25_source_epoch_isolation_v1",
+                            "snapshots": ["BTC-USD", "ETH-USD"],
+                            "subscriptions": ["heartbeats", "level2", "market_trades"],
+                            "session_id": str(c) * 32, "connection_id": c,
+                            "connection_gaps": c, "messages": 100 + c * 3,
+                            "last_sequence": 99 if c == 0 else 2,
+                            "heartbeats": 20 if c == 0 else 1,
+                            "last_receiver_time_ms": time.time_ns() // 1_000_000}
+                else:
+                    body = {**common, "monitor_transport": "UNIX_SOCKET"}
+                data = json.dumps(body).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *_args):
+                pass
+
+        sock = work / "v36_monitor.sock"
+        server = socketserver.UnixStreamServer(str(sock), Handler)
+        os.chmod(sock, 0o600)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        p = None
+
+        def wait_for(marker):
+            end = time.monotonic() + 8
+            while time.monotonic() < end:
+                if p.path.exists() and marker in p.path.read_bytes():
+                    return
+                time.sleep(.05)
+            self.fail("missing independent journal observation")
+
+        try:
+            p = JournalProcess(work, public, 180)
+            wait_for(b'"connection":0')
+            state["connection"] = 1
+            wait_for(b'"connection":1')
+            r = p.require_clean()
+            self.assertEqual(r["anomalies"], 0)
+            self.assertEqual(len(r["observed_epoch_transitions"]), 1)
+            self.assertFalse(r["zero_gap_certified"])
+            self.assertFalse(r["resilience_certified"])
+        finally:
+            if p is not None and p.process.poll() is None:
+                p.process.kill()
+                p.process.wait()
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=3)
 
     def test_no_source_or_orders_cannot_be_ready(self):
         value = safe_source({"reason": "private secret"}, {}, 503, 503)

@@ -77,6 +77,14 @@ class FailoverContracts(unittest.TestCase):
                               source("secondary", tick), disagreement=True)
         self.assertIsNone(r["active_source"])
 
+    def test_invalid_source_input_does_not_mutate_state(self):
+        old = self.prime()
+        with self.assertRaises(ValueError):
+            self.a.update(40, {}, source("secondary", 40))
+        self.assertTrue(self.a.cursor_valid(old["generation"], old["source_session"]))
+        r = self.a.update(40, source("primary", 40), source("secondary", 40))
+        self.assertEqual(r["generation"], old["generation"])
+
     def test_clock_regression_and_orders_blocked(self):
         self.a.update(10)
         with self.assertRaises(ValueError):
