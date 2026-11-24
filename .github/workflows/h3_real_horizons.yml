@@ -2,7 +2,7 @@ name: H3 frozen momentum horizons historical and 20m pilot
 on:
   push:
     branches: ['integration/h1-f6-research-20261124']
-    paths: ['btc_eth_terminal/scripts/h3_real_horizons_gate.py','.github/workflows/h3_real_horizons.yml']
+    paths: ['btc_eth_terminal/scripts/h3_real_horizons_gate.py','btc_eth_terminal/scripts/h1_f6_dataset_replay.py','.github/workflows/h3_real_horizons.yml']
 permissions:
   contents: read
 jobs:
@@ -20,6 +20,7 @@ jobs:
           python-version: '3.12'
       - run: pip install pyarrow==19.0.1 duckdb==1.2.2
       - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h3_*.py' -v
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h1_replay_physical_order.py' -v
       - name: Fetch authorized private historical source
         env:
           Q13_PRIVATE_RELEASE_URL: ${{ secrets.Q13_PRIVATE_RELEASE_URL }}

@@ -20,17 +20,19 @@ def replay_dataset(root,pin,product,*,fixture=False,projector=project,receipt_pi
          (r["source_kind"]=="ARCHIVE_REPLAY" and r["research_eligible"] is True),"MODE")
     f=root/"packets.parquet";expected=r["tables"]["packets"]
     need(not f.is_symlink() and digest(f)==expected["file_sha256"],"FILE_HASH")
-    db=duckdb.connect(":memory:",config={"memory_limit":"256MB","threads":"2"})
-    h=hashlib.sha256();count=0
+    db=duckdb.connect(":memory:",config={"memory_limit":"256MB","threads":"1","preserve_insertion_order":"true"})
+    h=hashlib.sha256();count=0;last_ms=None;last_mono=None
     def packets():
-        nonlocal count
-        cursor=db.execute("SELECT * FROM read_parquet(?) ORDER BY sequence",[str(f)])
+        nonlocal count,last_ms,last_mono
+        cursor=db.execute("SELECT * FROM read_parquet(?)",[str(f)])
         while batch:=cursor.fetchmany(256):
             for values in batch:
                 p=dict(zip(PACKET.names,values));feed_hash(h,p)
                 need(p["source_manifest_sha256"]==pin and p["epoch"]==pin+":0" and p["connection_id"]==0
                      and p["sequence"]==count and milliseconds(p["receiver_utc"])==p["receiver_ms"]
                      and hashlib.sha256(p["payload"].encode()).hexdigest()==p["payload_sha256"],"PACKET")
+                need((last_ms is None or p["receiver_ms"]>=last_ms) and (last_mono is None or p["receiver_monotonic_ns"]>=last_mono),"CLOCK_ORDER")
+                last_ms,last_mono=p["receiver_ms"],p["receiver_monotonic_ns"]
                 wire=strict_json(p["payload"])
                 need(wire["sequence_num"]==count and wire["channel"]==p["channel"],"WIRE")
                 count+=1
