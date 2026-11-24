@@ -209,6 +209,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: q28-30m-close-cause-redacted-summary-only
-          path: ${{ runner.temp }}/q27_30m_public/*.json
-          if-no-files-found: warn
+          path: ${{ runner.temp }}/q28_30m_public/*.json
+          if-no-files-found: error
           retention-days: 7
