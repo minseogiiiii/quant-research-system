@@ -108,7 +108,8 @@ class Arbiter:
             revoked = True
         if self.active is None and not disagreement:
             for name in ("primary", "secondary"):
-                if name in valid and self.candidates.get(name, (None, 0))[1] >= self.confirmations:
+                if (name in valid and self.candidates.get(name, (None, 0))[1]
+                        >= self.confirmations):
                     self.active = valid[name]
                     self.generation += 1
                     break

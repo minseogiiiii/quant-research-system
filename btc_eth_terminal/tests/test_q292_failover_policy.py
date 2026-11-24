@@ -90,7 +90,9 @@ class FailoverContracts(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.a.update(10)
         for tick in (20, 30, 40):
-            r = self.a.update(tick, replace(source("primary", tick), orders_enabled=True))
+            r = self.a.update(
+                tick, replace(source("primary", tick), orders_enabled=True)
+            )
         self.assertIsNone(r["active_source"])
 
 

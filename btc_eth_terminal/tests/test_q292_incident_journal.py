@@ -65,10 +65,12 @@ class JournalContracts(unittest.TestCase):
         j = Journal(self.file)
         try:
             j.append("START")
-            with patch("q292_incident_journal.os.write",
-                       side_effect=OSError(errno.ENOSPC, "disk full")):
-                with self.assertRaises(OSError):
-                    j.append("SAMPLE", source())
+            with (
+                patch("q292_incident_journal.os.write",
+                      side_effect=OSError(errno.ENOSPC, "disk full")),
+                self.assertRaises(OSError),
+            ):
+                j.append("SAMPLE", source())
             with self.assertRaises(ValueError):
                 j.append("STOP")
         finally:
@@ -97,7 +99,8 @@ class JournalContracts(unittest.TestCase):
             read_journal(self.file)
 
     def test_actual_independent_process_sigkill_preserves_records(self):
-        script = Path(__file__).resolve().parents[1] / "scripts/q292_incident_journal.py"
+        script = (Path(__file__).resolve().parents[1]
+                  / "scripts/q292_incident_journal.py")
         p = subprocess.Popen([sys.executable, str(script), "--socket",
                               str(self.root / "absent.sock"), "--journal",
                               str(self.file), "--duration", "30", "--period", "1"])
