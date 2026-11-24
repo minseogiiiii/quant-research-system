@@ -1,10 +1,11 @@
-name: Q29 immutable evidence-gated 180s, 30m and 5h public Coinbase acceptance
+name: Q29.1 ID-verified 180s, 30m and 5h public Coinbase acceptance
 on:
   push:
-    branches: [p0/q29-evidence-gated-five-hour-20261123]
+    branches: [p0/q29-1-artifact-id-transport-20261123]
     paths: ['.github/q29/arm_pipeline.json']
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: q29-evidence-gated-once-${{ github.ref }}
   cancel-in-progress: false
@@ -14,6 +15,8 @@ jobs:
     timeout-minutes: 28
     outputs:
       manifest_sha: ${{ steps.seal.outputs.manifest_sha }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      zip_sha: ${{ steps.upload.outputs.artifact-digest }}
     env:
       PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
     steps:
@@ -26,12 +29,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Frozen source manifest, strict readonly diff, and storage preflight
+      - name: Frozen source manifest, strict readonly diff, and exact successful transport smoke
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json,os,pathlib,subprocess
+          import json,os,pathlib,subprocess,urllib.request,urllib.parse
           assert os.environ['GITHUB_RUN_ATTEMPT']=='1', 'NO_RERUN_REUSE'
           arm=json.loads(pathlib.Path('.github/q29/arm_pipeline.json').read_text())
           parent=subprocess.check_output(['git','rev-parse','HEAD^'],text=True).strip()
@@ -41,6 +46,14 @@ jobs:
           assert subprocess.check_output(
               ['git','diff','--name-only','HEAD^','HEAD'],text=True
           ).splitlines()==['.github/q29/arm_pipeline.json'], 'ARM_NOT_SINGLE_FILE'
+          # The immediately preceding exact source commit must have a
+          # successful independent no-market artifact smoke run.
+          query=urllib.parse.urlencode({'head_sha':parent,'branch':'p0/q29-1-artifact-id-transport-20261123','per_page':30})
+          url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/workflows/q29_1_artifact_transport_smoke.yml/runs?'+query
+          req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','User-Agent':'q29-1-gate'})
+          with urllib.request.urlopen(req,timeout=20) as response:
+              runs=json.load(response)['workflow_runs']
+          assert any(x['head_sha']==parent and x['conclusion']=='success' and x['status']=='completed' and x['run_attempt']==1 for x in runs), 'NO_EXACT_PARENT_ARTIFACT_TRANSPORT_SMOKE_PASS'
           m=json.loads(pathlib.Path('.github/release-evidence/q14_candidate_source_git_blobs.json').read_bytes())
           pins=m['source_git_blobs']
           assert m['source_files']==278 and len(pins)==278
@@ -99,6 +112,10 @@ jobs:
               'btc_eth_terminal/scripts/q29_evidence_gate.py',
               'btc_eth_terminal/tests/test_q29_evidence_gate.py',
               'docs/Q29_EVIDENCE_GATED_FIVE_HOUR.md',
+              'btc_eth_terminal/scripts/q29_artifact_transport.py',
+              'btc_eth_terminal/tests/test_q29_artifact_transport.py',
+              '.github/workflows/q29_1_artifact_transport_smoke.yml',
+              'docs/Q29_1_ARTIFACT_TRANSPORT.md',
           }
           changed=set(subprocess.check_output(
               ['git','diff','--name-only','61fa43a8e956fc4a88d206587bc98ce4d85623f8','HEAD'],
@@ -118,7 +135,9 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check ruff==0.15.22
-          ruff check btc_eth_terminal/scripts/q29_evidence_gate.py \
+          ruff check btc_eth_terminal/scripts/q29_artifact_transport.py \
+            btc_eth_terminal/tests/test_q29_artifact_transport.py \
+            btc_eth_terminal/scripts/q29_evidence_gate.py \
             btc_eth_terminal/tests/test_q29_evidence_gate.py \
             btc_eth_terminal/scripts/q28_transport_incident_receipt.py \
             btc_eth_terminal/tests/test_q28_termination_incident.py \
@@ -224,6 +243,8 @@ jobs:
           print('PASS_Q27_BOTH_REAL_COMPATIBLE_GUARD_SYNTHETIC_CASES_NO_ORDERS')
           PY
           python -m unittest discover -s btc_eth_terminal/tests \
+            -p 'test_q29_artifact_transport.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests \
             -p 'test_q29_evidence_gate.py' -v
           python -m unittest discover -s btc_eth_terminal/tests \
             -p 'test_q28_termination_incident.py' -v
@@ -320,20 +341,17 @@ jobs:
           path: ${{ runner.temp }}/q29_180_public/
           if-no-files-found: error
           retention-days: 30
-      - name: Download from artifact storage, not local source directory
-        uses: actions/download-artifact@v4
-        with:
-          name: q29-180s-validated-evidence
-          path: ${{ runner.temp }}/q29_180_downloaded
-      - name: Verify uploaded artifact ID, manifest SHA and every receipt byte
+      - name: Retrieve by immutable artifact ID and verify ZIP and receipt hashes
+        timeout-minutes: 5
         env:
+          GH_TOKEN: ${{ github.token }}
           MANIFEST_SHA: ${{ steps.seal.outputs.manifest_sha }}
           ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$ARTIFACT_ID"
-          python btc_eth_terminal/scripts/q29_evidence_gate.py verify "$RUNNER_TEMP/q29_180_downloaded" --duration 180 --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --manifest-sha "$MANIFEST_SHA"
+          python btc_eth_terminal/scripts/q29_artifact_transport.py --artifact-id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --duration 180 --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --manifest-sha "$MANIFEST_SHA" --directory "$RUNNER_TEMP/q29_180_downloaded"
           echo "PASS_Q29_180S_DURABLE_EVIDENCE_ROUNDTRIP artifact_id=$ARTIFACT_ID"
       - name: Retain only explicit redacted diagnostic files if a stage fails
         if: failure()
@@ -364,6 +382,8 @@ jobs:
     timeout-minutes: 42
     outputs:
       manifest_sha: ${{ steps.seal.outputs.manifest_sha }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      zip_sha: ${{ steps.upload.outputs.artifact-digest }}
     env:
       PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
     steps:
@@ -376,19 +396,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Download preceding accepted evidence from this same run
-        uses: actions/download-artifact@v4
-        with:
-          name: q29-180s-validated-evidence
-          path: ${{ runner.temp }}/q29_prior_180
-      - name: Require previous stage bytes and receipt content, exact same SHA
+      - name: Retrieve and verify exact preceding 180s artifact ID from this run
+        timeout-minutes: 5
         env:
+          GH_TOKEN: ${{ github.token }}
           PRIOR_SHA: ${{ needs.preflight-180s.outputs.manifest_sha }}
+          ARTIFACT_ID: ${{ needs.preflight-180s.outputs.artifact_id }}
+          ZIP_SHA: ${{ needs.preflight-180s.outputs.zip_sha }}
         shell: bash
         run: |
           set -euo pipefail
-          test "$GITHUB_RUN_ATTEMPT" = 1
-          python btc_eth_terminal/scripts/q29_evidence_gate.py verify "$RUNNER_TEMP/q29_prior_180" --duration 180 --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --manifest-sha "$PRIOR_SHA"
+          python btc_eth_terminal/scripts/q29_artifact_transport.py --artifact-id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --duration 180 --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --manifest-sha "$PRIOR_SHA" --directory "$RUNNER_TEMP/q29_prior_180"
       - name: Revalidate original source hashes and resource budget
         shell: bash
         run: |
@@ -444,20 +462,17 @@ jobs:
           path: ${{ runner.temp }}/q29_1800_public/
           if-no-files-found: error
           retention-days: 30
-      - name: Download from artifact storage, not local source directory
-        uses: actions/download-artifact@v4
-        with:
-          name: q29-1800s-validated-evidence
-          path: ${{ runner.temp }}/q29_1800_downloaded
-      - name: Verify uploaded artifact ID, manifest SHA and every receipt byte
+      - name: Retrieve by immutable artifact ID and verify ZIP and receipt hashes
+        timeout-minutes: 5
         env:
+          GH_TOKEN: ${{ github.token }}
           MANIFEST_SHA: ${{ steps.seal.outputs.manifest_sha }}
           ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$ARTIFACT_ID"
-          python btc_eth_terminal/scripts/q29_evidence_gate.py verify "$RUNNER_TEMP/q29_1800_downloaded" --duration 1800 --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --manifest-sha "$MANIFEST_SHA"
+          python btc_eth_terminal/scripts/q29_artifact_transport.py --artifact-id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --duration 1800 --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --manifest-sha "$MANIFEST_SHA" --directory "$RUNNER_TEMP/q29_1800_downloaded"
           echo "PASS_Q29_1800S_DURABLE_EVIDENCE_ROUNDTRIP artifact_id=$ARTIFACT_ID"
       - name: Retain only explicit redacted diagnostic files if a stage fails
         if: failure()
@@ -484,6 +499,8 @@ jobs:
     timeout-minutes: 358
     outputs:
       manifest_sha: ${{ steps.seal.outputs.manifest_sha }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      zip_sha: ${{ steps.upload.outputs.artifact-digest }}
     env:
       PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
     steps:
@@ -496,31 +513,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Download preceding accepted evidence from this same run
-        uses: actions/download-artifact@v4
-        with:
-          name: q29-1800s-validated-evidence
-          path: ${{ runner.temp }}/q29_prior_1800
-      - name: Require previous stage bytes and receipt content, exact same SHA
+      - name: Retrieve and verify exact preceding 1800s artifact ID from this run
+        timeout-minutes: 5
         env:
+          GH_TOKEN: ${{ github.token }}
           PRIOR_SHA: ${{ needs.guarded-30m.outputs.manifest_sha }}
+          ARTIFACT_ID: ${{ needs.guarded-30m.outputs.artifact_id }}
+          ZIP_SHA: ${{ needs.guarded-30m.outputs.zip_sha }}
         shell: bash
         run: |
           set -euo pipefail
-          test "$GITHUB_RUN_ATTEMPT" = 1
-          python btc_eth_terminal/scripts/q29_evidence_gate.py verify "$RUNNER_TEMP/q29_prior_1800" --duration 1800 --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --manifest-sha "$PRIOR_SHA"
-      - name: Also independently retrieve the 180s accepted evidence
-        uses: actions/download-artifact@v4
-        with:
-          name: q29-180s-validated-evidence
-          path: ${{ runner.temp }}/q29_prior_180
-      - name: Require exact 180s manifest on the same source
+          python btc_eth_terminal/scripts/q29_artifact_transport.py --artifact-id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --duration 1800 --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --manifest-sha "$PRIOR_SHA" --directory "$RUNNER_TEMP/q29_prior_1800"
+      - name: Retrieve and verify exact preceding 180s artifact ID from this run
+        timeout-minutes: 5
         env:
+          GH_TOKEN: ${{ github.token }}
           PRIOR_SHA: ${{ needs.preflight-180s.outputs.manifest_sha }}
+          ARTIFACT_ID: ${{ needs.preflight-180s.outputs.artifact_id }}
+          ZIP_SHA: ${{ needs.preflight-180s.outputs.zip_sha }}
         shell: bash
         run: |
           set -euo pipefail
-          python btc_eth_terminal/scripts/q29_evidence_gate.py verify "$RUNNER_TEMP/q29_prior_180" --duration 180 --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --manifest-sha "$PRIOR_SHA"
+          python btc_eth_terminal/scripts/q29_artifact_transport.py --artifact-id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --duration 180 --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --manifest-sha "$PRIOR_SHA" --directory "$RUNNER_TEMP/q29_prior_180"
       - name: Revalidate original source hashes and resource budget
         shell: bash
         run: |
@@ -576,20 +590,17 @@ jobs:
           path: ${{ runner.temp }}/q29_18000_public/
           if-no-files-found: error
           retention-days: 30
-      - name: Download from artifact storage, not local source directory
-        uses: actions/download-artifact@v4
-        with:
-          name: q29-18000s-validated-evidence
-          path: ${{ runner.temp }}/q29_18000_downloaded
-      - name: Verify uploaded artifact ID, manifest SHA and every receipt byte
+      - name: Retrieve by immutable artifact ID and verify ZIP and receipt hashes
+        timeout-minutes: 5
         env:
+          GH_TOKEN: ${{ github.token }}
           MANIFEST_SHA: ${{ steps.seal.outputs.manifest_sha }}
           ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$ARTIFACT_ID"
-          python btc_eth_terminal/scripts/q29_evidence_gate.py verify "$RUNNER_TEMP/q29_18000_downloaded" --duration 18000 --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --manifest-sha "$MANIFEST_SHA"
+          python btc_eth_terminal/scripts/q29_artifact_transport.py --artifact-id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --duration 18000 --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --manifest-sha "$MANIFEST_SHA" --directory "$RUNNER_TEMP/q29_18000_downloaded"
           echo "PASS_Q29_18000S_DURABLE_EVIDENCE_ROUNDTRIP artifact_id=$ARTIFACT_ID"
       - name: Retain only explicit redacted diagnostic files if a stage fails
         if: failure()
