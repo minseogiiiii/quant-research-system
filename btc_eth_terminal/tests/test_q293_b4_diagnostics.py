@@ -47,7 +47,8 @@ class DiagnosticContracts(unittest.TestCase):
                      raw_text="private")
             m = dict(format="btc_eth_raw_soak_v10", orders_enabled=False,
                      connections=[dict(id=0, duplicate_snapshot_receipt=r)],
-                     faults=[dict(connection_id=0, reason="SOURCE:Error: DUP_SNAPSHOT")])
+                     faults=[dict(connection_id=0,
+                                  reason="SOURCE:Error: DUP_SNAPSHOT")])
             path.write_text(json.dumps(m))
             result = manifest_receipt(path)
             self.assertEqual(result["status"], "MANIFEST_READ")
