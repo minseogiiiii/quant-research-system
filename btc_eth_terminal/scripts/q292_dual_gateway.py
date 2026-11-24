@@ -28,6 +28,7 @@ from pathlib import Path
 from independent_soak_replay import price, strict_json
 from q25_session_isolation_guard import SourceEpochIsolatedEngine
 from q292_failover_policy import Arbiter, Source
+from q293_b4_diagnostics import ObserverJournal, reason_class
 from q293_long_policy import DISK_RESERVE, budgets
 from v36_live_engine import StateRejected
 from v36_observe_existing_collector import COLLECTOR, read_tap
@@ -48,10 +49,16 @@ class CheckedEngine(SourceEpochIsolatedEngine):
         self.shadow_seq = -1
         self.witnessed = {}
         self.witness_failure = False
+        self.diagnostic = None
 
     def _invalid(self, reason, phase="QUARANTINED"):
-        super()._invalid(reason, phase)
-        self.witnessed.clear()
+        # Invalidation must happen even if the diagnostic disk fails.
+        try:
+            if self.diagnostic is not None:
+                self.diagnostic.record(reason, self.connection_id, self.seq)
+        finally:
+            super()._invalid(reason, phase)
+            self.witnessed.clear()
 
     def _shadow_apply(self, line):
         if not 0 < len(line) <= MAX_FRAME:
@@ -136,6 +143,14 @@ class CheckedEngine(SourceEpochIsolatedEngine):
             try:
                 touched = self._shadow_apply(line)
                 super().consume(line)
+                # Frozen Book heaps retain duplicate entries for repeated price
+                # updates. Compact without changing the exact ladder or best.
+                for book in self.books.values():
+                    for side, levels in book.level.items():
+                        if len(book.heap[side]) > 3 * len(levels) + 1024:
+                            book.heap[side] = [
+                                -px if side == "bid" else px for px in levels]
+                            heapq.heapify(book.heap[side])
                 if self.status != "HEALTHY":
                     return
                 for p in PRODUCTS:
@@ -191,6 +206,8 @@ class Collector:
         self.logs = []
         self.done = [False]
         self.cached = None
+        self.diagnostic = None
+        self.last_reason = "NO_OBSERVATION"
         self.engine = CheckedEngine(
             mode="ARCHIVE_SIMULATION" if synthetic else "LIVE_SOURCE",
             collector_runtime_verified=not synthetic,
@@ -198,6 +215,8 @@ class Collector:
         )
         try:
             work.mkdir(mode=0o700)
+            self.diagnostic = ObserverJournal(work / "observer_events.jsonl")
+            self.engine.diagnostic = self.diagnostic
             tap = work / "tap.sock"
             if len(os.fsencode(tap)) > 100:
                 raise ValueError("DUAL_IPC_PATH_LENGTH")
@@ -270,10 +289,20 @@ class Collector:
 
     def observation(self):
         if self.process.poll() is not None:
+            self.last_reason = "COLLECTOR_EXITED"
             return None
-        checked = self.engine.checked_pair()
+        with self.engine._cv:
+            checked = self.engine.checked_pair()
+            if checked is None:
+                self.cached = None
+                self.last_reason = (reason_class(self.engine.reason)
+                                    if self.engine.status != "HEALTHY"
+                                    else "BOOK_WITNESS_NOT_READY")
+            else:
+                self.last_reason = "READY"
+            self.diagnostic.record(self.last_reason, self.engine.connection_id,
+                                   self.engine.seq)
         if checked is None:
-            self.cached = None
             return None
         health, pair = checked
         version = tuple(pair[p]["state_version"] for p in PRODUCTS)
@@ -303,6 +332,9 @@ class Collector:
         if self.thread is not None:
             self.thread.join(timeout=3)
         self.engine.stopped()
+        if self.diagnostic is not None:
+            self.engine.diagnostic = None
+            self.diagnostic.close()
         for stream in self.logs:
             stream.close()
 

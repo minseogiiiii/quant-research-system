@@ -23,6 +23,7 @@ from q28_transport_incident_receipt import incident_receipt
 from q292_dual_gateway import PRODUCTS
 from q292_resilient_gateway import ManagedSource, ResilientRoute
 from q292_stream_gateway import BoundedServer, Publisher, TransitionLedger, audit_ledger
+from q293_b4_diagnostics import manifest_receipt, observer_receipt
 from q293_epoch_audit import TradeIndex, scan
 from q293_long_policy import DISK_RESERVE, GIB, admission, budgets, process_sample
 from q293_source_ledger import SourceLedger
@@ -157,6 +158,7 @@ def run(root, output):
     comparison = {"MATCH": 0, "NOT_COMPARABLE": 0,
                   "SOURCE_UNAVAILABLE": 0, "DIVERGENCE": 0}
     failure = None
+    first_failure_sample = None
     try:
         deadline = time.monotonic() + DURATION + 65
         for name in ("primary", "secondary"):
@@ -197,9 +199,14 @@ def run(root, output):
                 if 20 <= elapsed <= DURATION - 8:
                     need(resources["process_count"] >= 5,
                          "PILOT_PROCESS_TREE_INCOMPLETE")
-                    need("SOURCE_UNAVAILABLE" not in
-                         body["checkpoint_comparison"].values(),
-                         "PILOT_STANDBY_UNAVAILABLE")
+                    if "SOURCE_UNAVAILABLE" in body["checkpoint_comparison"].values():
+                        first_failure_sample = {
+                            "elapsed_seconds": round(elapsed, 3),
+                            "active_source": body["active_source"],
+                            "generation": body["generation"],
+                            "source_diagnostics": body.get("source_diagnostics", {}),
+                        }
+                        raise ValueError("PILOT_STANDBY_UNAVAILABLE")
                     both_ready_samples += 1
                 if baseline is None:
                     baseline = (body["generation"], body["source_session"])
@@ -342,11 +349,19 @@ def run(root, output):
     if failure is not None:
         report["status"] = "FAIL"
         report["failure"] = failure
+        report["first_failure_sample"] = first_failure_sample
         report["incident_receipts"] = {}
+        report["collector_fault_receipts"] = {}
         for source in sources:
             attempt = source.root / "attempt_01"
             report["incident_receipts"][source.name] = incident_receipt(
                 attempt / "ws.jsonl", attempt / "hb.jsonl")
+            archive = capture_path(attempt)
+            report["collector_fault_receipts"][source.name] = {
+                "manifest": manifest_receipt(archive / "manifest.json")
+                if archive is not None else {"status": "NO_ARCHIVE"},
+                "observer": observer_receipt(attempt / "observer_events.jsonl"),
+            }
     write_report(output, report)
     print("Q293_DUAL_1800S_" + report["status"], flush=True)
     return 0 if report["status"] == "PASS" else 2

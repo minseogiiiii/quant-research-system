@@ -226,6 +226,8 @@ jobs:
           python -m pip install --disable-pip-version-check ruff==0.15.22
           ruff check btc_eth_terminal/scripts/q293_long_policy.py btc_eth_terminal/scripts/q293_source_ledger.py btc_eth_terminal/scripts/q293_epoch_audit.py btc_eth_terminal/scripts/q293_dual_1800s.py btc_eth_terminal/scripts/q293_b4_transport.py btc_eth_terminal/tests/test_q293_long_contracts.py btc_eth_terminal/scripts/q292_dual_gateway.py btc_eth_terminal/scripts/q292_isolated_observer.py btc_eth_terminal/scripts/q292_resilient_gateway.py
           python -m unittest discover -s btc_eth_terminal/tests -p 'test_q293_long_contracts.py' -v
+          ruff check btc_eth_terminal/scripts/q293_b4_diagnostics.py btc_eth_terminal/tests/test_q293_b4_diagnostics.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q293_b4_diagnostics.py' -v
   live-dual-1800s:
     if: >-
       github.event.head_commit.message == 'Q29.3-B4: arm gated real dual 1800s baseline'

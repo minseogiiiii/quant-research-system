@@ -204,6 +204,9 @@ class ResilientRoute:
             else "LIVE_READ_ONLY_CANDIDATE",
             "states": pair, "checkpoint_comparison": checks,
             "source_attempts": {s.name: s.attempts for s in self.sources},
+            "source_diagnostics": {s.name: getattr(s.worker, "last_reason",
+                                                  "NO_OBSERVATION")
+                                   for s in self.sources},
             "exchange_attested": False, "execution_authorized": False,
         }
 

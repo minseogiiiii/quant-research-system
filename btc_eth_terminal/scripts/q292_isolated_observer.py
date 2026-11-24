@@ -23,6 +23,7 @@ from pathlib import Path
 from independent_soak_replay import strict_json
 from q292_dual_gateway import PRODUCTS, ROOT, Collector, DualRoute, server_for_dual
 from q292_failover_policy import Source
+from q293_b4_diagnostics import reason_class
 
 MAX_REPLY = 256 * 1024
 IPC_TIMEOUT = 0.8
@@ -100,6 +101,7 @@ class ObserverProcess:
     def __init__(self, name, work, duration, synthetic):
         self.name, self.work, self.synthetic = name, Path(work), synthetic
         self.failed = False
+        self.last_reason = "OBSERVER_STARTING"
         self.closed = False
         self.start = time.monotonic()
         self.process = None
@@ -124,24 +126,38 @@ class ObserverProcess:
             child.close()
 
     def observation(self):
-        if self.failed or self.closed or self.process.poll() is not None:
+        if self.failed or self.closed:
+            return None
+        if self.process.poll() is not None:
+            self.last_reason = "OBSERVER_EXITED"
             return None
         # Startup can be slow on CI; do not issue a request before the worker
         # has installed its listener. Its private startup marker is not data.
         if not (self.work / "observer_ready").is_file():
             if time.monotonic() - self.start > STARTUP_GRACE:
                 self.failed = True
+                self.last_reason = "OBSERVER_STARTUP_TIMEOUT"
             return None
         deadline = time.monotonic() + IPC_TIMEOUT
         try:
             self.sock.settimeout(IPC_TIMEOUT)
             self.sock.sendall(b"R")
-            result = decode_observation(
-                receive_reply(self.sock, deadline), self.name, self.synthetic)
+            reply = receive_reply(self.sock, deadline)
+            if type(reply) is not dict or set(reply) != {"observation", "reason"}:
+                raise ValueError("OBSERVER_REPLY_SCHEMA")
+            self.last_reason = reason_class(reply["reason"])
+            result = decode_observation(reply["observation"], self.name, self.synthetic)
+            if result is None and reply["observation"] is not None:
+                self.last_reason = "OBSERVATION_STALE"
             if self.process.poll() is not None:
+                self.last_reason = "OBSERVER_EXITED"
                 return None
             return result
-        except (OSError, EOFError, ValueError, TypeError, KeyError):
+        except (OSError, EOFError, ValueError, TypeError, KeyError) as exc:
+            self.last_reason = ("IPC_TIMEOUT" if isinstance(exc, TimeoutError)
+                                else "IPC_EOF" if isinstance(exc, EOFError)
+                                else "IPC_OS_ERROR" if isinstance(exc, OSError)
+                                else "IPC_SCHEMA_REJECTED")
             # A timed-out reply may arrive later. Never reuse this stream.
             self.failed = True
             with contextlib.suppress(OSError):
@@ -196,7 +212,7 @@ def worker(args):
                     "source": asdict(observation[0]), "pair": observation[1],
                 }
                 sock.settimeout(IPC_TIMEOUT)
-                send_reply(sock, result)
+                send_reply(sock, {"observation": result, "reason": child.last_reason})
                 sock.settimeout(.25)
         finally:
             if child is not None:
