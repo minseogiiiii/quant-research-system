@@ -10,6 +10,7 @@ from post_quote_markout import IndexedBook
 from h3_momentum_horizons import POLICY,project as signal_project
 from h11_risk import Risk,validate_policy
 from h11_covariance import RollingCovariance,validate_sizing,size_units
+from h12_joint_risk import JointRisk,validate_budget
 from f6_liquidity_recovery import digest
 
 def need(ok,why):
@@ -26,7 +27,7 @@ def collect(factory,policy=None):
     return sorted(rows),reports
 
 class Portfolio:
-    def __init__(self,horizon,filtered,initial,risk_policy=None,sizing_policy=None):
+    def __init__(self,horizon,filtered,initial,risk_policy=None,sizing_policy=None,joint_budget_fraction=None):
         self.h=horizon;self.filtered=filtered;self.initial=initial;self.cash=initial
         self.pending={};self.pos={};self.blocked=False;self.events=[]
         self.count=defaultdict(int);self.realized=Decimal(0);self.peak=initial
@@ -34,6 +35,7 @@ class Portfolio:
         self.peak_exposure=Decimal(0)
         self.risk=Risk(initial,risk_policy) if risk_policy is not None else None
         self.sizing_policy=sizing_policy;self.entry_qty={};self.sizing_events=[]
+        self.joint=JointRisk(initial,joint_budget_fraction) if joint_budget_fraction is not None else None
     def signal(self,t,product,seq,flag,lat,sizing=None):
         if self.filtered and not flag:return
         self.count["signals"]+=1
@@ -92,6 +94,10 @@ class Portfolio:
                         reason=self.risk.admit(t,self.cash,self.pos,books,clocks,age,product,amount,q)
                         if reason:
                             self.reject(product,side,reason);continue
+                    if self.joint is not None:
+                        reason=self.joint.admit(t,product,q,self.pos,books,clocks,age)
+                        if reason:
+                            self.reject(product,side,reason);continue
                     if amount>self.cash:
                         self.reject(product,side,"cash_rejected");continue
                     need(product not in self.pos,"DUP_POSITION")
@@ -135,6 +141,7 @@ class Portfolio:
                 "observed_grid_peak_exposure":fmt(self.peak_exposure),
                 "cash_inventory_witness":True,"event_digest":digest(self.events)}
         if self.risk is not None:result["risk"]=self.risk.receipt()
+        if self.joint is not None:result["joint_risk"]=self.joint.receipt()
         if self.sizing_policy is not None:
             result["sizing"]={"frozen_intents":len(self.sizing_events),"intent_sha256":digest(self.sizing_events),
                 "min_base_units":min((x[3] for x in self.sizing_events),default=None),
@@ -142,7 +149,7 @@ class Portfolio:
                 "unavailable":c["sizing_unavailable"],"below_minimum":c["sizing_below_minimum"]}
         return result
 
-def simulate(packets,signals,policy=None,*,initial_cash="10000",risk_policy=None,sizing_policy=None):
+def simulate(packets,signals,policy=None,*,initial_cash="10000",risk_policy=None,sizing_policy=None,joint_budget_fraction=None):
     p=POLICY if policy is None else policy
     initial=Decimal(initial_cash)
     need(initial.is_finite() and initial>0 and initial<=Decimal("1000000000"),"INITIAL")
@@ -155,8 +162,11 @@ def simulate(packets,signals,policy=None,*,initial_cash="10000",risk_policy=None
     if sizing_policy is not None:
         need(risk_policy is not None,"SIZING_REQUIRES_RISK")
         validate_sizing(sizing_policy)
+    if joint_budget_fraction is not None:
+        need(sizing_policy is not None and risk_policy is not None,"JOINT_REQUIRES_SIZING_RISK")
+        validate_budget(joint_budget_fraction)
     covariance=RollingCovariance(grid,sizing_policy["window_returns"]) if sizing_policy is not None else None
-    portfolios=[Portfolio(h,f,initial,risk_policy,sizing_policy) for h in p["horizons_ms"] for f in (False,True)]
+    portfolios=[Portfolio(h,f,initial,risk_policy,sizing_policy,joint_budget_fraction) for h in p["horizons_ms"] for f in (False,True)]
     pos=0;prior=-1;last=first=decision=None
     with localcontext() as ctx:
         ctx.prec=80
@@ -176,6 +186,7 @@ def simulate(packets,signals,policy=None,*,initial_cash="10000",risk_policy=None
                 for a in portfolios:
                     a.expire(decision,tol);a.mark(decision,books,clocks,age)
                     if a.risk is not None:a.risk.observe(decision,a.cash,a.pos,books,clocks,age,strict=True)
+                    if a.joint is not None:a.joint.update(decision,estimate,grid)
                 while pos<len(signals) and signals[pos][0]<=decision:
                     dt,product,sq,flag=signals[pos];stamp,actual=clocks[product]
                     need(dt==decision and stamp is not None and stamp<dt and dt-stamp<=age and actual==sq and sq<seq and type(flag) is bool,"SIGNAL_CAUSAL")
@@ -209,6 +220,7 @@ def simulate(packets,signals,policy=None,*,initial_cash="10000",risk_policy=None
                 "capital_shared_across_scenarios":False,"actual_fills_verified":False,"selection_performed":False,
                 "oos_approved":False,"alpha_confirmed":False,"execution_authorized":False}
         if risk_policy is not None:result["risk_policy"]=risk_policy;result["risk_policy_sha256"]=digest(risk_policy)
+        if joint_budget_fraction is not None:result["joint_budget_fraction"]=joint_budget_fraction
         if covariance is not None:
             result["sizing_policy"]=sizing_policy;result["sizing_policy_sha256"]=digest(sizing_policy)
             result["covariance"]=covariance.receipt()
