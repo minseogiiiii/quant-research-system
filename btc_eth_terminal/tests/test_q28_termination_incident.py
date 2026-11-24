@@ -225,6 +225,71 @@ class CrashEvidenceTests(unittest.TestCase):
         )
         self.assertFalse(report["network_root_cause_proven"])
 
+
+    def test_q292_late_old_socket_callbacks_keep_first_close(self):
+        ws, guard = self.samples(guarded=False)
+        ws = ws[:3] + [
+            q24_event(3, "SOCKET_CONSTRUCTED", socket=1),
+            q24_event(4, "SOCKET_OPEN", socket=1),
+            q24_event(5, "SOCKET_ERROR", socket=0),
+            q24_event(6, "SOCKET_CLOSE", socket=0, code=1006),
+            q24_event(7, "LOCAL_CLOSE_REQUEST", socket=0, local=True),
+            q24_event(8, "PROCESS_EXIT", socket=1),
+        ]
+        guard += [
+            q27_event(4, "SOCKET_CONSTRUCTED", socket=1),
+            q27_event(5, "SOCKET_OPEN", socket=1),
+            q27_event(6, "SOCKET_ERROR", socket=0),
+            q27_event(7, "SOCKET_CLOSE", socket=0),
+            q27_event(8, "PROCESS_EXIT", socket=1),
+        ]
+        self.write(self.ws, ws)
+        self.write(self.guard, guard)
+        self.assertEqual(read_private_trace(self.ws), ws)
+        self.assertEqual(read_trace(self.guard), guard)
+        report = incident_receipt(self.ws, self.guard)
+        self.assertEqual(
+            report["observed_termination_class"],
+            "WEBSOCKET_ERROR_THEN_UNREQUESTED_CLOSE_OBSERVED",
+        )
+        self.assertTrue(report["first_socket"]["second_socket_constructed"])
+        self.assertEqual(report["q24_committed_events"], len(ws))
+        self.assertEqual(report["q27_committed_events"], len(guard))
+        self.assertFalse(report["source_continuity_certified"])
+
+    def test_q292_unknown_socket_and_duplicate_construction_rejected(self):
+        ws, guard = self.samples(guarded=False)
+        for event, idx in (("SOCKET_ERROR", 2), ("SOCKET_CONSTRUCTED", 0)):
+            with self.subTest(event=event, socket=idx):
+                w = ws + [q24_event(len(ws), event, socket=idx)]
+                g = guard + [q27_event(len(guard), event, socket=idx)]
+                self.write(self.ws, w)
+                self.write(self.guard, g)
+                with self.assertRaises(Q24TraceRejected):
+                    read_private_trace(self.ws, preserve_crash_prefix=True)
+                with self.assertRaises(Q27TraceRejected):
+                    read_trace(self.guard, preserve_crash_prefix=True)
+
+    def test_q292_old_socket_count_and_clock_regression_rejected(self):
+        ws, guard = self.samples(guarded=False)
+        w = ws + [q24_event(len(ws), "SOCKET_CONSTRUCTED", socket=1)]
+        g = guard + [q27_event(len(guard), "SOCKET_CONSTRUCTED", socket=1)]
+        late_w = q24_event(len(w), "LOCAL_CLOSE_REQUEST", local=True)
+        late_g = q27_event(len(g), "SOCKET_CLOSE")
+        for field in ("clock", "count"):
+            with self.subTest(field=field):
+                x, y = late_w.copy(), late_g.copy()
+                if field == "clock":
+                    x["elapsed_ms"] = y["elapsed_ms"] = 1
+                else:
+                    x["heartbeat_count"] = y["heartbeat_count"] = 0
+                self.write(self.ws, w + [x])
+                self.write(self.guard, g + [y])
+                with self.assertRaises(Q24TraceRejected):
+                    read_private_trace(self.ws, preserve_crash_prefix=True)
+                with self.assertRaises(Q27TraceRejected):
+                    read_trace(self.guard, preserve_crash_prefix=True)
+
     def test_actual_node_sigkill_preserves_first_close_evidence(self):
         """OS SIGKILL: Node cannot execute PROCESS_EXIT, committed prefix wins."""
         node = shutil.which("node")

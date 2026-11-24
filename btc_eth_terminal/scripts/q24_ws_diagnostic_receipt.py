@@ -91,7 +91,8 @@ def read_private_trace(
         raise Q24TraceRejected("TRACE_EVENT_BUDGET_EXCEEDED")
     items = []
     prev_elapsed = -1
-    previous_index = -1
+    constructed = set()
+    last_per_socket = {}
     for n, line in enumerate(lines):
         if len(line) > 2048:
             raise Q24TraceRejected("TRACE_EVENT_OVERSIZED")
@@ -125,7 +126,6 @@ def read_private_trace(
             raise Q24TraceRejected("INVALID_WS_CONNECTION_INDEX_OR_CLOCK")
         if (
             event["elapsed_ms"] < prev_elapsed
-            or idx is not None and idx < previous_index
             or event["message_count"] < event["heartbeat_count"]
         ):
             raise Q24TraceRejected("NONMONOTONE_OR_INCONSISTENT_WS_TRACE")
@@ -139,8 +139,23 @@ def read_private_trace(
         ):
             raise Q24TraceRejected("CLOSE_METADATA_ON_NON_CLOSE_EVENT")
         prev_elapsed = event["elapsed_ms"]
+        # Lifecycle callbacks from an older socket can arrive after a new
+        # socket is constructed. Construction order, not callback order,
+        # defines identity. The global clock and per-socket counts stay strict.
         if idx is not None:
-            previous_index = idx
+            if event["event"] == "SOCKET_CONSTRUCTED":
+                if idx != len(constructed):
+                    raise Q24TraceRejected("INVALID_WS_CONNECTION_INDEX_OR_CLOCK")
+                constructed.add(idx)
+            elif idx not in constructed:
+                raise Q24TraceRejected("INVALID_WS_CONNECTION_INDEX_OR_CLOCK")
+            counts = (event["message_count"], event["heartbeat_count"])
+            prior = last_per_socket.get(idx, (0, 0))
+            if any(a < b for a, b in zip(counts, prior, strict=True)):
+                raise Q24TraceRejected("NONMONOTONE_OR_INCONSISTENT_WS_TRACE")
+            last_per_socket[idx] = counts
+        elif event["event"] not in ("TRACE_START", "PROCESS_EXIT"):
+            raise Q24TraceRejected("INVALID_WS_CONNECTION_INDEX_OR_CLOCK")
         items.append(event)
     if items[0]["event"] != "TRACE_START":
         raise Q24TraceRejected("MISSING_WS_TRACE_START")

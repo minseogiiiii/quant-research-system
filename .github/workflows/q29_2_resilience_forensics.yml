@@ -1,0 +1,42 @@
+name: Q29.2 diagnostic race regression and read-only fault acceptance
+on:
+  push:
+    branches: [p0/q29-2-resilience-forensics-20261123]
+permissions:
+  contents: read
+jobs:
+  synthetic-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Frozen source and readonly pin verification
+        run: |
+          python - <<'PY'
+          import json, pathlib, subprocess
+          m=json.loads(pathlib.Path('.github/release-evidence/q14_candidate_source_git_blobs.json').read_text())
+          assert len(m['source_git_blobs'])==278
+          assert all(m[k] is False for k in ('real_orders_enabled','release_approved','merge_approved'))
+          for p,sha in m['source_git_blobs'].items():
+              assert subprocess.check_output(['git','hash-object',p],text=True).strip()==sha,p
+          PY
+      - name: Lint changed Python and verify new diagnostic regression
+        run: |
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q24_ws_diagnostic_receipt.py btc_eth_terminal/scripts/q27_heartbeat_receipt.py btc_eth_terminal/scripts/q22_ci_5h_supervisor.py btc_eth_terminal/tests/test_q28_termination_incident.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q28_termination_incident.py' -v
+      - name: Existing fault recovery and evidence gates
+        run: |
+          set -euo pipefail
+          for pattern in test_q22_ci_5h_contract.py test_q23_diagnostics_and_replay.py test_q24_ws_close_forensics.py test_q25_session_gap_isolation.py test_q26_three_fault_recovery.py test_q27_heartbeat_guard.py test_q29_artifact_transport.py test_q29_evidence_gate.py test_v36_2_transport_gap.py test_v36_2_sse_backpressure.py test_v36_2_storage_faults.py test_v36_3_durable_archive_gate.py; do
+            python -m unittest discover -s btc_eth_terminal/tests -p "$pattern" -v
+          done
+          node --test btc_eth_terminal/tests/q24_ws_close_probe.test.mjs

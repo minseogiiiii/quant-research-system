@@ -658,6 +658,8 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                     "event_class": result["observed_termination_class"],
                     "q24_committed": result["q24_committed_events"],
                     "q27_committed": result["q27_committed_events"],
+                    "q24_trace_validation": result["q24_trace_validation"],
+                    "q27_trace_validation": result["q27_trace_validation"],
                     "source_certified": False,
                     "real_orders_enabled": False,
                 }, sort_keys=True), flush=True)

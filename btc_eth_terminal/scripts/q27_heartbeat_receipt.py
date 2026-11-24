@@ -90,7 +90,7 @@ def read_trace(
     events = []
     prev_elapsed = -1
     prev_interventions = 0
-    current_socket = -1
+    highest_constructed_socket = -1
     last_per_socket = {}
     constructed = set()
     for n, line in enumerate(lines):
@@ -126,10 +126,7 @@ def read_trace(
             if event[key] is not None and not _nonnegative(event[key]):
                 raise Q27TraceRejected("PRIVATE_TRACE_EVENT_AGE_INVALID")
         idx = event["socket_index"]
-        if idx is not None and (
-            not _nonnegative(idx, 64)
-            or idx < current_socket
-        ):
+        if idx is not None and not _nonnegative(idx, 64):
             raise Q27TraceRejected("PRIVATE_TRACE_SOCKET_INDEX_INVALID")
         if (
             event["elapsed_ms"] < prev_elapsed
@@ -138,9 +135,10 @@ def read_trace(
             raise Q27TraceRejected("PRIVATE_TRACE_NONMONOTONE_CLOCK_OR_COUNT")
         if idx is not None:
             if event["event"] == "SOCKET_CONSTRUCTED":
-                if idx != current_socket + 1 or idx in constructed:
+                if idx != highest_constructed_socket + 1 or idx in constructed:
                     raise Q27TraceRejected("PRIVATE_TRACE_SOCKET_REUSED")
                 constructed.add(idx)
+                highest_constructed_socket = idx
             elif idx not in constructed:
                 raise Q27TraceRejected("PRIVATE_TRACE_SOCKET_NOT_CONSTRUCTED")
             if idx in last_per_socket:
@@ -153,7 +151,6 @@ def read_trace(
             last_per_socket[idx] = (
                 event["heartbeat_count"], event["other_message_count"]
             )
-            current_socket = idx
         elif event["event"] not in ("GUARD_START",):
             raise Q27TraceRejected("PRIVATE_TRACE_SOCKET_INDEX_MISSING")
         prev_elapsed = event["elapsed_ms"]
