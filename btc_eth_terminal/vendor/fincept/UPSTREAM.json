@@ -33,6 +33,11 @@
       "upstream": "fincept-qt/scripts/Analytics/backtesting/base/contract.py",
       "local": "btc_eth_terminal/vendor/fincept/base/contract.py",
       "git_blob": "a8339514c0b5c1a1056bfebe24bfcb903989bd1d"
+    },
+    {
+      "upstream": "fincept-qt/scripts/Analytics/pyportfolioopt_wrapper/additional_optimizers.py",
+      "local": "btc_eth_terminal/vendor/fincept/portfolio/additional_optimizers.py",
+      "git_blob": "273df40785f71a92c7f0e4b0370fc5e6b8e2382e"
     }
   ],
   "scope": "Unmodified isolated upstream sources. No runtime import by existing engine. Review combined-work licensing before linkage or distribution."
