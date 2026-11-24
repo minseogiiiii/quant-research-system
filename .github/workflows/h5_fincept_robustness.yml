@@ -1,0 +1,23 @@
+name: H5 registered Fincept robustness diagnostics
+on:
+  push:
+    branches: ['integration/h1-f6-research-20261124']
+    paths: ['btc_eth_terminal/scripts/h5_*.py','btc_eth_terminal/tests/test_h5_*.py','.github/workflows/h5_fincept_robustness.yml']
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts:btc_eth_terminal/tests
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy==2.2.6 pandas==2.2.3
+      - run: python btc_eth_terminal/scripts/verify_fincept_vendor.py
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h5_*.py' -v
