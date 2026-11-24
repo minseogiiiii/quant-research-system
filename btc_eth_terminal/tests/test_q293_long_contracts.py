@@ -126,9 +126,9 @@ class LongContracts(unittest.TestCase):
                 ledger.record("secondary", 1, "READY", "b" * 32)
                 ledger.record("secondary", 1, "NOT_READY")
                 ledger.record("secondary", 2, "READY", "c" * 32)
-                with patch("q293_source_ledger.os.fsync", side_effect=OSError):
-                    with self.assertRaises(OSError):
-                        ledger.record("secondary", 2, "RETIRED")
+                with (patch("q293_source_ledger.os.fsync", side_effect=OSError),
+                      self.assertRaises(OSError)):
+                    ledger.record("secondary", 2, "RETIRED")
                 with self.assertRaises(ValueError):
                     ledger.record("primary", 1, "STOPPED")
             finally:
