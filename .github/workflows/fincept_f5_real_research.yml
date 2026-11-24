@@ -1,0 +1,40 @@
+name: Fincept F5 private real research diagnostic
+on:
+  push:
+    branches: ['integration/fincept-microstructure-20261124']
+    paths: ['btc_eth_terminal/backend/f5_*.py','btc_eth_terminal/scripts/f5_private_research_diagnostic_gate.py','.github/workflows/fincept_f5_real_research.yml']
+permissions:
+  contents: read
+jobs:
+  real-archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:.github/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Retrieve previously authorized frozen archive
+        env:
+          Q13_PRIVATE_RELEASE_URL: ${{ secrets.Q13_PRIVATE_RELEASE_URL }}
+          Q13_GITHUB_ARCHIVE_TOKEN: ${{ secrets.Q13_GITHUB_ARCHIVE_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/f4_private" "$RUNNER_TEMP/f4_receipt"
+          python .github/scripts/q16_secure_private_archive_download.py --output "$RUNNER_TEMP/f4_private/q7_frozen.zip"
+      - name: Verify independent clock, descriptive IC and execution quote coverage
+        run: python btc_eth_terminal/scripts/f5_private_research_diagnostic_gate.py --release-zip "$RUNNER_TEMP/f4_private/q7_frozen.zip" --output "$RUNNER_TEMP/f4_receipt/receipt.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: f5-real-research-diagnostic
+          path: ${{ runner.temp }}/f4_receipt/receipt.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove raw archive
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/f4_private"
