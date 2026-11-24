@@ -9,7 +9,8 @@ from q13_private_fixture_gate import verify_zip,PREFIX
 from independent_soak_replay import strict_json
 from h1_streaming_parquet import convert
 from h6_registered_strategy_runner import run
-from h5_experiment_registry import snapshot
+from h5_experiment_registry import snapshot,sha
+from h8_qualification import assess
 PIN="8f2e0ec88a601a92ab4c7bcd0e04b20536fbe46bbd8b3c7f67ae3c1d075c28e5"
 SOURCE=PREFIX+"backend/data/live_v14_clean_120s/coinbase_btc_eth_soak_wsgXRy/"
 def require(ok,reason):
@@ -42,6 +43,9 @@ def gate(archive,output):
         require(r["results"][0]["sessions"][0]["closed_roundtrips"]==5,"H6_BASELINE_TRADE_COUNT")
         require(abs(r["results"][0]["sessions"][0]["net_return"]-(-7.651274/10000))<1e-8,"H6_BASELINE_CASH")
         r.update(status="ENGINEERING_DIAGNOSTIC_PASS",raw_data_uploaded=False,source_kind="PREVIOUSLY_INSPECTED_HISTORICAL")
+        qualification=assess(r,journal,r["plan_sha256"],r["registry_head_sha256"],sha(r))
+        require(all(t["verdict"]=="REJECTED_DEVELOPMENT" for t in qualification["trials"]),"H8_NEGATIVE_DEVELOPMENT")
+        r["qualification"]=qualification
         with output.open("x") as f:json.dump(r,f,sort_keys=True,allow_nan=False);f.write("\n")
         print("H6_REAL_REGISTERED_RUNNER_PASS")
 if __name__=="__main__":
