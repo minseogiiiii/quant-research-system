@@ -4,6 +4,8 @@ import {ResilientGatewayClient} from '../datahub/resilientClient';
 import {workspaces,widgets,initial,decode,move,toggle,resize,commands,parseCommand} from './model';
 import type {Workspace,Widget,Layout} from './model';
 import './workspace.css';
+import {admitCandleBundle} from './candleContract';
+import SourceCandleChart from './SourceCandleChart';
 const key=(w:Workspace)=>'fincept.workspace.v1.'+w;
 function load(w:Workspace){try{return decode(localStorage.getItem(key(w)),w);}catch{return initial(w);}}
 function save(w:Workspace,l:Layout){try{localStorage.setItem(key(w),JSON.stringify(l));return true;}catch{return false;}}
@@ -18,7 +20,7 @@ function App(){
  function update(l:Layout){setLayout(l);setMessage(save(w,l)?'Layout saved':'Storage unavailable; layout is temporary');}
  function switchTo(next:Workspace){setW(next);setLayout(load(next));setMessage('');}
  function run(raw:string){const c=parseCommand(raw);if(!c){setMessage('Unknown command; no action executed');return;}
- if(c==='BTC'||c==='ETH'||c==='BTC OFI'||c==='ETH OFI'||c==='SYS'){
+ if(c==='BTC'||c==='ETH'||c==='BTC OFI'||c==='ETH OFI'||c==='SYS'||c==='BTC CHART'||c==='ETH CHART'){
  const target:Workspace=c==='SYS'?'System':c.endsWith('OFI')?'Microstructure':'Market';
  const l=load(target);const next=l.panels.some(p=>p.id===c)?l:toggle(l,c);
  setW(target);setLayout(next);setMessage(save(target,next)?'Opened '+c:'Opened; storage unavailable');setPalette(false);return;}
@@ -29,6 +31,10 @@ function App(){
  if(id==='SYS')return <dl><dt>Admission</dt><dd>{view.status}</dd><dt>Reason</dt><dd>{view.reason}</dd><dt>Source</dt><dd>{view.frame?.active_source??'N/A'}</dd><dt>Generation</dt><dd>{view.frame?.generation??'N/A'}</dd><dt>Session</dt><dd>{view.frame?.source_session??'N/A'}</dd></dl>;
  if(!view.frame)return <p role="status">No currently trusted quote</p>;
  const q=view.frame.states[id.startsWith('BTC')?'BTC-USD':'ETH-USD'];
+ if(id.endsWith('CHART')){
+ const bundle=admitCandleBundle(q);
+ return bundle?<SourceCandleChart key={view.frame.gateway_run+':'+view.frame.generation+':'+bundle.key} product={q.product} bundle={bundle}/>:<p role="status">No source-bound completed Candle bundle; chart blocked.</p>;
+ }
  if(id.endsWith('OFI')){const ofi=q.ofi_since_connection_base;return <><p>Connection-scoped OFI (base units)</p><strong>{typeof ofi==='string'&&/^-?\d+(\.\d+)?$/.test(ofi)?ofi:'N/A'}</strong><p>Session {q.session_id}</p></>;}
  return <><div className="f3quotes"><div>BEST BID <strong>{q.best_bid}</strong></div><div>BEST ASK <strong>{q.best_ask}</strong></div></div><dl><dt>Version</dt><dd>{q.state_version}</dd><dt>Receiver UTC</dt><dd>{new Date(q.receiver_time_ms).toISOString()}</dd><dt>Source hash</dt><dd>{q.source_raw_sha256}</dd></dl></>;
  }

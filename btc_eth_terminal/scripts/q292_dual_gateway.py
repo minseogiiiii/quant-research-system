@@ -26,6 +26,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 from independent_soak_replay import price, strict_json
+from f3_candle_bundle import candle_bundle
 from q25_session_isolation_guard import SourceEpochIsolatedEngine
 from q292_failover_policy import Arbiter, Source
 from q293_b4_diagnostics import ObserverJournal, reason_class
@@ -43,6 +44,7 @@ class CheckedEngine(SourceEpochIsolatedEngine):
     """Independent Decimal ladder projection, sharing only the archived input."""
 
     def __init__(self, **kwargs):
+        self.f3_candle_bundles = {}
         super().__init__(**kwargs)
         self.shadow = {}
         self.shadow_epoch = None
@@ -51,7 +53,15 @@ class CheckedEngine(SourceEpochIsolatedEngine):
         self.witness_failure = False
         self.diagnostic = None
 
+    def _publish(self, product, receiver_ms, seq):
+        before = self.version
+        super()._publish(product, receiver_ms, seq)
+        if self.version != before:
+            row = self.rows[product][-1]
+            self.f3_candle_bundles[product] = candle_bundle(row, self.candles[product])
+
     def _invalid(self, reason, phase="QUARANTINED"):
+        self.f3_candle_bundles.clear()
         # Invalidation must happen even if the diagnostic disk fails.
         try:
             if self.diagnostic is not None:
@@ -191,6 +201,14 @@ class CheckedEngine(SourceEpochIsolatedEngine):
                    or row["session_id"] != health["session_id"]
                    for p, row in pair.items()):
                 return None
+            # Only attach the bundle captured at this exact witnessed row's publication.
+            for p, row in pair.items():
+                bundle = self.f3_candle_bundles.get(p)
+                if bundle and all(bundle[k] == row[k] for k in (
+                    "product", "run_id", "session_id", "connection_id", "state_version",
+                    "source_sequence", "source_raw_sha256"
+                )):
+                    pair[p] = {**row, "completed_candles": bundle}
             return health, copy.deepcopy(pair)
 
 

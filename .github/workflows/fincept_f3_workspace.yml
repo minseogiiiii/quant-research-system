@@ -24,6 +24,24 @@ jobs:
           npx --no-install vite build --config vite.workspace.config.ts
           npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/compiled src/datahub/resilientStore.ts src/datahub/resilientClient.ts
           node --test tests/resilientStore.test.mjs
+          npx --no-install tsc --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/candle-compiled src/workspace/candleContract.ts
+          node --test tests/candleContract.test.mjs
+  candle-backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_f3_candle_bundle.py' -v
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_dual_gateway.py' -v
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_isolated_observer.py' -v
   browser:
     needs: workspace-contracts
     runs-on: ubuntu-24.04
