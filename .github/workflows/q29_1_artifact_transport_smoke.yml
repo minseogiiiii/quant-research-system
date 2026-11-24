@@ -1,0 +1,73 @@
+name: Q29.1 artifact-ID transport smoke (no market capture)
+on:
+  push:
+    branches: [p0/q29-1-artifact-id-transport-20261123]
+    paths:
+      - '.github/workflows/q29_1_artifact_transport_smoke.yml'
+      - 'btc_eth_terminal/scripts/q29_artifact_transport.py'
+      - 'btc_eth_terminal/tests/test_q29_artifact_transport.py'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  upload-and-read-back:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      zip_sha: ${{ steps.upload.outputs.artifact-digest }}
+      fixture_sha: ${{ steps.fixture.outputs.digest }}
+    env:
+      PYTHONPATH: btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline adversarial transport and evidence contracts
+        run: |
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q29_artifact_transport.py btc_eth_terminal/tests/test_q29_artifact_transport.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q29_artifact_transport.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q29_evidence_gate.py' -v
+      - name: Create explicitly synthetic one-file transfer fixture
+        id: fixture
+        run: |
+          mkdir "$RUNNER_TEMP/q29_transport_fixture"
+          printf '{"synthetic":true,"market_evidence":false}\n' > "$RUNNER_TEMP/q29_transport_fixture/transport_fixture.json"
+          echo "digest=$(sha256sum "$RUNNER_TEMP/q29_transport_fixture/transport_fixture.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: q29-transport-smoke-not-market
+          path: ${{ runner.temp }}/q29_transport_fixture/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Read back exact artifact ID on uploading runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
+          FIXTURE_SHA: ${{ steps.fixture.outputs.digest }}
+        run: |
+          python btc_eth_terminal/scripts/q29_artifact_transport.py --artifact-id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --run-id "$GITHUB_RUN_ID" --sha "$GITHUB_SHA" --directory "$RUNNER_TEMP/q29_same_runner_readback" --smoke-sha "$FIXTURE_SHA"
+  cross-runner-read-back:
+    needs: upload-and-read-back
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    env:
+      PYTHONPATH: btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch exact same artifact from new runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.upload-and-read-back.outputs.artifact_id }}
+          ZIP_SHA: ${{ needs.upload-and-read-back.outputs.zip_sha }}
+          FIXTURE_SHA: ${{ needs.upload-and-read-back.outputs.fixture_sha }}
+        run: |
+          python btc_eth_terminal/scripts/q29_artifact_transport.py --artifact-id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --run-id "$GITHUB_RUN_ID" --sha "$GITHUB_SHA" --directory "$RUNNER_TEMP/q29_cross_runner_readback" --smoke-sha "$FIXTURE_SHA"
+          echo PASS_Q29_TRANSPORT_SAME_AND_CROSS_RUNNER_NO_MARKET
