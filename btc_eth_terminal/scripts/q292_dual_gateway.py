@@ -10,6 +10,7 @@ import argparse
 import contextlib
 import copy
 import hashlib
+import heapq
 import json
 import os
 import secrets
@@ -75,7 +76,8 @@ class CheckedEngine(SourceEpochIsolatedEngine):
             raise ValueError("SHADOW_SEQUENCE_GAP")
         self.shadow_seq = seq
         if wire["channel"] != "l2_data":
-            return
+            return {}
+        touched = {}
         for event in wire["events"]:
             p, kind = event["product_id"], event["type"]
             if p not in PRODUCTS:
@@ -91,12 +93,14 @@ class CheckedEngine(SourceEpochIsolatedEngine):
                 px = price(update["price_level"])
                 qty = price(update["new_quantity"], zero=True)
                 levels = self.shadow[p][side]
+                touched.setdefault(p, set()).add((side, px))
                 if qty:
                     levels[px] = qty
                 else:
                     levels.pop(px, None)
                 if len(levels) > MAX_LEVELS:
                     raise ValueError("SHADOW_DEPTH_BUDGET")
+        return touched
 
     def _matches_row(self, p, row):
         book = self.shadow[p]
@@ -105,7 +109,8 @@ class CheckedEngine(SourceEpochIsolatedEngine):
         if row["l2_book_levels"] != {k: len(v) for k, v in book.items()}:
             return False
         for side, key in (("bid", "bids"), ("offer", "asks")):
-            levels = sorted(book[side].items(), reverse=side == "bid")[:10]
+            select_levels = heapq.nlargest if side == "bid" else heapq.nsmallest
+            levels = select_levels(10, book[side].items())
             reported = row["depth"][key]
             if len(levels) != 10 or len(reported) != 10:
                 return False
@@ -128,18 +133,28 @@ class CheckedEngine(SourceEpochIsolatedEngine):
     def consume(self, line):
         with self._cv:
             try:
-                self._shadow_apply(line)
+                touched = self._shadow_apply(line)
                 super().consume(line)
                 if self.status != "HEALTHY":
                     return
                 for p in PRODUCTS:
-                    if self.books[p].level != self.shadow.get(p):
+                    book = self.shadow.get(p)
+                    primary = self.books[p].level
+                    if book is None or any(len(primary[k]) != len(book[k])
+                                           for k in ("bid", "offer")):
+                        raise ValueError("INDEPENDENT_BOOK_DIVERGENCE")
+                    # Compare every modified level even between publications;
+                    # retain full equality at each new publishable state.
+                    if any(primary[k].get(px) != book[k].get(px)
+                           for k, px in touched.get(p, ())):
                         raise ValueError("INDEPENDENT_BOOK_DIVERGENCE")
                     if not self.rows[p]:
                         continue
                     row = self.rows[p][-1]
                     if self.witnessed.get(p) == row["state_version"]:
                         continue
+                    if primary != book:
+                        raise ValueError("INDEPENDENT_BOOK_DIVERGENCE")
                     # Some multi-event frames publish intermediate states;
                     # do not attest them unless the independent final ladder
                     # matches. A subsequent verified state can be admitted.

@@ -5,9 +5,12 @@ Candidate only. No gapless replay, venue attestation, or order admission.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import re
+import select
+import stat
 import threading
 import time
 from http.server import ThreadingHTTPServer
@@ -47,7 +50,9 @@ class TransitionLedger:
 
     def __init__(self, path):
         path = Path(path)
-        if path.parent.stat().st_mode & 0o077:
+        parent = path.parent.lstat()
+        if (not stat.S_ISDIR(parent.st_mode) or parent.st_uid != os.getuid()
+                or parent.st_mode & 0o077):
             raise ValueError("LEDGER_PRIVATE_DIRECTORY_REQUIRED")
         self.fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY |
                           os.O_NOFOLLOW, 0o600)
@@ -68,6 +73,10 @@ class TransitionLedger:
     def commit(self, body):
         if self.failed:
             raise ValueError("LEDGER_FAILED")
+        if (body.get("real_orders_enabled") is not False
+                or body.get("zero_gap_certified") is not False
+                or body.get("historical_gap_recovered", False) is not False):
+            raise ValueError("LEDGER_UNSAFE_ADMISSION")
         value = record_fields(body)
         if value == self.last:
             return
@@ -102,7 +111,13 @@ def audit_ledger(path):
     """Verify committed prefix, distinguish torn tail from valid completion."""
     previous, count, generation, run = ZERO, 0, -1, None
     torn = False
-    with Path(path).open("rb") as stream:
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as stream:
+        start = os.fstat(stream.fileno())
+        if (not stat.S_ISREG(start.st_mode) or start.st_uid != os.getuid()
+                or start.st_nlink != 1 or start.st_mode & 0o077
+                or start.st_size > MAX_RECORDS * MAX_LINE):
+            raise ValueError("LEDGER_UNSAFE_FILE")
         while raw := stream.readline(MAX_LINE + 1):
             if len(raw) > MAX_LINE or count >= MAX_RECORDS:
                 raise ValueError("LEDGER_BOUND")
@@ -114,7 +129,9 @@ def audit_ledger(path):
             if (set(row) != {"index", "previous", "run", "generation",
                              "source", "session_sha256", "real_orders_enabled",
                              "historical_gap_recovered"}
-                    or row["index"] != count or row["previous"] != previous
+                    or type(row["index"]) is not int or row["index"] != count
+                    or type(row["generation"]) is not int
+                    or row["previous"] != previous
                     or row["generation"] <= generation
                     or run is not None and row["run"] != run
                     or row["real_orders_enabled"] is not False
@@ -123,6 +140,15 @@ def audit_ledger(path):
                 raise ValueError("LEDGER_INTEGRITY")
             count += 1
             previous, generation, run = digest, row["generation"], row["run"]
+            if (type(run) is not str or not re.fullmatch("[0-9a-f]{32}", run)
+                    or row["source"] not in (None, "primary", "secondary")
+                    or (row["source"] is None) != (row["session_sha256"] is None)
+                    or row["session_sha256"] is not None and not re.fullmatch(
+                        "[0-9a-f]{64}", row["session_sha256"])):
+                raise ValueError("LEDGER_RECORD_SCHEMA")
+        end = os.fstat(stream.fileno())
+        if (start.st_size, start.st_mtime_ns) != (end.st_size, end.st_mtime_ns):
+            raise ValueError("LEDGER_CHANGED_DURING_READ")
     return {"records": count, "torn_tail": torn, "terminal_sha256": previous,
             "zero_gap_certified": False}
 
@@ -203,6 +229,32 @@ class Publisher:
 
 
 class StreamHandler(Handler):
+    def handle(self):
+        # Socket idle timeout alone permits an endless slow-drip request.
+        deadline = time.monotonic() + .75
+        header = bytearray()
+        while b"\r\n\r\n" not in header:
+            left = deadline - time.monotonic()
+            if left <= 0 or len(header) >= 8192:
+                return
+            ready, _, _ = select.select([self.connection], [], [], left)
+            if not ready:
+                return
+            try:
+                part = self.connection.recv(8193 - len(header))
+            except OSError:
+                return
+            if not part:
+                return
+            header.extend(part)
+            if len(header) > 8192:
+                return
+        self.rfile.close()
+        self.rfile = io.BytesIO(bytes(header))
+        self.close_connection = True
+        self.handle_one_request()
+        self.close_connection = True
+
     def do_GET(self):
         if self.path != "/events":
             super().do_GET()
@@ -221,6 +273,8 @@ class StreamHandler(Handler):
     def stream(self):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Connection", "close")
         self.end_headers()
@@ -256,6 +310,8 @@ class BoundedServer(ThreadingHTTPServer):
     block_on_close = False
 
     def __init__(self, publisher, port=0, stream_seconds=120):
+        if not 1 <= stream_seconds <= 120:
+            raise ValueError("STREAM_DURATION_BOUND")
         self.route = publisher
         self.stream_seconds = stream_seconds
         self.stream_slots = threading.BoundedSemaphore(8)
