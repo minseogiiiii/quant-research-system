@@ -6,6 +6,7 @@ import {pairProjections} from './pair';
 import type {Pair} from './pair';
 import './terminal.css';
 import ResearchPanel from '../research/ResearchPanel';
+import QualificationPanel from '../research/QualificationPanel';
 const MAX=24*1024*1024;
 function Replay(){
  const [pair,setPair]=useState<Pair|null>(null),[error,setError]=useState(''),[time,setTime]=useState<number|null>(null),[log,setLog]=useState(true);
@@ -39,7 +40,7 @@ function Replay(){
  </section>;
 }
 function Terminal(){
- const [mode,setMode]=useState<'LIVE'|'REPLAY'|'RESEARCH'>('REPLAY');
- return <><header className="ms-top"><strong>Quant Research Terminal · Candidate</strong><nav aria-label="Data mode"><button aria-pressed={mode==='LIVE'} onClick={()=>setMode('LIVE')}>LIVE READ-ONLY</button><button aria-pressed={mode==='REPLAY'} onClick={()=>setMode('REPLAY')}>ARCHIVE REPLAY</button><button aria-pressed={mode==='RESEARCH'} onClick={()=>setMode('RESEARCH')}>RESEARCH</button></nav><span>Orders disabled · NO CONFIRMED EXECUTABLE ALPHA</span></header>{mode==='LIVE'?<WorkspaceCandidate key="live"/>:mode==='RESEARCH'?<ResearchPanel key="research"/>:<Replay key="replay"/>}</>;
+ const [mode,setMode]=useState<'LIVE'|'REPLAY'|'RESEARCH'|'QUALIFICATION'>('REPLAY');
+ return <><header className="ms-top"><strong>Quant Research Terminal · Candidate</strong><nav aria-label="Data mode"><button aria-pressed={mode==='LIVE'} onClick={()=>setMode('LIVE')}>LIVE READ-ONLY</button><button aria-pressed={mode==='REPLAY'} onClick={()=>setMode('REPLAY')}>ARCHIVE REPLAY</button><button aria-pressed={mode==='RESEARCH'} onClick={()=>setMode('RESEARCH')}>RESEARCH</button><button aria-pressed={mode==='QUALIFICATION'} onClick={()=>setMode('QUALIFICATION')}>QUALIFICATION</button></nav><span>Orders disabled · NO CONFIRMED EXECUTABLE ALPHA</span></header>{mode==='LIVE'?<WorkspaceCandidate key="live"/>:mode==='RESEARCH'?<ResearchPanel key="research"/>:mode==='QUALIFICATION'?<QualificationPanel key="qualification"/>:<Replay key="replay"/>}</>;
 }
 createRoot(document.getElementById('root')!).render(<React.StrictMode><Terminal/></React.StrictMode>);

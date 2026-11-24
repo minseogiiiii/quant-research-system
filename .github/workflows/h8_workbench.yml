@@ -1,0 +1,34 @@
+name: H8 qualification workbench
+on:
+  push:
+    branches: ['integration/h1-f6-research-20261124']
+    paths: ['btc_eth_terminal/frontend/src/research/QualificationPanel.tsx','btc_eth_terminal/frontend/src/research/qualificationContract.ts','btc_eth_terminal/frontend/src/microstructure/Terminal.tsx','btc_eth_terminal/frontend/tests/qualification.test.mjs','btc_eth_terminal/scripts/h8_*.py','.github/workflows/h8_workbench.yml']
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts:btc_eth_terminal/tests
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyarrow==19.0.1 duckdb==1.2.2 numpy==2.2.6 pandas==2.2.3 playwright==1.51.0
+      - run: npm ci --ignore-scripts --prefix btc_eth_terminal/frontend
+      - working-directory: btc_eth_terminal/frontend
+        run: |
+          npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/qualification-compiled src/research/qualificationContract.ts
+          node --test tests/qualification.test.mjs
+          npx --no-install tsc --noEmit
+          npx --no-install vite build --config vite.microstructure.config.ts
+      - run: python -m playwright install --with-deps chromium
+      - run: python btc_eth_terminal/scripts/h8_workbench_browser.py
+      - run: python btc_eth_terminal/scripts/f4_microstructure_browser.py
