@@ -31,3 +31,4 @@ jobs:
           npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/compiled src/datahub/resilientStore.ts
           node --test tests/resilientStore.test.mjs
           npx --no-install tsc --noEmit
+          npx --no-install vite build --config vite.fincept.config.ts
