@@ -42,3 +42,59 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install --disable-pip-version-check numpy==2.2.6 pandas==2.2.3
       - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_fincept_qualification.py' -v
+  browser-synthetic:
+    needs: [vendor-integrity, frontend-contracts, analytics-qualification]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --prefix btc_eth_terminal/frontend
+      - run: python -m pip install --disable-pip-version-check playwright==1.51.0
+      - run: python -m playwright install --with-deps chromium
+      - run: python -u btc_eth_terminal/scripts/f1_browser_e2e.py --synthetic --workdir "$RUNNER_TEMP/f1s" --output "$RUNNER_TEMP/f1s.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: f1-synthetic-browser-receipt
+          path: ${{ runner.temp }}/f1s.json
+          if-no-files-found: warn
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/f1s"
+  browser-live:
+    if: >-
+      github.event.head_commit.message == 'F1-C: arm isolated browser live parity'
+    needs: [browser-synthetic]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --prefix btc_eth_terminal/frontend
+      - run: python -m pip install --disable-pip-version-check playwright==1.51.0
+      - run: python -m playwright install --with-deps chromium
+      - run: |
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          python -u btc_eth_terminal/scripts/f1_browser_e2e.py --execute-real-public --workdir "$RUNNER_TEMP/f1l" --output "$RUNNER_TEMP/f1l.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: f1-live-browser-receipt
+          path: ${{ runner.temp }}/f1l.json
+          if-no-files-found: warn
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/f1l"
