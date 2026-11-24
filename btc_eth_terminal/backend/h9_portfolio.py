@@ -9,6 +9,7 @@ from f5_execution_depth import walk
 from post_quote_markout import IndexedBook
 from h3_momentum_horizons import POLICY,project as signal_project
 from h11_risk import Risk,validate_policy
+from h11_covariance import RollingCovariance,validate_sizing,size_units
 from f6_liquidity_recovery import digest
 
 def need(ok,why):
@@ -25,21 +26,30 @@ def collect(factory,policy=None):
     return sorted(rows),reports
 
 class Portfolio:
-    def __init__(self,horizon,filtered,initial,risk_policy=None):
+    def __init__(self,horizon,filtered,initial,risk_policy=None,sizing_policy=None):
         self.h=horizon;self.filtered=filtered;self.initial=initial;self.cash=initial
         self.pending={};self.pos={};self.blocked=False;self.events=[]
         self.count=defaultdict(int);self.realized=Decimal(0);self.peak=initial
         self.dd=Decimal(0);self.grid=0;self.missing=0;self.last_equity=None
         self.peak_exposure=Decimal(0)
         self.risk=Risk(initial,risk_policy) if risk_policy is not None else None
-    def signal(self,t,product,seq,flag,lat):
+        self.sizing_policy=sizing_policy;self.entry_qty={};self.sizing_events=[]
+    def signal(self,t,product,seq,flag,lat,sizing=None):
         if self.filtered and not flag:return
         self.count["signals"]+=1
         if self.blocked:self.count["blocked_signal"]+=1
         elif product in self.pending or product in self.pos:self.count["overlap_rejected"]+=1
-        else:self.pending[product]=("BUY",t+lat,seq);self.count["entry_intents"]+=1
+        else:
+            self.pending[product]=("BUY",t+lat,seq);self.count["entry_intents"]+=1
+            if self.sizing_policy is not None:
+                q=sizing
+                if q is None:self.reject(product,"BUY","sizing_unavailable")
+                elif q==0:self.reject(product,"BUY","sizing_below_minimum")
+                else:
+                    self.entry_qty[product]=q
+                    self.sizing_events.append((t,product,seq,q))
     def reject(self,product,side,reason):
-        del self.pending[product];self.count[reason]+=1
+        del self.pending[product];self.entry_qty.pop(product,None);self.count[reason]+=1
         if side=="SELL":self.blocked=True;self.count["failed_exits"]+=1
         else:self.count["failed_entries"]+=1
     def expire(self,t,tol):
@@ -66,14 +76,17 @@ class Portfolio:
                 need(seq>intent[2],"FUTURE_QUOTE")
                 if side=="BUY" and self.blocked:
                     self.reject(product,side,"blocked_entry");continue
-                k=(product,side)
+                requested=qty[product]
+                if self.sizing_policy is not None:
+                    requested=self.entry_qty[product] if side=="BUY" else int(self.pos[product][1]*SCALE)
+                k=(product,side,requested)
                 if k not in cache:
-                    b=books[product];cache[k]=walk(b.bid,b.offer,side,qty[product],cap,fee,slip)
+                    b=books[product];cache[k]=walk(b.bid,b.offer,side,requested,cap,fee,slip)
                 r=cache[k]
                 if r["status"]!="INDICATIVE_FULL_DEPTH_QUOTE":
                     self.reject(product,side,"depth_"+side.lower());continue
                 amount=Decimal(r["all_in_quote"]);q=Decimal(r["requested_base"])
-                need(amount>0 and q==Decimal(qty[product])/SCALE,"QUOTE")
+                need(amount>0 and q==Decimal(requested)/SCALE,"QUOTE")
                 if side=="BUY":
                     if self.risk is not None:
                         reason=self.risk.admit(t,self.cash,self.pos,books,clocks,age,product,amount,q)
@@ -82,6 +95,7 @@ class Portfolio:
                     if amount>self.cash:
                         self.reject(product,side,"cash_rejected");continue
                     need(product not in self.pos,"DUP_POSITION")
+                    self.entry_qty.pop(product,None)
                     self.cash-=amount;self.pos[product]=(amount,q)
                     self.pending[product]=("SELL",t+self.h+lat,seq);self.count["entries"]+=1
                 else:
@@ -121,9 +135,14 @@ class Portfolio:
                 "observed_grid_peak_exposure":fmt(self.peak_exposure),
                 "cash_inventory_witness":True,"event_digest":digest(self.events)}
         if self.risk is not None:result["risk"]=self.risk.receipt()
+        if self.sizing_policy is not None:
+            result["sizing"]={"frozen_intents":len(self.sizing_events),"intent_sha256":digest(self.sizing_events),
+                "min_base_units":min((x[3] for x in self.sizing_events),default=None),
+                "max_base_units":max((x[3] for x in self.sizing_events),default=None),
+                "unavailable":c["sizing_unavailable"],"below_minimum":c["sizing_below_minimum"]}
         return result
 
-def simulate(packets,signals,policy=None,*,initial_cash="10000",risk_policy=None):
+def simulate(packets,signals,policy=None,*,initial_cash="10000",risk_policy=None,sizing_policy=None):
     p=POLICY if policy is None else policy
     initial=Decimal(initial_cash)
     need(initial.is_finite() and initial>0 and initial<=Decimal("1000000000"),"INITIAL")
@@ -133,7 +152,11 @@ def simulate(packets,signals,policy=None,*,initial_cash="10000",risk_policy=None
     need(len(signals)<=400000 and signals==sorted(signals) and len({(x[0],x[1]) for x in signals})==len(signals),"SIGNALS")
     books={k:IndexedBook() for k in PRODUCTS};clocks=dict.fromkeys(PRODUCTS,(None,None))
     if risk_policy is not None:validate_policy(risk_policy)
-    portfolios=[Portfolio(h,f,initial,risk_policy) for h in p["horizons_ms"] for f in (False,True)]
+    if sizing_policy is not None:
+        need(risk_policy is not None,"SIZING_REQUIRES_RISK")
+        validate_sizing(sizing_policy)
+    covariance=RollingCovariance(grid,sizing_policy["window_returns"]) if sizing_policy is not None else None
+    portfolios=[Portfolio(h,f,initial,risk_policy,sizing_policy) for h in p["horizons_ms"] for f in (False,True)]
     pos=0;prior=-1;last=first=decision=None
     with localcontext() as ctx:
         ctx.prec=80
@@ -142,13 +165,22 @@ def simulate(packets,signals,policy=None,*,initial_cash="10000",risk_policy=None
             prior=seq;last=t
             if first is None:first=t;decision=((t+grid-1)//grid)*grid
             while decision<=t:
+                estimate=None
+                if covariance is not None:
+                    mids={}
+                    for product in PRODUCTS:
+                        stamp,_=clocks[product];book=books[product]
+                        if stamp is not None and stamp<decision and decision-stamp<=age and book.bid and book.offer:
+                            mids[product]=book.best("bid")[0]+book.best("offer")[0]
+                    estimate=covariance.observe(decision,mids)
                 for a in portfolios:
                     a.expire(decision,tol);a.mark(decision,books,clocks,age)
                     if a.risk is not None:a.risk.observe(decision,a.cash,a.pos,books,clocks,age,strict=True)
                 while pos<len(signals) and signals[pos][0]<=decision:
                     dt,product,sq,flag=signals[pos];stamp,actual=clocks[product]
                     need(dt==decision and stamp is not None and stamp<dt and dt-stamp<=age and actual==sq and sq<seq and type(flag) is bool,"SIGNAL_CAUSAL")
-                    for a in portfolios:a.signal(dt,product,sq,flag,lat)
+                    sizing=None if estimate is None else size_units(estimate,product,mids[product],initial,qty[product],sizing_policy)
+                    for a in portfolios:a.signal(dt,product,sq,flag,lat,sizing)
                     pos+=1
                 decision+=grid
             for a in portfolios:a.expire(t,tol)
@@ -177,4 +209,7 @@ def simulate(packets,signals,policy=None,*,initial_cash="10000",risk_policy=None
                 "capital_shared_across_scenarios":False,"actual_fills_verified":False,"selection_performed":False,
                 "oos_approved":False,"alpha_confirmed":False,"execution_authorized":False}
         if risk_policy is not None:result["risk_policy"]=risk_policy;result["risk_policy_sha256"]=digest(risk_policy)
+        if covariance is not None:
+            result["sizing_policy"]=sizing_policy;result["sizing_policy_sha256"]=digest(sizing_policy)
+            result["covariance"]=covariance.receipt()
         return result
