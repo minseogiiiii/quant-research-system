@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 import duckdb
 import pyarrow as pa
@@ -59,36 +60,44 @@ def rows(root,m,pin):
         need(identity(path)==before and h.hexdigest()==c["archive_sha256"] and count==c["messages"],"CHUNK_CHANGED")
     need(prior+1==m["messages"],"COUNT")
 
-def verify_tables(folder,expected,witness):
-    db=duckdb.connect(":memory:",config={"memory_limit":"256MB","threads":"2","temp_directory":str(folder/"duckdb-temp")})
+def verify_tables(folder,expected,witness,*,timings=None):
+    db=duckdb.connect(":memory:",config={"memory_limit":"256MB","threads":"1","preserve_insertion_order":"true","temp_directory":str(folder/"duckdb-temp")})
     try:
         receipts={}
         epoch=Epoch(0)
         for name,schema in SCHEMAS.items():
             path=folder/(name+".parquet")
-            order="sequence" if name=="packets" else "sequence,event_index,item_index"
-            q="SELECT * FROM read_parquet(?) ORDER BY "+order
-            cursor=db.execute(q,[str(path)])
-            h=hashlib.sha256();count=0
+            started=time.monotonic()
+            # The converter writes ordered row groups. Avoid sorting the entire
+            # archive again; explicit monotonic keys AND canonical hash fail closed
+            # if the scan order or physical file order ever changes.
+            cursor=db.execute("SELECT * FROM read_parquet(?)",[str(path)])
+            h=hashlib.sha256();count=0;prior=None
             while batch:=cursor.fetchmany(256):
                 for values in batch:
-                    r=dict(zip(schema.names,values));feed_hash(h,r);count+=1
+                    r=dict(zip(schema.names,values))
+                    key=(r["sequence"],) if name=="packets" else (r["sequence"],r["event_index"],r["item_index"])
+                    need(all(type(k) is int and k>=0 for k in key) and (prior is None or key>prior),"PARQUET_PHYSICAL_ORDER")
+                    prior=key;feed_hash(h,r);count+=1
                     if name=="packets":
                         need(milliseconds(r["receiver_utc"])==r["receiver_ms"],"PARQUET_CLOCK")
                         epoch.consume(dict(connection_id=r["connection_id"],received_utc=r["receiver_utc"],
                              local_monotonic_ns=str(r["receiver_monotonic_ns"]),raw_text=r["payload"],sha256=r["payload_sha256"]),None,"primary")
             need((count,h.hexdigest())==expected[name],"PARQUET_"+name.upper()+"_PARITY")
             receipts[name]={"rows":count,"canonical_rows_sha256":h.hexdigest(),"file_sha256":digest(path)}
+            if timings is not None:timings["verify_"+name+"_seconds"]=time.monotonic()-started
         result=epoch.summary()
         need(result["book_sha256"]==witness["epochs"][0]["book_sha256"] and result["messages"]==witness["sealed_messages"],"PARQUET_REPLAY")
         return receipts,result
     finally:
         db.close()
 
-def convert(root,pin,destination,*,fixture=False):
+def convert(root,pin,destination,*,fixture=False,timings=None):
     root=Path(root);dest=Path(destination)
     need(not dest.exists() and not dest.is_symlink(),"OUTPUT_EXISTS")
+    started=time.monotonic()
     cert=audit(root,pin)
+    if timings is not None:timings['durable_admission_seconds']=time.monotonic()-started
     raw=(root/"manifest.json").read_bytes();m=strict_json(raw)
     need(hashlib.sha256(raw).hexdigest()==pin,"PIN")
     if fixture:
@@ -96,11 +105,14 @@ def convert(root,pin,destination,*,fixture=False):
              not cert["partial_chunks_not_admitted"] and not cert["manifest_tmp_not_admitted"],"FIXTURE_ONLY")
     else:
         need(cert["eligible_for_archived_replay"],"NOT_CLEAN")
+    started=time.monotonic()
     witness=scan(root,pin,"primary")
+    if timings is not None:timings["raw_epoch_replay_seconds"]=time.monotonic()-started
     need(len(witness["epochs"])==1 and not witness["unsealed_entries_excluded"]
          and not witness["manifest_tmp_excluded"] and witness["sealed_messages"]==m["messages"],"SEALED_EPOCH")
     with tempfile.TemporaryDirectory(prefix=".h1-stage-",dir=dest.parent) as tmp:
         staging=Path(tmp)/"dataset";staging.mkdir()
+        started=time.monotonic()
         writers={name:pq.ParquetWriter(staging/(name+".parquet"),schema,compression="zstd") for name,schema in SCHEMAS.items()}
         buffers={name:[] for name in SCHEMAS};sizes=dict.fromkeys(SCHEMAS,0);counts=dict.fromkeys(SCHEMAS,0)
         hashes={name:hashlib.sha256() for name in SCHEMAS}
@@ -121,7 +133,8 @@ def convert(root,pin,destination,*,fixture=False):
             for w in writers.values():w.close()
         need((root/"manifest.json").read_bytes()==raw,"MANIFEST_CHANGED")
         expected={name:(counts[name],hashes[name].hexdigest()) for name in SCHEMAS}
-        receipt,final=verify_tables(staging,expected,witness)
+        if timings is not None:timings["normalization_and_write_seconds"]=time.monotonic()-started
+        receipt,final=verify_tables(staging,expected,witness,timings=timings)
         need(not dest.exists(),"OUTPUT_RACE")
         report={"schema":"h1_historical_dataset_v1","source_manifest_sha256":pin,"epoch":pin+":0",
                 "source_kind":"SYNTHETIC_TEST_ONLY" if fixture else "ARCHIVE_REPLAY",

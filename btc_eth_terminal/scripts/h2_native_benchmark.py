@@ -80,13 +80,15 @@ def benchmark(target,root):
             legacy_rejected=str(e)
         need(legacy_rejected is not None,"LEGACY_LIMIT")
     start=time.monotonic()
-    out=root/"dataset";r=convert(raw,pin,out,fixture=True)
+    timings={}
+    out=root/"dataset";r=convert(raw,pin,out,fixture=True,timings=timings)
     elapsed=time.monotonic()-start
     need(r["independent_replay_parity"] and not r["research_eligible"] and r["tables"]["packets"]["rows"]==count
          and r["tables"]["l2"]["rows"]==count*512,"ROUNDTRIP")
     return dict(schema="h2_native_synthetic_benchmark_v1",status="PASS",synthetic=True,
         target_archive_bytes=target,actual_archive_bytes=size,packets=count,chunks=chunks,
         l2_rows=r["tables"]["l2"]["rows"],generation_seconds=generate_s,conversion_and_audit_seconds=elapsed,
+        stage_seconds=timings,verification_scan="PHYSICAL_ORDER_AND_CANONICAL_HASH",
         archive_mb_per_second=size/1e6/elapsed,peak_process_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
         parquet_bytes=sum(p.stat().st_size for p in out.glob("*.parquet")),
         legacy_rejection=legacy_rejected,source_manifest_sha256=pin,independent_replay_parity=True,
