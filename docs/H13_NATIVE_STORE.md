@@ -8,3 +8,4 @@ python btc_eth_terminal/scripts/h13_native_store.py --root "$HOME/quant-native-s
 python btc_eth_terminal/scripts/h13_native_store.py --root "$HOME/quant-native-store" inventory
 ```
 Run additional bounded sessions explicitly; no claim that intervals between sessions are observed or gap-free. Keep store outside repository and never upload raw data without authorization.
+Use `inventory --reaudit-raw` to hash and semantically re-audit every sealed original chunk and compare counts/bytes with admission and dataset receipts. This is intentionally more expensive than normal inventory. Imports read pinned manifest bytes, enforce exact chunk names and sizes, stream bounded regular files without following terminal symlinks, and recheck SHA-256 during copying. Parent storage and source owner remain trusted.

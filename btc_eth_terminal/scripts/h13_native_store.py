@@ -78,13 +78,25 @@ def entries(root,*,fixture=False):
         out.append({"dataset_path":str(folder/"dataset"),"dataset_receipt_sha256":r["dataset_receipt_sha256"],"role":"DEVELOPMENT"})
     return out
 
-def inventory(root,*,fixture=False):
+def inventory(root,*,fixture=False,reaudit=False):
     with locked(root) as root:
         es=entries(root,fixture=fixture)
         c=catalog(es,0,fixture=fixture) if es else None
-        return {"schema":"h13_local_inventory_v1","sessions":es,"catalog":c,
+        audits=[]
+        if reaudit and c:
+            for row in c["sessions"]:
+                pin=row["source_manifest_sha256"];folder=root/"sessions"/pin
+                a=audit(folder/"raw",pin);r=read_json(folder/"admission.json")
+                need((not a["eligible_for_archived_replay"] and not a["partial_chunks_not_admitted"]
+                      and not a["manifest_tmp_not_admitted"]) if fixture else a["eligible_for_archived_replay"],"RAW_REAUDIT")
+                need(a["sealed_messages_verified"]==row["source_messages"]==r["source_messages"]
+                     and a["sealed_bytes_verified"]==r["archive_bytes"]
+                     and row["first_receiver_ms"]==r["first_receiver_ms"] and row["last_receiver_ms"]==r["last_receiver_ms"],"RAW_DATASET_INVENTORY")
+                audits.append({"source_manifest_sha256":pin,"sealed_messages":a["sealed_messages_verified"],
+                               "sealed_bytes":a["sealed_bytes_verified"],"classification":a["classification"]})
+        return {"schema":"h13_local_inventory_v1","sessions":es,"catalog":c,"raw_audits":audits,
                 "unpublished_attempts":len(list((root/"incoming").iterdir())),
-                "raw_chunks_reaudited":False,"external_attestation":False,"execution_authorized":False}
+                "raw_chunks_reaudited":bool(reaudit and c),"external_attestation":False,"execution_authorized":False}
 
 def publish(root,stage,pin,origin,*,fixture=False):
     raw=stage/"raw";dest=root/"sessions"/pin
@@ -113,14 +125,29 @@ def import_archive(root,source,pin,*,fixture=False):
     with locked(root) as root:
         need(pin_ok(pin) and not (root/"sessions"/pin).exists(),"DUPLICATE_OR_PIN")
         cert=audit(source,pin)
-        m=read_json(source/"manifest.json",BOUNDS["MAX_MANIFEST_BYTES"])
+        mf=source/"manifest.json"
+        need(mf.is_file() and not mf.is_symlink() and 0<mf.stat().st_size<=BOUNDS["MAX_MANIFEST_BYTES"],"MANIFEST_FILE")
+        with mf.open("rb") as f:manifest=f.read(BOUNDS["MAX_MANIFEST_BYTES"]+1)
+        need(len(manifest)<=BOUNDS["MAX_MANIFEST_BYTES"] and hashlib.sha256(manifest).hexdigest()==pin,"MANIFEST_CHANGED")
+        m=strict_json(manifest)
         need((m.get("synthetic_fixture") is True and not cert["partial_chunks_not_admitted"]
               and not cert["manifest_tmp_not_admitted"]) if fixture else cert["eligible_for_archived_replay"],"SOURCE_ADMISSION")
         need(shutil.disk_usage(root).free>=RESERVE+4*cert["sealed_bytes_verified"],"DISK")
         stage=Path(tempfile.mkdtemp(prefix="import-",dir=root/"incoming"))
         raw=stage/"raw";raw.mkdir();(raw/"chunks").mkdir()
-        shutil.copyfile(source/"manifest.json",raw/"manifest.json")
-        for ch in m["chunks"]:shutil.copyfile(source/ch["file"],raw/ch["file"])
+        (raw/"manifest.json").write_bytes(manifest)
+        for ch in m["chunks"]:
+            name=ch["file"];size=ch["archived_line_bytes"]
+            need(re.fullmatch(r"chunks/chunk_\d{5}_conn_\d{3}\.jsonl",name)
+                 and type(size) is int and 0<size<=BOUNDS["MAX_CHUNK_BYTES"],"CHUNK_COPY_CONTRACT")
+            fd=os.open(source/name,os.O_RDONLY|os.O_NOFOLLOW)
+            with os.fdopen(fd,"rb") as src,(raw/name).open("xb") as dst:
+                st=os.fstat(src.fileno())
+                need(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and st.st_size==size,"CHUNK_COPY_FILE")
+                h=hashlib.sha256();n=0
+                while block:=src.read(1024*1024):
+                    n+=len(block);need(n<=size,"CHUNK_COPY_LIMIT");h.update(block);dst.write(block)
+                need(n==size and h.hexdigest()==ch["archive_sha256"],"CHUNK_COPY_HASH")
         # Re-audited copied bytes by H1; never publish incomplete source.
         return publish(root,stage,pin,"EXTERNALLY_PINNED_IMPORT",fixture=fixture)
 
@@ -154,10 +181,10 @@ def main():
     sub=p.add_subparsers(dest="action",required=True)
     q=sub.add_parser("capture");q.add_argument("--duration",type=int,default=1800);q.add_argument("--archive-budget-bytes",type=int,default=1_000_000_000)
     q=sub.add_parser("import");q.add_argument("--archive",type=Path,required=True);q.add_argument("--manifest-sha256",required=True)
-    sub.add_parser("inventory")
+    q=sub.add_parser("inventory");q.add_argument("--reaudit-raw",action="store_true")
     a=p.parse_args()
     if a.action=="capture":r=capture(a.root,a.duration,a.archive_budget_bytes)
     elif a.action=="import":r=import_archive(a.root,a.archive,a.manifest_sha256)
-    else:r=inventory(a.root)
+    else:r=inventory(a.root,reaudit=a.reaudit_raw)
     print(json.dumps(r,sort_keys=True,allow_nan=False))
 if __name__=="__main__":main()

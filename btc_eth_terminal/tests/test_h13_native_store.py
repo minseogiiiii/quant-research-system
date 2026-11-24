@@ -33,3 +33,16 @@ class Store(unittest.TestCase):
             root.chmod(0o755)
             with self.assertRaises(ValueError):inventory(root)
             with self.assertRaises(ValueError):capture(root,1,50_000_000)
+
+    def test_full_raw_reaudit_detects_corruption(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);raw=root/"raw";store=root/"store"
+            pin,*_=generate(raw,150000,levels=8)
+            import_archive(store,raw,pin,fixture=True)
+            r=inventory(store,fixture=True,reaudit=True)
+            self.assertTrue(r["raw_chunks_reaudited"])
+            self.assertEqual(len(r["raw_audits"]),1)
+            chunk=next((store/"sessions"/pin/"raw"/"chunks").glob("*.jsonl"))
+            data=chunk.read_bytes();chunk.write_bytes(data[:-1]+b"x")
+            self.assertFalse(inventory(store,fixture=True)["raw_chunks_reaudited"])
+            with self.assertRaises(ValueError):inventory(store,fixture=True,reaudit=True)
