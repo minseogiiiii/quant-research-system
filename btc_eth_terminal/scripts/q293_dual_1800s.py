@@ -322,7 +322,8 @@ def run(root, output):
                 need(value.get("schema") == "q293_sealed_epoch_forensics_v1"
                      and value["unsealed_entries_excluded"] == 0
                      and value["manifest_tmp_excluded"] is False
-                     and value["sealed_messages"] == report["archives"][name]["messages"]
+                     and value["sealed_messages"] ==
+                     report["archives"][name]["messages"]
                      and value["manifest_sha256"] ==
                      report["archives"][name]["manifest_sha256"]
                      and len(value["epochs"]) == 1
