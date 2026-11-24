@@ -40,3 +40,8 @@ jobs:
             python -m unittest discover -s btc_eth_terminal/tests -p "$pattern" -v
           done
           node --test btc_eth_terminal/tests/q24_ws_close_probe.test.mjs
+      - name: Independent durable incident journal and epoch audit
+        run: |
+          set -euo pipefail
+          ruff check btc_eth_terminal/scripts/q292_incident_journal.py btc_eth_terminal/tests/test_q292_incident_journal.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_incident_journal.py' -v
