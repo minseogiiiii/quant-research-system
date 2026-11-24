@@ -1,0 +1,7 @@
+# F0/F1 isolated integration candidate
+
+Parent B4.1 accepted 1eae31cc3a7b44cd0fd4a40983e98708fd0937a3. No modification of frozen collector, gateway, main branch or existing frontend entry points. B5 live injection remains a separate unarmed infrastructure gate.
+
+F0: exact upstream Fincept files copied as standalone unmodified AGPL sources with upstream LICENSE and Git blob pins. Public repository: retain copyright/license, evaluate combined-work distribution terms before integrating vendor code into the existing application. No vendor runtime imports yet; original tests depend on additional upstream modules and are not represented as executed. Missing base_provider dependencies mean this is not a complete upstream package.
+
+F1 foundation: candidate shared read-only state store validates both BTC/ETH rows atomically, exact depth arithmetic using existing integrity module, source identity/generation/sequence, event cursor, timestamps, authorization flags and stale invalidation. New HTTP handshake required before switching generation. Old callbacks ignored; quote objects immutable. Not wired to production UI or actual SSE yet. Next: test actual captured rows and synthetic failover HTTP/SSE in Chromium; add bounded connection lifecycle and separate UI entry. No candles, heatmap, research results, or execution claims. F2 analytics qualification follows vendor integrity and independent numerical/point-in-time tests.

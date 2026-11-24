@@ -1,0 +1,33 @@
+name: Fincept integration F0 F1 contracts
+on:
+  push:
+    branches: ['integration/fincept-f0-f1-20261124']
+permissions:
+  contents: read
+jobs:
+  vendor-integrity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python btc_eth_terminal/scripts/verify_fincept_vendor.py
+  frontend-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: btc_eth_terminal/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: |
+          set -euo pipefail
+          npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/compiled src/datahub/resilientStore.ts
+          node --test tests/resilientStore.test.mjs
+          npx --no-install tsc --noEmit
