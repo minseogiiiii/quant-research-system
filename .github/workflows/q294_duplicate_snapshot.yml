@@ -8,6 +8,8 @@ jobs:
   reproduce:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
