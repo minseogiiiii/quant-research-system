@@ -195,6 +195,11 @@ class DuplicateSnapshot(unittest.TestCase):
             self.assertEqual(len(rejected),1)
             self.assertEqual(hashlib.sha256(rejected[0].read_bytes()).hexdigest(),receipt["raw_sha256"])
             self.assertEqual(manifest["connections"][0]["messages"],8)
+            from q293_b4_diagnostics import manifest_receipt
+            public=manifest_receipt(archive_dirs[0]/"manifest.json")
+            self.assertEqual(public["status"],"MANIFEST_READ")
+            self.assertEqual(public["duplicate_snapshot_receipts"][0]["raw_sha256"],receipt["raw_sha256"])
+            self.assertNotIn("raw_text",json.dumps(public))
             self.assertGreaterEqual(
                 len(list((archive_dirs[0] / "chunks").glob("*.jsonl"))), 2
             )
