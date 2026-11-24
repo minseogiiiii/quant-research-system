@@ -33,7 +33,7 @@ with subprocess.Popen(["npm","exec","--no","--","vite","--config","vite.orderflo
             upload(report)
             page.get_by_text("4 unique updates",exact=False).wait_for()
             page.get_by_text("0.100000000000000001",exact=True).wait_for()
-            page.get_by_label("Observed bucket").select_option("2")
+            page.get_by_role("combobox", name="Observed bucket", exact=True).select_option("2")
             page.get_by_text("CVD 0.250000000000000001",exact=False).wait_for()
             assert page.locator("tbody tr").count()==1
             report["rows"][0]["cells"][0]["buy_base"]="0.1"
