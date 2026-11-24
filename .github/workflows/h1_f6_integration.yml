@@ -20,6 +20,7 @@ jobs:
       - run: pip install pyarrow==19.0.1 duckdb==1.2.2 numpy==2.2.6 pandas==2.2.3
       - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h1_*.py' -v
       - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_f6_*.py' -v
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h2_*.py' -v
       - name: Fetch previously authorized frozen source
         env:
           Q13_PRIVATE_RELEASE_URL: ${{ secrets.Q13_PRIVATE_RELEASE_URL }}
