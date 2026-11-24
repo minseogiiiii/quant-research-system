@@ -30,3 +30,6 @@ jobs:
           npx --no-install vite build --config vite.workspace.config.ts
           npx --no-install vite build --config vite.heatmap.config.ts
           npx --no-install vite build --config vite.orderflow.config.ts
+      - run: python -m pip install playwright==1.51.0
+      - run: python -m playwright install --with-deps chromium
+      - run: python btc_eth_terminal/scripts/f4_microstructure_browser.py
