@@ -1,0 +1,5 @@
+# Q29.2-E independent observer isolation
+
+Each source now has an independent Python observer and original Node collector in the candidate isolated path. The parent communicates over inherited AF_UNIX socketpairs, one per observer; no named public observer endpoint, no pickle, bounded JSON framing and absolute reply deadline. A timeout permanently quarantines that IPC stream. Worker and Node collector use Linux parent-death signals to bound orphan lifetime, with a parent-PID recheck before exec. The existing Q29.2-D path and strict zero-gap acceptance are retained.
+
+Synthetic CI kills the primary observer, checks secondary state and new cursor, verifies orphan Node termination, stops the secondary observer with SIGSTOP, and checks bounded fail-closed behavior and no late reply reuse. Other tests check oversized/partial IPC and malformed identity. No live source certification. Same-host failure, disk, network, public gateway, durable route ledger, persistent SSE and cross-source comparable checkpoint validation remain open. No automatic live test.

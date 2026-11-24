@@ -166,7 +166,7 @@ class CheckedEngine(SourceEpochIsolatedEngine):
 class Collector:
     """A real original Node collector, with its own IPC and archive directory."""
 
-    def __init__(self, name, work, duration, synthetic):
+    def __init__(self, name, work, duration, synthetic, *, parent_bound=False):
         self.name = name
         self.work = work
         self.synthetic = synthetic
@@ -214,6 +214,13 @@ class Collector:
             for preload in ("q27_heartbeat_guard.mjs", "q24_ws_close_probe.mjs"):
                 args += ["--import", str(ROOT / "scripts" / preload)]
             args.append(str(COLLECTOR))
+            if parent_bound:
+                import sys
+
+                args = [
+                    sys.executable, str(ROOT / "scripts/q292_parent_bound_exec.py"),
+                    str(os.getpid()), *args,
+                ]
             for name in ("stdout.log", "stderr.log"):
                 self.logs.append((work / name).open("xb"))
             self.process = subprocess.Popen(
