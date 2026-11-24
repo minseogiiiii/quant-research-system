@@ -155,9 +155,12 @@ jobs:
           python -m pip install --disable-pip-version-check ruff==0.15.22
           ruff check btc_eth_terminal/scripts/q292_stream_gateway.py btc_eth_terminal/scripts/q292_dual_gateway.py btc_eth_terminal/tests/test_q292_integrated_stress.py
           python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_integrated_stress.py' -v
+          python -m py_compile btc_eth_terminal/scripts/q293_dual_180s.py btc_eth_terminal/scripts/q293_pilot_transport.py
+          ruff check btc_eth_terminal/scripts/q293_dual_180s.py btc_eth_terminal/scripts/q293_pilot_transport.py
   live-dual-180s:
     # Run once on the explicitly armed pilot commit, never on routine pushes.
-    if: github.event.head_commit.message == 'Q29.3-A: arm gated real dual 180s baseline'
+    if: >-
+      github.event.head_commit.message == 'Q29.3-A: arm gated real dual 180s baseline'
     needs: [synthetic-regression, journal-failover-contracts, dual-collector-integration, independent-observer-integration, durable-stream-integration, managed-source-integration, integrated-stress]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
