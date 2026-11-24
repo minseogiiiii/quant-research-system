@@ -1,0 +1,24 @@
+name: Fincept F4 order flow candidate
+on:
+  push:
+    branches: ['integration/fincept-f4-depth-20261124']
+permissions:
+  contents: read
+jobs:
+  flow-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: btc_eth_terminal/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: |
+          npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/flow-compiled src/orderflow/contract.ts
+          node --test tests/orderflow.test.mjs
+          npx --no-install tsc --noEmit
+          npx --no-install vite build --config vite.orderflow.config.ts
