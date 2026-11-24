@@ -22,10 +22,11 @@ def need(ok,why):
     if not ok:raise ValueError("H3_"+why)
 def fmt(x):return format(x,"f")
 
-def project(packets,product,policy=None,*,signal_sink=None):
+def project(packets,product,policy=None,*,signal_sink=None,feature_sink=None,features_only=False):
     import json
     p=json.loads(json.dumps(POLICY if policy is None else policy))
     need(product in PRODUCTS and set(p)==set(POLICY),"POLICY")
+    need(not features_only or callable(feature_sink),"FEATURE_SINK")
     grid,look,window,age,lat,tol=(p[k] for k in ("grid_ms","momentum_ms","ofi_ms","max_age_ms","latency_ms","tolerance_ms"))
     hs=p["horizons_ms"]
     need(all(type(v) is int for v in (grid,look,window,age,lat,tol)) and 100<=grid<=60000
@@ -66,14 +67,20 @@ def project(packets,product,policy=None,*,signal_sink=None):
         while len(quotes)>1 and quotes[1][0]<anchor:quotes.popleft()
         current=state()
         if snap is None or anchor<snap or t-window<snap or current is None or last_l2 is None or t-last_l2>age or not quotes:
-            missing+=1;return
+            missing+=1
+            if feature_sink is not None:feature_sink([t,None])
+            return
         at,oldmid,oldseq=quotes[0]
         if at>=anchor or anchor-at>age:
-            missing+=1;return
+            missing+=1
+            if feature_sink is not None:feature_sink([t,None])
+            return
         need(last_l2<t and oldseq<=last_seq,"FEATURE_FUTURE")
         eligible+=1
         (b,bq),(a,aq)=current
         mid=b+a
+        if feature_sink is not None:feature_sink([t,last_l2,last_seq,at,oldseq,mid,oldmid,rolling,bq,aq])
+        if features_only:return
         mom=Decimal((mid-oldmid)*10000)/Decimal(oldmid)
         if mom<threshold:return
         flag=rolling>0 and Decimal(bq-aq)/Decimal(bq+aq)>=imin
@@ -136,6 +143,10 @@ def project(packets,product,policy=None,*,signal_sink=None):
         for _,_,kind,signal,h,_ in pending:
             tally(signal[2],"source_ended",h)
         need(first is not None,"EMPTY")
+        if features_only:
+            return {"schema":"h10_feature_projection_v1","product":product,"source_messages":prior+1,
+                    "source_first_ms":first,"source_last_ms":last,"decisions":decisions,
+                    "eligible_decisions":eligible,"missing_decisions":missing}
         rows=[]
         for h in hs:
             cohorts_out={}
