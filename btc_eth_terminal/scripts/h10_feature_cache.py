@@ -9,6 +9,7 @@ from decimal import Decimal,localcontext
 from pathlib import Path
 from h3_momentum_horizons import POLICY,project,PRODUCTS
 from h9_portfolio import simulate
+from f4_depth_buckets import units,SCALE
 from h1_f6_dataset_replay import replay_dataset
 from h5_experiment_registry import sha,hex64
 from independent_soak_replay import strict_json
@@ -117,6 +118,14 @@ def load(cache,cache_pin,source,receipt,policy=None,*,fixture=False):
 def run_cached(dataset,cache,cache_pin,source,receipt,policy=None,*,initial_cash="10000",fixture=False):
     p=POLICY if policy is None else policy
     sig,coverage,span=load(cache,cache_pin,source,receipt,p,fixture=fixture)
+    lat,tol=p['latency_ms'],p['tolerance_ms'];hs=p['horizons_ms']
+    need(type(lat) is int and 1<=lat<=5000 and type(tol) is int and 0<=tol<=10000
+         and type(hs) is list and 1<=len(hs)<=6 and all(type(h) is int and 100<=h<=900000 for h in hs)
+         and hs==sorted(set(hs)), 'EXECUTION_CLOCK')
+    need(type(p['quantity']) is dict and set(p['quantity'])==set(PRODUCTS)
+         and all(0<units(q)<=1000000*SCALE for q in p['quantity'].values()),'QUANTITY')
+    cap,fee,slip=map(units,(p['capacity_fraction'],p['fee_bps'],p['extra_slippage_bps']))
+    need(0<cap<=SCALE and 0<=fee<=100*SCALE and 0<=slip<=500*SCALE,'EXECUTION_COST')
     result=replay_dataset(dataset,source,"BTC-USD",fixture=fixture,receipt_pin=receipt,
         projector=lambda packets,product:simulate(packets,sig,p,initial_cash=initial_cash))
     need((result["source_messages"],result["source_first_ms"],result["source_last_ms"])==span,"REPLAY_SPAN")
