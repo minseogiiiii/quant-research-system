@@ -11,7 +11,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from q292_incident_journal import Journal, audit, read_journal, safe_source
+from q292_incident_journal import (
+    Journal, JournalProcess, audit, read_journal, safe_source,
+)
 
 
 def source(connection=0, gaps=0, messages=100, seq=99, heartbeats=20):
@@ -113,6 +115,30 @@ class JournalContracts(unittest.TestCase):
         r = audit(*read_journal(self.file))
         self.assertFalse(r["clean_stop"])
         self.assertGreaterEqual(r["unavailable_samples"], 1)
+
+    def test_owner_lifecycle_persists_unavailable_evidence_not_acceptance(self):
+        public = self.root / "public"
+        public.mkdir()
+        p = JournalProcess(self.root / "capture", public, 180)
+        try:
+            end = time.monotonic() + 5
+            while time.monotonic() < end:
+                if p.path.exists() and b"UNAVAILABLE" in p.path.read_bytes():
+                    break
+                time.sleep(.05)
+            else:
+                self.fail("journal process did not start")
+            p.check()
+            r = p.finish()
+            self.assertTrue(r["clean_stop"])
+            self.assertEqual(r["ready_samples"], 0)
+            self.assertEqual(r, json.loads(p.public.read_text()))
+            with self.assertRaises(ValueError):
+                p.require_clean()
+        finally:
+            if p.process.poll() is None:
+                p.process.kill()
+                p.process.wait()
 
     def test_no_source_or_orders_cannot_be_ready(self):
         value = safe_source({"reason": "private secret"}, {}, 503, 503)

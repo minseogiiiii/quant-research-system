@@ -38,6 +38,7 @@ from q23_redacted_diagnostics import (  # noqa: E402
 from q24_ws_diagnostic_receipt import publish_receipt  # noqa: E402
 from q27_heartbeat_receipt import publish_receipt as publish_q27_receipt  # noqa: E402
 from q28_transport_incident_receipt import publish_incident  # noqa: E402
+from q292_incident_journal import JournalProcess  # noqa: E402
 
 MONITOR_INTERVAL = 15
 MEMORY_CEILING = 2 * 1024**3
@@ -391,6 +392,10 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
     was_ready = False
     last_progress_slot = 0
     failfast = False
+    journal = None
+    journal_flag = os.environ.get("Q292_INCIDENT_JOURNAL_ENABLED")
+    if journal_flag not in (None, "1"):
+        raise Q22Rejected("Q292_JOURNAL_FLAG_MUST_BE_EXPLICIT")
     # Private logs live OUTSIDE the public summary artifact directory.
     with (
         Path(str(work) + ".observer_stdout.log").open("x") as out,
@@ -406,7 +411,11 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
             stdout=out, stderr=err, start_new_session=True,
         )
         try:
+            if journal_flag == "1":
+                journal = JournalProcess(work, public, seconds)
             while True:
+                if journal is not None:
+                    journal.check()
                 now = time.monotonic()
                 elapsed = now - started
                 rc = observer.poll()
@@ -528,6 +537,8 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                 "24h_persistent_host_certified": False,
                 "order_execution_enabled": False,
             })
+            if journal is not None:
+                journal.require_clean()
             (public / "live_monitoring_summary.json").write_text(
                 json.dumps(result, indent=2, sort_keys=True) + "\n")
             print("PASS_Q22_SOURCE_FANOUT_RESOURCE_MONITORING "
@@ -584,7 +595,14 @@ def run(work: Path, public: Path, seconds: int, port: int) -> dict:
                         window_active.wait(timeout=5)
                 if window_log is not None and not window_log.closed:
                     window_log.close()
-            _shutdown(observer, child)
+            try:
+                _shutdown(observer, child)
+            finally:
+                if journal is not None:
+                    try:
+                        journal.finish()
+                    except (OSError, ValueError, TypeError, KeyError):
+                        print("FAIL_Q292_JOURNAL_EVIDENCE_UNAVAILABLE", flush=True)
             if os.environ.get("Q24_WS_DIAG_ENABLED") == "1":
                 # The probe remains in the 0700 source workdir. Read it only
                 # after collector shutdown to include the final close/exit

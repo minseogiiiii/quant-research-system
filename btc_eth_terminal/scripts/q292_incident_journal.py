@@ -12,6 +12,8 @@ import os
 import re
 import signal
 import stat
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -120,11 +122,15 @@ class Journal:
         self.failed = False
         self.stopped = False
         # Persist the directory entry as well as subsequent records.
-        dfd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
         try:
-            os.fsync(dfd)
-        finally:
-            os.close(dfd)
+            dfd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(dfd)
+            finally:
+                os.close(dfd)
+        except OSError:
+            os.close(self.fd)
+            raise
 
     def append(self, event, source=None, *, mono_ns=None):
         if self.failed or self.stopped:
@@ -225,12 +231,15 @@ def audit(rows, torn):
     last = None
     unavailable = 0
     anomalies = 0
+    ready_samples = 0
+    seen_sessions = set()
     for row in rows:
         if row["event"] == "UNAVAILABLE":
             unavailable += 1
         s = row["source"]
         if s is None or not s["ready"]:
             continue
+        ready_samples += 1
         if last is not None:
             a, b = last["source"], s
             changed = a["session_sha256"] != b["session_sha256"]
@@ -238,6 +247,7 @@ def audit(rows, torn):
             if changed or delta:
                 valid = (changed and delta > 0 and
                          b["connection"] > a["connection"] and
+                         b["session_sha256"] not in seen_sessions and
                          b["messages"] >= a["messages"])
                 gaps.append({"previous_index": last["index"],
                              "new_index": row["index"], "gap_delta": delta,
@@ -248,15 +258,71 @@ def audit(rows, torn):
                   or any(b[k] < a[k] for k in (
                       "messages", "sequence", "heartbeats"))):
                 anomalies += 1
+        seen_sessions.add(s["session_sha256"])
         last = row
     return {"schema": "q292_incident_journal_audit_v1",
             "records": len(rows), "terminal_sha256": rows[-1]["sha256"],
             "clean_stop": rows[-1]["event"] == "STOP" and not torn,
             "torn_tail": torn, "unavailable_samples": unavailable,
+            "ready_samples": ready_samples,
             "observed_epoch_transitions": gaps, "anomalies": anomalies,
             "physical_root_cause_proven": False,
             "zero_gap_certified": False, "resilience_certified": False,
             "real_orders_enabled": False}
+
+
+class JournalProcess:
+    """Owner-side lifecycle adapter; collector and journal are separate PIDs.
+
+    Evidence is diagnostic-only; a failed journal prevents opt-in strict
+    acceptance but a healthy journal cannot waive any existing capture gate.
+    """
+
+    def __init__(self, work, public, seconds):
+        self.directory = work.parent / (work.name + ".incident")
+        self.directory.mkdir(mode=0o700)
+        self.path = self.directory / "journal.jsonl"
+        self.public = public / "q292_journal_audit.json"
+        self.process = subprocess.Popen([
+            sys.executable, str(Path(__file__).resolve()),
+            "--socket", str(work / "v36_monitor.sock"),
+            "--journal", str(self.path),
+            "--duration", str(seconds + 90),
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+           start_new_session=True)
+        self.result = None
+
+    def check(self):
+        if self.process.poll() is not None:
+            raise ValueError("Q292_INDEPENDENT_JOURNAL_EXITED")
+
+    def finish(self):
+        if self.result is not None:
+            return self.result
+        if self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait(timeout=5)
+        result = audit(*read_journal(self.path))
+        result["monitor_exit_code"] = self.process.returncode
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(self.public, flags, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(canonical(result) + b"\\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        self.result = result
+        return result
+
+    def require_clean(self):
+        result = self.finish()
+        if (not result["clean_stop"] or result["monitor_exit_code"] != 0
+                or result["ready_samples"] < 1 or result["anomalies"] != 0):
+            raise ValueError("Q292_JOURNAL_NOT_CLEAN")
+        return result
 
 
 def monitor(sock, path, period, duration):
