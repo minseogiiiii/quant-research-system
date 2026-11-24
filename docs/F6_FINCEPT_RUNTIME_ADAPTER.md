@@ -1,0 +1,2 @@
+# F6 isolated runtime candidate
+Opt-in offline analytics CLI calls the pinned unmodified Fincept metrics module after verifying upstream git blobs. Explicit 365-day regular net portfolio return grid; reject missing/irregular/invalid values before vendor calls. Independent scalar compounding, drawdown, Sharpe and tail quantile witnesses. No portfolio-return fabrication from trade markouts, no live engine import. AGPL compliance review before combined deployment or distribution; this is not a license approval.

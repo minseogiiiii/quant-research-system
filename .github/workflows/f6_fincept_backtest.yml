@@ -1,0 +1,22 @@
+name: F6 Fincept offline research adapter
+on:
+  push:
+    branches: ['integration/f6-fincept-backtest-20261124']
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts:btc_eth_terminal/tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy==2.2.6 pandas==2.2.3
+      - run: python btc_eth_terminal/scripts/verify_fincept_vendor.py
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_fincept_qualification.py' -v
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_f2_research_contract.py' -v
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_f6_*.py' -v
