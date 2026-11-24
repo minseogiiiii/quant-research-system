@@ -22,7 +22,7 @@ def need(ok,why):
     if not ok:raise ValueError("H3_"+why)
 def fmt(x):return format(x,"f")
 
-def project(packets,product,policy=None):
+def project(packets,product,policy=None,*,signal_sink=None):
     import json
     p=json.loads(json.dumps(POLICY if policy is None else policy))
     need(product in PRODUCTS and set(p)==set(POLICY),"POLICY")
@@ -79,6 +79,7 @@ def project(packets,product,policy=None):
         flag=rolling>0 and Decimal(bq-aq)/Decimal(bq+aq)>=imin
         signals+=1;filtered+=int(flag)
         tally(flag,"opportunities")
+        if signal_sink is not None:signal_sink((t,product,last_seq,flag))
         schedule(t+lat,"ENTRY",(t,last_seq,flag))
     with localcontext() as ctx:
         ctx.prec=80
