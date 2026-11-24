@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from q28_transport_incident_receipt import incident_receipt
 from q292_dual_gateway import PRODUCTS, cursor
 from q292_resilient_gateway import ManagedSource, ResilientRoute
 from q292_stream_gateway import BoundedServer, Publisher, TransitionLedger, audit_ledger
@@ -340,6 +341,15 @@ def run(root, output, synthetic):
         while not process_quiescent(identities) and time.monotonic() < until:
             time.sleep(.1)
         need(process_quiescent(identities), "B5_DESCENDANT_NOT_QUIESCENT")
+        # Preserve independent bounded close/guard evidence before archive
+        # semantic replay, which may itself fail. No peer intent is inferred.
+        report["transport_incidents"] = {}
+        for source in sources:
+            for attempt in sorted(source.root.glob("attempt_*")):
+                key = source.name + ":" + attempt.name
+                report["transport_incidents"][key] = incident_receipt(
+                    attempt / "ws.jsonl", attempt / "hb.jsonl",
+                    collector_failed=False)
         report["route_ledger"] = audit_ledger(root / "route.jsonl")
         report["source_ledger"] = audit_source_ledger(root / "source.jsonl")
         index = TradeIndex(root / "trade.db") if not synthetic else None
