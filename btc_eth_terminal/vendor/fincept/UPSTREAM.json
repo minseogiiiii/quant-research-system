@@ -1,0 +1,39 @@
+{
+  "schema": "fincept_vendor_v1",
+  "repository": "Fincept-Corporation/FinceptTerminal",
+  "commit": "914134de5fd227fe66969c4591ac9ca7e461cdf4",
+  "license": "AGPL-3.0",
+  "files": [
+    {
+      "upstream": "LICENSE",
+      "local": "btc_eth_terminal/vendor/fincept/LICENSE",
+      "git_blob": "be3f7b28e564e7dd05eaf59d64adba1a4065ac0e"
+    },
+    {
+      "upstream": "fincept-qt/scripts/Analytics/backtesting/base/metrics.py",
+      "local": "btc_eth_terminal/vendor/fincept/base/metrics.py",
+      "git_blob": "3c488e88cbcb359a7190fdc6440b4476fb9bd762"
+    },
+    {
+      "upstream": "fincept-qt/scripts/Analytics/backtesting/base/monte_carlo.py",
+      "local": "btc_eth_terminal/vendor/fincept/base/monte_carlo.py",
+      "git_blob": "b6f07d2b29f5332b2a5efc42bf3942e49d72b307"
+    },
+    {
+      "upstream": "fincept-qt/scripts/Analytics/backtesting/base/robustness.py",
+      "local": "btc_eth_terminal/vendor/fincept/base/robustness.py",
+      "git_blob": "099b0ec34d0e56cf6d8690082fd646545ffcb19c"
+    },
+    {
+      "upstream": "fincept-qt/scripts/Analytics/backtesting/base/progress.py",
+      "local": "btc_eth_terminal/vendor/fincept/base/progress.py",
+      "git_blob": "c0836dcc80791921bf6f0dc6f14b12f4f9e1ecac"
+    },
+    {
+      "upstream": "fincept-qt/scripts/Analytics/backtesting/base/contract.py",
+      "local": "btc_eth_terminal/vendor/fincept/base/contract.py",
+      "git_blob": "a8339514c0b5c1a1056bfebe24bfcb903989bd1d"
+    }
+  ],
+  "scope": "Unmodified isolated upstream sources. No runtime import by existing engine. Review combined-work licensing before linkage or distribution."
+}
