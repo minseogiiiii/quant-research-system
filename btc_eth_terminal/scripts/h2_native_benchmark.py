@@ -21,8 +21,8 @@ def need(ok,reason):
     if not ok:raise ValueError("H2_BENCH_"+reason)
 def encode(x):return json.dumps(x,separators=(",",":"),allow_nan=False).encode()
 def stamp(ms):return datetime.fromtimestamp(ms/1000,tz=timezone.utc).isoformat(timespec="milliseconds").replace("+00:00","Z")
-def wire(seq,levels):
-    t=stamp(BASE+seq*10)
+def wire(seq,levels,start_ms=BASE):
+    t=stamp(start_ms+seq*10)
     events=[]
     for p,base in zip(PRODUCTS,(50000,2000)):
         rows=[]
@@ -35,8 +35,9 @@ def wire(seq,levels):
     packet=dict(connection_id=0,received_utc=t,local_monotonic_ns=str(seq*10000000+1),raw_text=raw.decode(),sha256=hashlib.sha256(raw).hexdigest())
     return encode(packet)+b"\n",len(raw),t
 
-def generate(root,target,levels=128):
+def generate(root,target,levels=128,*,start_ms=BASE):
     need(type(target) is int and 1000<=target<=MAX_TARGET and 2<=levels<=256,"TARGET")
+    need(type(start_ms) is int and 1_500_000_000_000<=start_ms<=2_000_000_000_000,"CLOCK")
     root.mkdir();(root/"chunks").mkdir()
     chunks=[];total=raw_total=seq=0;buf=bytearray();raw_count=0;n=0;first=last=None
     def flush():
@@ -49,7 +50,7 @@ def generate(root,target,levels=128):
             first_received_utc=first,last_received_utc=last))
         buf=bytearray();raw_count=n=0;first=last=None
     while total<target or seq<2:
-        line,size,t=wire(seq,levels)
+        line,size,t=wire(seq,levels,start_ms)
         if n and len(buf)+len(line)>CHUNK:flush()
         if n==0:first=t
         last=t;buf.extend(line);raw_count+=size;n+=1;seq+=1;total+=len(line);raw_total+=size

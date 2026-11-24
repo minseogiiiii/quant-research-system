@@ -2,7 +2,7 @@ name: H6 registered native strategy runner
 on:
   push:
     branches: ['integration/h1-f6-research-20261124']
-    paths: ['btc_eth_terminal/scripts/h6_*.py','btc_eth_terminal/tests/test_h6_*.py','.github/workflows/h6_registered_runner.yml']
+    paths: ['btc_eth_terminal/scripts/h6_*.py','btc_eth_terminal/tests/test_h6_*.py','btc_eth_terminal/scripts/h7_*.py','btc_eth_terminal/tests/test_h7_*.py','.github/workflows/h6_registered_runner.yml']
 permissions:
   contents: read
 jobs:
@@ -20,3 +20,4 @@ jobs:
           python-version: '3.12'
       - run: pip install pyarrow==19.0.1 duckdb==1.2.2 numpy==2.2.6 pandas==2.2.3
       - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h6_*.py' -v
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h7_*.py' -v
