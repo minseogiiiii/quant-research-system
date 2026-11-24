@@ -157,6 +157,12 @@ class ResilientRoute:
 
     def read(self):
         observations = [source.tick() for source in self.sources]
+        for index, value in enumerate(observations):
+            if value is not None and (
+                self.sources[index].name, value[0].session
+            ) in self.arbiter.retired:
+                self.sources[index].retire()
+                observations[index] = None
         checks = compare(*observations)
         divergent = "DIVERGENCE" in checks.values()
         before = self.arbiter.active

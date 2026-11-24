@@ -62,7 +62,8 @@ class ResilienceContracts(unittest.TestCase):
                 self.assertFalse(third["historical_gap_recovered"])
                 self.assertTrue((p.root / "attempt_01").is_dir())
                 self.assertTrue((p.root / "attempt_02").is_dir())
-                self.assertGreaterEqual(audit_ledger(root / "route.jsonl")["records"], 3)
+                self.assertGreaterEqual(
+                    audit_ledger(root / "route.jsonl")["records"], 3)
             finally:
                 publisher.close()
                 p.close()
