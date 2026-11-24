@@ -1,0 +1,2 @@
+# F7 PnL attribution candidate
+Opt-in F6 trace does not change frozen strategy output. Completed roundtrip arrival-mid gross less spread, displayed depth walk, additional adverse price assumption and fees equals indicative net cash flow. Signed latency decomposition uses strictly earlier decision-mid observations; unavailable exit-decision marks remain null. Cash/base ledger marks at regular pre-packet grid; no fill interpolation; missing equity blocks metrics. Unresolved positions are never reported as flat. Raw trace stays local. No actual fills, OOS or executable alpha.

@@ -44,7 +44,7 @@ class RecoverySignal:
         self.history.append(bid_size)
         return signal
 
-def project(packets,product,policy=None):
+def project(packets,product,policy=None,*,trace=None):
     p=json.loads(json.dumps(POLICY if policy is None else policy))
     need(product in PRODUCTS and set(p)==set(POLICY),"POLICY")
     step,warm,hold,lat,tol,age=(p[k] for k in ("step_ms","warmup_samples","hold_ms","latency_ms","tolerance_ms","max_age_ms"))
@@ -59,8 +59,14 @@ def project(packets,product,policy=None):
     first=last=last_l2=last_seq=decision=None
     prior=-1;initialized=False;pending=None;position=None;blocked=False
     outcomes=[];signals=entries=exits=valid=missing=0
+    def mid():
+        return Decimal(book.best('bid')[0]+book.best('offer')[0])/(2*SCALE)
+    def record(kind,**row):
+        if trace is not None:trace.append(dict(kind=kind,**row))
     def decide(t):
         nonlocal pending,signals,valid,missing
+        fresh=last_l2 is not None and last_l2<t and t-last_l2<=age and bool(book.bid) and bool(book.offer)
+        record('GRID',time=t,cash=text(cash),base=text(Decimal(qty)/SCALE if position is not None else Decimal(0)),mid=text(mid()) if fresh else None)
         if last_l2 is None or t-last_l2>age or not book.bid or not book.offer:
             missing+=1;signal.reset();return
         need(last_l2<t,"FUTURE_FEATURE")
@@ -71,9 +77,11 @@ def project(packets,product,policy=None):
             signals+=1
             if pending is None and position is None and not blocked:
                 pending=("BUY",t+lat,t,last_seq)
+                record("SIGNAL",time=t,sequence=last_seq,mid=text(mid()))
     def reject(side,target,t,reason):
         nonlocal pending,blocked
         outcomes.append({"side":side,"target_ms":target,"observed_ms":t,"status":reason})
+        record("REJECT",side=side,target_ms=target,time=t,status=reason)
         if side=="SELL":blocked=True
         pending=None
     with localcontext() as ctx:
@@ -85,6 +93,11 @@ def project(packets,product,policy=None):
             while decision<=t:
                 need(valid+missing<200000,"DECISION_BUDGET")
                 decide(decision);decision+=step
+            if position is not None and pending is not None and pending[0]=='SELL' and not position.get('exit_decision_recorded') and t>=pending[2]:
+                dt=pending[2]
+                fresh=last_l2 is not None and last_l2<dt and dt-last_l2<=age and bool(book.bid) and bool(book.offer)
+                record('EXIT_DECISION',time=dt,sequence=last_seq if fresh else None,mid=text(mid()) if fresh else None)
+                position['exit_decision_recorded']=True
             affected=False
             if wire["channel"]=="l2_data":
                 for e in wire["events"]:
@@ -112,11 +125,13 @@ def project(packets,product,policy=None):
             if side=="BUY":
                 if amount>cash:
                     reject(side,target,t,"INSUFFICIENT_CASH");continue
+                record('BUY',time=t,sequence=seq,decision_ms=decision_t,quote=r)
                 cash-=amount;entries+=1
                 position={"entry_quote":amount,"entry_ms":t,"entry_seq":seq,"signal_ms":decision_t,"signal_seq":signal_seq}
                 pending=("SELL",t+hold+lat,t+hold,seq)
             else:
                 need(position is not None,"SELL_WITHOUT_POSITION")
+                record('SELL',time=t,sequence=seq,decision_ms=decision_t,quote=r)
                 cash+=amount;exits+=1
                 pnl=amount-position["entry_quote"]
                 outcomes.append({"status":"INDICATIVE_ROUNDTRIP","signal_ms":position["signal_ms"],
