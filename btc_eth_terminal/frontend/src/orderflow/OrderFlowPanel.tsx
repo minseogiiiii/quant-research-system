@@ -19,7 +19,7 @@ export default function OrderFlowPanel(){
  <svg viewBox="0 0 1000 150" role="img" aria-label="Observed cumulative volume delta; unobserved buckets are not connected" preserveAspectRatio="none">
  <line x1="0" y1="75" x2="1000" y2="75" stroke="#52677a"/>
  {data.rows.map((r,i)=>{const x=(r.time-data.start)/(data.end-data.start)*1000,y=75-(max?Number(r.cvd)/max:0)*65;const p=data.rows[i-1];return <g key={r.time}>{p&&r.time-p.time===data.step&&<line x1={(p.time-data.start)/(data.end-data.start)*1000} y1={75-(max?Number(p.cvd)/max:0)*65} x2={x} y2={y} stroke="#58d2b4" strokeWidth="2"/>}<circle cx={x} cy={y} r="2.5" fill="#58d2b4"/></g>;})}</svg>
- {row?<><label>Observed bucket <select value={selection} onChange={e=>setSelection(Number(e.target.value))}>{data.rows.map((r,i)=><option key={r.time} value={i}>{new Date(r.time).toISOString()}</option>)}</select></label>
+ {row?<><label>Observed bucket <select aria-label="Observed bucket" value={selection} onChange={e=>setSelection(Number(e.target.value))}>{data.rows.map((r,i)=><option key={r.time} value={i}>{new Date(r.time).toISOString()}</option>)}</select></label>
  <p>Buy {row.buy} · Sell {row.sell} · Delta {row.delta} · CVD {row.cvd} (base units)</p>
  <div className="of-table"><table><thead><tr><th>Price bucket low</th><th>Aggressive sell</th><th>Aggressive buy</th><th>Trades</th></tr></thead><tbody>{row.cells.map(c=><tr key={c.price}><td>{c.price}</td><td className="of-sell">{c.sell}</td><td className="of-buy">{c.buy}</td><td>{c.trades}</td></tr>)}</tbody></table></div></>:<p>No observed trades in this window.</p>}</>:<p>No order flow projection loaded.</p>}
  </section>;
