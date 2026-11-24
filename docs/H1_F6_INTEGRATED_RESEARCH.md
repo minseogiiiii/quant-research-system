@@ -1,0 +1,2 @@
+# H1/F6 candidate integration
+Merge H1 and F6 without changing the frozen strategy. Replay packets from Parquet via DuckDB with file digest, per-row canonical digest, per-packet hash, epoch/sequence/receiver validation. Compare complete strategy output with native raw replay, not independent strategy algorithm. Local validated dataset receipt is a prerequisite, not an external authentication of arbitrary user files. No alpha or OOS claims.
