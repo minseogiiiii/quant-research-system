@@ -36,6 +36,28 @@ class DiagnosticContracts(unittest.TestCase):
             self.assertEqual(fault_class("SOURCE:Error: SEQUENCE_GAP malicious"),
                              "UNKNOWN_REDACTED")
 
+    def test_duplicate_inside_first_packet_receipt_and_redaction(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "manifest.json"
+            r = dict(schema="q294_dup_snapshot_v1", connection_id=0, sequence=0,
+                     previous_committed_sequence=None, product="BTC-USD",
+                     event_index=1, event_count=2, level_count=1,
+                     already_committed_snapshot=False, prior_updates=0,
+                     raw_sha256="a"*64, same_socket=True, root_cause_proven=False,
+                     raw_text="private")
+            m = dict(format="btc_eth_raw_soak_v10", orders_enabled=False,
+                     connections=[dict(id=0, duplicate_snapshot_receipt=r)],
+                     faults=[dict(connection_id=0, reason="SOURCE:Error: DUP_SNAPSHOT")])
+            path.write_text(json.dumps(m))
+            result = manifest_receipt(path)
+            self.assertEqual(result["status"], "MANIFEST_READ")
+            self.assertEqual(result["duplicate_snapshot_receipts"][0]["sequence"], 0)
+            self.assertNotIn("private", json.dumps(result))
+            r["sequence"] = 1
+            path.write_text(json.dumps(m))
+            self.assertEqual(manifest_receipt(path)["status"],
+                             "MANIFEST_UNAVAILABLE_OR_REJECTED")
+
     def test_observer_first_event_survives_later_shutdown(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "events.jsonl"

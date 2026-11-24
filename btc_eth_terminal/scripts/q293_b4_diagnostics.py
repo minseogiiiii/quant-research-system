@@ -103,12 +103,19 @@ def manifest_receipt(path):
             r = c.get("duplicate_snapshot_receipt")
             if r is None:
                 continue
-            keys = ("connection_id", "sequence", "previous_committed_sequence",
-                    "event_index", "event_count", "level_count", "prior_updates")
+            if not isinstance(r, dict):
+                raise ValueError("DUP_SNAPSHOT_RECEIPT_SCHEMA")
+            keys = ("connection_id", "sequence", "event_index", "event_count",
+                    "level_count", "prior_updates")
+            prev = r.get("previous_committed_sequence")
             if (r.get("schema") != "q294_dup_snapshot_v1"
-                    or not all(type(r.get(k)) is int and 0 <= r[k] < 10**9 for k in keys)
+                    or not all(type(r.get(k)) is int and 0 <= r[k] < 10**9
+                               for k in keys)
                     or r["connection_id"] != c["id"]
-                    or r["sequence"] != r["previous_committed_sequence"] + 1
+                    or "previous_committed_sequence" not in r
+                    or not (prev is None and r["sequence"] == 0
+                            or type(prev) is int and 0 <= prev < 10**9
+                            and r["sequence"] == prev + 1)
                     or not 0 <= r["event_index"] < r["event_count"]
                     or r["product"] not in ("BTC-USD", "ETH-USD")
                     or type(r.get("already_committed_snapshot")) is not bool
@@ -117,8 +124,10 @@ def manifest_receipt(path):
                     or not isinstance(r.get("raw_sha256"), str)
                     or not re.fullmatch(r"[0-9a-f]{64}", r["raw_sha256"])):
                 raise ValueError("DUP_SNAPSHOT_RECEIPT_SCHEMA")
-            duplicate_snapshots.append({k: r[k] for k in (*keys, "product",
-                "already_committed_snapshot", "same_socket", "root_cause_proven", "raw_sha256")})
+            public_keys = (*keys, "previous_committed_sequence", "product",
+                           "already_committed_snapshot", "same_socket",
+                           "root_cause_proven", "raw_sha256")
+            duplicate_snapshots.append({k: r[k] for k in public_keys})
         finish = m.get("finish_reason")
         return {"status": "MANIFEST_READ", "manifest_sha256":
                 hashlib.sha256(raw).hexdigest(), "faults": faults,

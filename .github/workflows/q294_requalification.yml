@@ -34,7 +34,7 @@ jobs:
           for p,sha in m['source_git_blobs'].items():
               expected='3bd505d29f1727575eb24cf884453890b3663ec9' if p==collector else sha
               assert subprocess.check_output(['git','hash-object',p],text=True).strip()==expected,p
-          assert subprocess.check_output(['git','hash-object','btc_eth_terminal/scripts/q293_b4_diagnostics.py'],text=True).strip()=='82cb19989d0555111931b67c1b555a1b3408ea4d'
+          assert subprocess.check_output(['git','hash-object','btc_eth_terminal/scripts/q293_b4_diagnostics.py'],text=True).strip()=='b9febbd728b393e4ec63c56e72867b3d4c95aa1a'
           PY
       - name: Lint changed Python and verify new diagnostic regression
         run: |
