@@ -8,6 +8,7 @@ from f4_depth_buckets import units,SCALE,PRODUCTS
 from f5_execution_depth import walk
 from post_quote_markout import IndexedBook
 from h3_momentum_horizons import POLICY,project as signal_project
+from h11_risk import Risk,validate_policy
 from f6_liquidity_recovery import digest
 
 def need(ok,why):
@@ -24,12 +25,13 @@ def collect(factory,policy=None):
     return sorted(rows),reports
 
 class Portfolio:
-    def __init__(self,horizon,filtered,initial):
+    def __init__(self,horizon,filtered,initial,risk_policy=None):
         self.h=horizon;self.filtered=filtered;self.initial=initial;self.cash=initial
         self.pending={};self.pos={};self.blocked=False;self.events=[]
         self.count=defaultdict(int);self.realized=Decimal(0);self.peak=initial
         self.dd=Decimal(0);self.grid=0;self.missing=0;self.last_equity=None
         self.peak_exposure=Decimal(0)
+        self.risk=Risk(initial,risk_policy) if risk_policy is not None else None
     def signal(self,t,product,seq,flag,lat):
         if self.filtered and not flag:return
         self.count["signals"]+=1
@@ -55,7 +57,7 @@ class Portfolio:
         self.peak=max(self.peak,eq);self.dd=max(self.dd,1-eq/self.peak)
         self.peak_exposure=max(self.peak_exposure,exposure)
         self.last_equity=eq
-    def fill(self,t,seq,affected,books,qty,cap,fee,slip,lat,cache):
+    def fill(self,t,seq,affected,books,qty,cap,fee,slip,lat,cache,clocks=None,age=None):
         # Exits before entries, then alphabetical product priority on one packet.
         for side in ("SELL","BUY"):
             for product in sorted(affected):
@@ -73,6 +75,10 @@ class Portfolio:
                 amount=Decimal(r["all_in_quote"]);q=Decimal(r["requested_base"])
                 need(amount>0 and q==Decimal(qty[product])/SCALE,"QUOTE")
                 if side=="BUY":
+                    if self.risk is not None:
+                        reason=self.risk.admit(t,self.cash,self.pos,books,clocks,age,product,amount,q)
+                        if reason:
+                            self.reject(product,side,reason);continue
                     if amount>self.cash:
                         self.reject(product,side,"cash_rejected");continue
                     need(product not in self.pos,"DUP_POSITION")
@@ -82,6 +88,7 @@ class Portfolio:
                     cost,base=self.pos.pop(product);need(base==q,"INVENTORY")
                     self.cash+=amount;self.realized+=amount-cost;del self.pending[product];self.count["exits"]+=1
                 self.events.append((side,product,fmt(amount),fmt(q)))
+                if self.risk is not None:self.risk.observe(t,self.cash,self.pos,books,clocks,age)
                 need(self.cash>=0 and len(self.pos)<=2,"CAPITAL")
     def finish(self):
         for product,(side,_,_) in list(self.pending.items()):
@@ -104,7 +111,7 @@ class Portfolio:
              and c["failed_exits"]==len(self.pos),"COUNTS")
         flat=not self.pos
         if flat:need(cash==self.initial+pnl,"FLAT_CASH")
-        return {"horizon_ms":self.h,"cohort":"momentum_micro_filter" if self.filtered else "momentum",
+        result={"horizon_ms":self.h,"cohort":"momentum_micro_filter" if self.filtered else "momentum",
                 "counts":dict(c),"initial_cash":fmt(self.initial),"ending_cash":fmt(cash),
                 "realized_net_quote":fmt(pnl),"unresolved_products":sorted(self.pos),
                 "final_flat_return":fmt(cash/self.initial-1) if flat else None,
@@ -113,8 +120,10 @@ class Portfolio:
                 "grid_max_drawdown":fmt(self.dd) if self.grid and not self.missing else None,
                 "observed_grid_peak_exposure":fmt(self.peak_exposure),
                 "cash_inventory_witness":True,"event_digest":digest(self.events)}
+        if self.risk is not None:result["risk"]=self.risk.receipt()
+        return result
 
-def simulate(packets,signals,policy=None,*,initial_cash="10000"):
+def simulate(packets,signals,policy=None,*,initial_cash="10000",risk_policy=None):
     p=POLICY if policy is None else policy
     initial=Decimal(initial_cash)
     need(initial.is_finite() and initial>0 and initial<=Decimal("1000000000"),"INITIAL")
@@ -123,7 +132,8 @@ def simulate(packets,signals,policy=None,*,initial_cash="10000"):
     grid,lat,tol,age=(p[k] for k in ("grid_ms","latency_ms","tolerance_ms","max_age_ms"))
     need(len(signals)<=400000 and signals==sorted(signals) and len({(x[0],x[1]) for x in signals})==len(signals),"SIGNALS")
     books={k:IndexedBook() for k in PRODUCTS};clocks=dict.fromkeys(PRODUCTS,(None,None))
-    portfolios=[Portfolio(h,f,initial) for h in p["horizons_ms"] for f in (False,True)]
+    if risk_policy is not None:validate_policy(risk_policy)
+    portfolios=[Portfolio(h,f,initial,risk_policy) for h in p["horizons_ms"] for f in (False,True)]
     pos=0;prior=-1;last=first=decision=None
     with localcontext() as ctx:
         ctx.prec=80
@@ -132,7 +142,9 @@ def simulate(packets,signals,policy=None,*,initial_cash="10000"):
             prior=seq;last=t
             if first is None:first=t;decision=((t+grid-1)//grid)*grid
             while decision<=t:
-                for a in portfolios:a.expire(decision,tol);a.mark(decision,books,clocks,age)
+                for a in portfolios:
+                    a.expire(decision,tol);a.mark(decision,books,clocks,age)
+                    if a.risk is not None:a.risk.observe(decision,a.cash,a.pos,books,clocks,age,strict=True)
                 while pos<len(signals) and signals[pos][0]<=decision:
                     dt,product,sq,flag=signals[pos];stamp,actual=clocks[product]
                     need(dt==decision and stamp is not None and stamp<dt and dt-stamp<=age and actual==sq and sq<seq and type(flag) is bool,"SIGNAL_CAUSAL")
@@ -155,10 +167,14 @@ def simulate(packets,signals,policy=None,*,initial_cash="10000"):
             for product in affected:
                 b=books[product];need(b.bid and b.offer and b.best("bid")[0]<b.best("offer")[0],"BOOK")
             cache={}
-            for a in portfolios:a.fill(t,seq,affected,books,qty,cap,fee,slip,lat,cache)
+            for a in portfolios:
+                if a.risk is not None:a.risk.observe(t,a.cash,a.pos,books,clocks,age)
+                a.fill(t,seq,affected,books,qty,cap,fee,slip,lat,cache,clocks,age)
         need(first is not None and pos==len(signals),"SOURCE_INVENTORY")
-        return {"schema":"h9_portfolio_diagnostic_v1","policy_sha256":digest(p),"source_messages":prior+1,
+        result={"schema":"h9_portfolio_diagnostic_v1","policy_sha256":digest(p),"source_messages":prior+1,
                 "source_first_ms":first,"source_last_ms":last,"signals":len(signals),"signal_sha256":digest(signals),
                 "portfolios":[a.finish() for a in portfolios],"capital_shared_across_products":True,
                 "capital_shared_across_scenarios":False,"actual_fills_verified":False,"selection_performed":False,
                 "oos_approved":False,"alpha_confirmed":False,"execution_authorized":False}
+        if risk_policy is not None:result["risk_policy"]=risk_policy;result["risk_policy_sha256"]=digest(risk_policy)
+        return result
