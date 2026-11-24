@@ -1,0 +1,2 @@
+# H2 native benchmark
+Generate a sealed Coinbase-shaped synthetic archive with two books, snapshots and bounded 512-level packet updates; never market evidence. Stream chunks, exact pins; verify legacy rejection beyond 1GB, then use H1 durable admission (fixture mode only), Parquet/DuckDB and independent book replay. Record real elapsed conversion/audit wall time, process RSS (Linux KiB), rows and storage bytes. 1.02GB target; 10GB/real data tests remain separate and no production capacity claim. Temporary raw data deleted; only receipt uploaded.

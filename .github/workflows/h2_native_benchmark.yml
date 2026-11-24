@@ -1,0 +1,31 @@
+name: H2 native archive synthetic 1GB benchmark
+on:
+  push:
+    branches: ['integration/h1-f6-research-20261124']
+    paths: ['btc_eth_terminal/scripts/h2_native_benchmark.py','btc_eth_terminal/tests/test_h2_native_benchmark.py','.github/workflows/h2_native_benchmark.yml']
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts:btc_eth_terminal/tests
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyarrow==19.0.1 duckdb==1.2.2
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h2_native_benchmark.py' -v
+      - name: Measure complete H1 pipeline over >1GB generated native archive
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/h2-report"
+          python -u btc_eth_terminal/scripts/h2_native_benchmark.py --target-bytes 1020000000 --output "$RUNNER_TEMP/h2-report/receipt.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: h2-native-synthetic-benchmark
+          path: ${{ runner.temp }}/h2-report/receipt.json
+          if-no-files-found: error
