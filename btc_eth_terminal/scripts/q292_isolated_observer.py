@@ -197,7 +197,9 @@ def worker(args):
                               args.synthetic, parent_bound=True)
             (args.workdir / "observer_ready").touch(mode=0o600, exist_ok=False)
             # Bounded even if the parent has a bug and never sends EOF.
-            end = time.monotonic() + args.duration + 10
+            # Original collector starts duration after snapshots (45s setup)
+            # and adds a five-second capture margin. Parent owns the hard cap.
+            end = time.monotonic() + args.duration + 60
             while not stopped and time.monotonic() < end:
                 try:
                     request = sock.recv(1)

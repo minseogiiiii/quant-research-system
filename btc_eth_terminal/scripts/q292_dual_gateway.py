@@ -331,12 +331,14 @@ class Collector:
             self.listener.close()
         if self.thread is not None:
             self.thread.join(timeout=3)
-        self.engine.stopped()
-        if self.diagnostic is not None:
-            self.engine.diagnostic = None
-            self.diagnostic.close()
-        for stream in self.logs:
-            stream.close()
+        try:
+            self.engine.stopped()
+        finally:
+            if self.diagnostic is not None:
+                self.engine.diagnostic = None
+                self.diagnostic.close()
+            for stream in self.logs:
+                stream.close()
 
 
 class DualRoute:

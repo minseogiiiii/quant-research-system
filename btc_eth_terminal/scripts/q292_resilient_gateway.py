@@ -125,7 +125,15 @@ class ManagedSource:
             self.seen_ready = True
             self.last_good = now
             return value
-        if (self.worker.failed
+        # An observer that stopped its tap reader cannot become healthy on
+        # the same IPC stream; retire immediately, not after absence timeout.
+        terminal = getattr(self.worker, "last_reason", None) in {
+            "LIVE_ADMISSION_REJECTED", "COLLECTOR_OBSERVATION_SOCKET_CLOSED",
+            "LOCAL_OBSERVER_BACKPRESSURE_EXCEEDED", "INVALID_OBSERVER_TRANSPORT_CONTROL",
+            "INDEPENDENT_SOURCE_WITNESS_FAILED", "OBSERVER_SOCKET_FAILURE",
+            "COLLECTOR_EXITED", "DUAL_IPC_FAILED",
+        }
+        if (self.worker.failed or terminal
                 or not self.seen_ready and now - self.started > STARTUP_LIMIT
                 or self.last_good is not None
                 and now - self.last_good > ABSENCE_LIMIT):

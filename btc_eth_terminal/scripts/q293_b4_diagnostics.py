@@ -103,7 +103,8 @@ def manifest_receipt(path):
                 hashlib.sha256(raw).hexdigest(), "faults": faults,
                 "first_fault_class": faults[0]["class"] if faults else None,
                 "finish_class": finish if finish in FINISH else "OTHER_REDACTED",
-                "connections": len(m["connections"]), "network_root_cause_proven": False}
+                "connections": len(m["connections"]),
+                "network_root_cause_proven": False}
     except (OSError, ValueError, KeyError, TypeError):
         return {"status": "MANIFEST_UNAVAILABLE_OR_REJECTED",
                 "network_root_cause_proven": False}
@@ -122,12 +123,16 @@ class ObserverJournal:
         self.count = 0
         self.previous = ZERO
         self.last = None
+        self.failed = False
 
     def record(self, reason, connection, sequence):
         reason = reason_class(reason)
-        conn = connection if type(connection) is int and 0 <= connection < 1000 else None
+        conn = (connection if type(connection) is int
+                and 0 <= connection < 1000 else None)
         seq = sequence if type(sequence) is int and -1 <= sequence < 10**9 else None
         with self.lock:
+            if self.failed:
+                raise OSError("OBSERVER_JOURNAL_FAILED")
             key = (reason, conn)
             if key == self.last:
                 return
@@ -138,9 +143,13 @@ class ObserverJournal:
                    "previous": self.previous}
             digest = hashlib.sha256(canonical(row)).hexdigest()
             raw = canonical({**row, "sha256": digest}) + b"\n"
-            if len(raw) > MAX_LINE or os.write(self.fd, raw) != len(raw):
-                raise OSError("OBSERVER_JOURNAL_WRITE")
-            os.fsync(self.fd)
+            try:
+                if len(raw) > MAX_LINE or os.write(self.fd, raw) != len(raw):
+                    raise OSError("OBSERVER_JOURNAL_WRITE")
+                os.fsync(self.fd)
+            except OSError:
+                self.failed = True
+                raise
             self.previous = digest
             self.count += 1
             self.last = key
