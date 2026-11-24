@@ -1,0 +1,65 @@
+name: F6 frozen liquidity recovery historical and forward pilot
+on:
+  push:
+    branches: ['integration/f6-fincept-backtest-20261124']
+    paths: ['btc_eth_terminal/scripts/f6_recovery_real_gate.py','btc_eth_terminal/backend/f6_liquidity_recovery.py','.github/workflows/f6_recovery_real.yml']
+permissions:
+  contents: read
+jobs:
+  historical:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts:.github/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch frozen private source
+        env:
+          Q13_PRIVATE_RELEASE_URL: ${{ secrets.Q13_PRIVATE_RELEASE_URL }}
+          Q13_GITHUB_ARCHIVE_TOKEN: ${{ secrets.Q13_GITHUB_ARCHIVE_TOKEN }}
+        run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/f6-private" "$RUNNER_TEMP/f6-historical"
+          python .github/scripts/q16_secure_private_archive_download.py --output "$RUNNER_TEMP/f6-private/q7.zip"
+      - run: python btc_eth_terminal/scripts/f6_recovery_real_gate.py --release-zip "$RUNNER_TEMP/f6-private/q7.zip" --output "$RUNNER_TEMP/f6-historical/receipt.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: f6-historical-diagnostic
+          path: ${{ runner.temp }}/f6-historical/receipt.json
+          if-no-files-found: error
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/f6-private"
+  forward:
+    needs: historical
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts:.github/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: f6-historical-diagnostic
+          path: ${{ runner.temp }}/f6-historical
+      - run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/f6-forward"
+          python btc_eth_terminal/scripts/f6_recovery_real_gate.py --historical-receipt "$RUNNER_TEMP/f6-historical/receipt.json" --output "$RUNNER_TEMP/f6-forward/receipt.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: f6-forward-diagnostic
+          path: ${{ runner.temp }}/f6-forward/receipt.json
+          if-no-files-found: error
