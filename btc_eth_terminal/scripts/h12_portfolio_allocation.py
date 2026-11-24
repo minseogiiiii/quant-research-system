@@ -30,7 +30,7 @@ def erc_function():
     need(len(defs)==1 and not defs[0].decorator_list,"VENDOR_FUNCTION")
     # Execute only the reviewed, immutable function AST, never the surrounding
     # vendor service, imports or dynamically supplied source.
-    ns={"np":np,"__builtins__":{"range":range,"float":float,"min":min,"ValueError":ValueError}}
+    ns={"np":np,"__builtins__":{"range":range,"float":float,"int":int,"min":min,"ValueError":ValueError}}
     exec(compile(ast.Module(body=defs,type_ignores=[]),"<pinned-fincept-erc>","exec"),ns)
     return ns["equal_risk_contribution_weights"]
 
