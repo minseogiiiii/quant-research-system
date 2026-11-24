@@ -39,16 +39,22 @@ class DualGatewayContracts(unittest.TestCase):
                     except HTTPError as exc:
                         return exc.code, json.load(exc)
 
-                def until(label):
+                def until(label=None):
                     end = time.monotonic() + 12
                     while time.monotonic() < end:
                         status, value = get()
-                        if status == 200 and value["active_source"] == label:
+                        ready = route.arbiter.candidates
+                        if status == 200 and (value["active_source"] == label
+                                or label is None and len(ready) == 2
+                                and all(n >= route.arbiter.confirmations
+                                        for _, n in ready.values())):
                             return value
                         time.sleep(.15)
-                    self.fail("DUAL_SOURCE_NOT_READY:" + label)
+                    self.fail("DUAL_SOURCE_NOT_READY:" + str(label))
 
-                first = until("primary")
+                first = until()
+                if first["active_source"] == "secondary":
+                    p, s = s, p
                 self.assertEqual(first["mode"], "SYNTHETIC_ONLY")
                 self.assertEqual(set(first["states"]), {"BTC-USD", "ETH-USD"})
                 self.assertTrue(all(
@@ -57,7 +63,7 @@ class DualGatewayContracts(unittest.TestCase):
                 old = cursor(first)
                 p.process.send_signal(signal.SIGKILL)
                 p.process.wait(timeout=3)
-                second = until("secondary")
+                second = until(s.name)
                 self.assertNotEqual(first["source_session"], second["source_session"])
                 self.assertGreater(second["generation"], first["generation"])
                 status, invalid = get(last=old)

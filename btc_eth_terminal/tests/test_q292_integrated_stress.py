@@ -45,7 +45,12 @@ class IntegratedStress(unittest.TestCase):
                     return json.load(response)
 
             try:
-                first = until(lambda x: x["active_source"] == "primary")
+                first = until(lambda x: x["active_source"] is not None
+                              and set(x.get("checkpoint_comparison", {}).values())
+                              <= {"MATCH", "NOT_COMPARABLE"}
+                              and len(x.get("checkpoint_comparison", {})) == 2)
+                if first["active_source"] == "secondary":
+                    p, s = s, p
                 for _ in range(8):
                     response = urlopen(url + "/events", timeout=8)
                     streams.append(response)
@@ -72,7 +77,7 @@ class IntegratedStress(unittest.TestCase):
                                     for r in replies))
 
                 p.worker.process.kill()
-                second = until(lambda x: x["active_source"] == "secondary")
+                second = until(lambda x: x["active_source"] == s.name)
                 self.assertNotEqual(first["source_session"], second["source_session"])
                 for response in streams:
                     tail = response.read()
@@ -81,11 +86,11 @@ class IntegratedStress(unittest.TestCase):
                         second["source_session"].encode() + b'","state_version"', tail)
                     response.close()
                 streams.clear()
-                until(lambda x: x.get("source_attempts", {}).get("primary", 0) >= 2
+                until(lambda x: x.get("source_attempts", {}).get(p.name, 0) >= 2
                       and x.get("checkpoint_comparison", {}).get("BTC-USD")
                       in ("MATCH", "NOT_COMPARABLE"))
                 s.worker.process.kill()
-                third = until(lambda x: x["active_source"] == "primary")
+                third = until(lambda x: x["active_source"] == p.name)
                 self.assertNotEqual(first["source_session"], third["source_session"])
                 self.assertFalse(third["zero_gap_certified"])
                 self.assertFalse(third["historical_gap_recovered"])

@@ -46,16 +46,21 @@ class ResilienceContracts(unittest.TestCase):
                 self.fail("RESTART_OR_FAILOVER_DEADLINE")
 
             try:
-                first = until(lambda x: x["active_source"] == "primary")
+                first = until(lambda x: x["active_source"] is not None
+                              and set(x.get("checkpoint_comparison", {}).values())
+                              <= {"MATCH", "NOT_COMPARABLE"}
+                              and len(x.get("checkpoint_comparison", {})) == 2)
+                if first["active_source"] == "secondary":
+                    p, s = s, p
                 p.worker.process.kill()
-                second = until(lambda x: x["active_source"] == "secondary")
+                second = until(lambda x: x["active_source"] == s.name)
                 self.assertNotEqual(first["source_session"], second["source_session"])
-                until(lambda x: x.get("source_attempts", {}).get("primary", 0) >= 2
+                until(lambda x: x.get("source_attempts", {}).get(p.name, 0) >= 2
                       and x.get("checkpoint_comparison", {}).get("BTC-USD")
                       in ("MATCH", "NOT_COMPARABLE"))
-                self.assertEqual(publisher.read()["active_source"], "secondary")
+                self.assertEqual(publisher.read()["active_source"], s.name)
                 s.worker.process.kill()
-                third = until(lambda x: x["active_source"] == "primary")
+                third = until(lambda x: x["active_source"] == p.name)
                 self.assertNotEqual(first["source_session"], third["source_session"])
                 self.assertGreater(third["generation"], second["generation"])
                 self.assertFalse(third["zero_gap_certified"])

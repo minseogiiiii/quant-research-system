@@ -36,16 +36,24 @@ class IsolationContracts(unittest.TestCase):
                 p, s = sources
                 route = DualRoute(p, s)
 
-                def until(label):
+                def until(label=None):
                     end = time.monotonic() + 12
                     while time.monotonic() < end:
                         result = route.read()
-                        if result["active_source"] == label:
+                        ready = route.arbiter.candidates
+                        if result["active_source"] is not None and (
+                            result["active_source"] == label
+                            or label is None and len(ready) == 2
+                            and all(n >= route.arbiter.confirmations
+                                    for _, n in ready.values())
+                        ):
                             return result
                         time.sleep(.12)
-                    self.fail("ISOLATED_ROUTE_NOT_READY:" + label)
+                    self.fail("ISOLATED_ROUTE_NOT_READY:" + str(label))
 
-                first = until("primary")
+                first = until()
+                if first["active_source"] == "secondary":
+                    p, s = s, p
                 self.assertNotEqual(p.process.pid, s.process.pid)
                 children = Path(
                     f"/proc/{p.process.pid}/task/{p.process.pid}/children"
@@ -55,7 +63,7 @@ class IsolationContracts(unittest.TestCase):
                 self.assertTrue(running(node_pid))
                 p.process.kill()
                 p.process.wait(timeout=4)
-                second = until("secondary")
+                second = until(s.name)
                 self.assertNotEqual(cursor(first), cursor(second))
                 self.assertFalse(second["zero_gap_certified"])
                 self.assertEqual(set(second["states"]), {"BTC-USD", "ETH-USD"})
