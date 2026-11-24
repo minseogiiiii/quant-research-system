@@ -1,0 +1,42 @@
+name: H12 Fincept allocation and joint risk
+on:
+  push:
+    branches: ['integration/h1-f6-research-20261124']
+    paths: ['btc_eth_terminal/scripts/h12_*.py','btc_eth_terminal/backend/h12_*.py','btc_eth_terminal/backend/h9_portfolio.py','btc_eth_terminal/tests/test_h12_*.py','btc_eth_terminal/vendor/fincept/**','.github/workflows/h12_portfolio_allocation.yml']
+permissions:
+  contents: read
+jobs:
+  allocation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts:btc_eth_terminal/tests:.github/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyarrow==19.0.1 duckdb==1.2.2 numpy==2.2.6 pandas==2.2.3
+      - run: python btc_eth_terminal/scripts/verify_fincept_vendor.py
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h9_*.py' -v
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h10_*.py' -v
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h11_*.py' -v
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_h12_*.py' -v
+      - name: Fetch authorized frozen source
+        env:
+          Q13_PRIVATE_RELEASE_URL: ${{ secrets.Q13_PRIVATE_RELEASE_URL }}
+          Q13_GITHUB_ARCHIVE_TOKEN: ${{ secrets.Q13_GITHUB_ARCHIVE_TOKEN }}
+        run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/h12-private" "$RUNNER_TEMP/h12-report"
+          python .github/scripts/q16_secure_private_archive_download.py --output "$RUNNER_TEMP/h12-private/q7.zip"
+      - run: python btc_eth_terminal/scripts/h12_real_allocation_gate.py --release-zip "$RUNNER_TEMP/h12-private/q7.zip" --output "$RUNNER_TEMP/h12-report/receipt.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: h12-real-allocation-receipt
+          path: ${{ runner.temp }}/h12-report/receipt.json
+          if-no-files-found: error
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/h12-private"

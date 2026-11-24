@@ -12,7 +12,7 @@ def estimate(b):
 class Joint(unittest.TestCase):
     def test_covariance_dollar_risk(self):
         x={"BTC-USD":Decimal(100),"ETH-USD":Decimal(50)}
-        self.assertEqual(dollar_vol(estimate("0"),x),Decimal(200).sqrt())
+        self.assertAlmostEqual(float(dollar_vol(estimate("0"),x)),float(Decimal(200).sqrt()),places=12)
         self.assertGreater(dollar_vol(estimate(".01"),x),dollar_vol(estimate("0"),x))
     def test_combined_exposure_and_missing_reset(self):
         books={p:IndexedBook() for p in ("BTC-USD","ETH-USD")}
