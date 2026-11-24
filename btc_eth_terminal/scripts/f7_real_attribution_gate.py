@@ -12,6 +12,7 @@ from f5_independent_clock import read_independent
 from f6_liquidity_recovery import build,POLICY,digest
 from f7_pnl_attribution import summarize
 from f6_fincept_metrics_adapter import evaluate
+from f7_cost_sensitivity import sensitivity
 PIN="8f2e0ec88a601a92ab4c7bcd0e04b20536fbe46bbd8b3c7f67ae3c1d075c28e5"
 SOURCE=PREFIX+"backend/data/live_v14_clean_120s/coinbase_btc_eth_soak_wsgXRy/"
 def require(ok,reason):
@@ -53,6 +54,7 @@ def run(archive,output):
             else:
                 report["fincept_grid_metrics"]=None
                 report["metrics_scope"]="UNAVAILABLE_INCOMPLETE_GRID"
+            report["fixed_path_cost_sensitivity"]=sensitivity(report,POLICY)
             products[p]=report
         result={"schema":"f7_real_attribution_receipt_v1","status":"PASS","source_manifest_sha256":PIN,
                 "policy_sha256":digest(POLICY),"products":products,"raw_data_uploaded":False,

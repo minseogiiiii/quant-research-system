@@ -34,6 +34,7 @@ def decompose(buy,sell,signal_mid,exit_mid=None):
         net=sn-bn
         need(close(gross-sum(costs.values()),net),"DECOMPOSITION")
         out={"arrival_mid_gross_quote":gross,**costs,"net_quote":net,
+             "entry_depth_notional":bg,"exit_depth_notional":sg,
              "entry_latency_pnl":(d(signal_mid)-bm)*q}
         # Holding gross at decision clocks and signed latency components are
         # only available when an earlier, fresh exit-decision quote exists.
@@ -74,7 +75,7 @@ def summarize(packets,product,policy=None):
                 grid.append({"time":row["time"],"equity":fmt(equity) if equity is not None else None,"base":fmt(base)})
             else:raise ValueError("F7_TRACE_KIND")
         need(len(completed)==report["closed_roundtrips"] and bool(base)==report["unresolved_position"],"INVENTORY")
-        fields=("arrival_mid_gross_quote",*COSTS,"net_quote","entry_latency_pnl")
+        fields=("arrival_mid_gross_quote",*COSTS,"net_quote","entry_latency_pnl","entry_depth_notional","exit_depth_notional")
         totals={k:fmt(sum((d(x[k]) for x in completed),Decimal(0))) for k in fields}
         need(close(d(totals["net_quote"]),d(report["realized_net_quote"])),"NET_RECONCILIATION")
         latency_complete=sum(x["decision_mid_gross_quote"] is not None for x in completed)
