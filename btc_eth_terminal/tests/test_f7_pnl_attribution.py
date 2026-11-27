@@ -1,9 +1,10 @@
-import unittest
 import copy
+import unittest
 from decimal import Decimal
+
+from f5_execution_depth import SCALE, walk
 from f6_liquidity_recovery import POLICY, project
-from f7_pnl_attribution import summarize, decompose
-from f5_execution_depth import walk, SCALE
+from f7_pnl_attribution import decompose, summarize
 from test_f4_ofi_markout import packet
 
 

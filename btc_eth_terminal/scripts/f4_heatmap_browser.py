@@ -5,6 +5,7 @@ import subprocess
 import time
 import urllib.request
 from pathlib import Path
+
 from playwright.sync_api import sync_playwright
 
 root = Path(__file__).resolve().parents[1] / "frontend"

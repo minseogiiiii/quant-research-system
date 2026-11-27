@@ -1,8 +1,9 @@
-import unittest
-from f6_liquidity_recovery import project, POLICY, RecoverySignal
-from test_f4_ofi_markout import packet
-from decimal import Decimal
 import copy
+import unittest
+from decimal import Decimal
+
+from f6_liquidity_recovery import POLICY, RecoverySignal, project
+from test_f4_ofi_markout import packet
 
 
 class Recovery(unittest.TestCase):

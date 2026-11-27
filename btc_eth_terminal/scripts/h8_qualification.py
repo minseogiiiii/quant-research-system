@@ -5,13 +5,14 @@ same-policy independent holdout performance, calibrated fills or live safety.
 """
 
 from __future__ import annotations
+
 import argparse
+import json
 import math
 from pathlib import Path
-from h5_experiment_registry import sha, snapshot, need, hex64
+
+from h5_experiment_registry import hex64, need, sha, snapshot
 from independent_soak_replay import strict_json
-import json
-import hashlib
 
 
 def assess(report, journal, plan_pin, head, report_pin):

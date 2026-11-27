@@ -2,7 +2,8 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-from h5_experiment_registry import create, append, snapshot, sha, series_hash
+
+from h5_experiment_registry import append, create, sha, snapshot
 
 
 def plan(n=2):

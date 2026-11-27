@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
-from f4_depth_buckets import project, units, decimal, build
+
+from f4_depth_buckets import build, decimal, project, units
 
 
 def level(side, px, qty):
@@ -81,12 +82,17 @@ class Buckets(unittest.TestCase):
                 units(raw)
 
     def test_epoch_gate_before_replay(self):
-        with patch(
-            "f4_depth_buckets.verify_capture",
-            return_value={"source_eligible_for_state_replay": True, "connections": 2},
+        with (
+            patch(
+                "f4_depth_buckets.verify_capture",
+                return_value={
+                    "source_eligible_for_state_replay": True,
+                    "connections": 2,
+                },
+            ),
+            self.assertRaisesRegex(ValueError, "SINGLE_EPOCH"),
         ):
-            with self.assertRaisesRegex(ValueError, "SINGLE_EPOCH"):
-                build(".", "a" * 64)
+            build(".", "a" * 64)
 
     def test_pre_window_snapshot_without_fabricated_bucket(self):
         r = project(

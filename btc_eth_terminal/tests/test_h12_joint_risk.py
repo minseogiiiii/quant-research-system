@@ -1,12 +1,13 @@
 import unittest
 from decimal import Decimal
-from h12_joint_risk import dollar_vol, JointRisk
-from post_quote_markout import IndexedBook
+
 from f4_depth_buckets import SCALE
 from h9_portfolio import simulate
 from h11_risk import POLICY as RISK
-from test_h11_covariance import POLICY as SIZING
+from h12_joint_risk import JointRisk, dollar_vol
+from post_quote_markout import IndexedBook
 from test_h9_portfolio import fixture
+from test_h11_covariance import POLICY as SIZING
 
 
 def estimate(b):

@@ -2,10 +2,11 @@ import hashlib
 import tempfile
 import unittest
 from pathlib import Path
-from h2_native_benchmark import generate
+
 from h1_streaming_parquet import convert
-from h6_registered_strategy_runner import run, prepare
+from h2_native_benchmark import generate
 from h5_experiment_registry import snapshot
+from h6_registered_strategy_runner import prepare, run
 
 
 class Runner(unittest.TestCase):

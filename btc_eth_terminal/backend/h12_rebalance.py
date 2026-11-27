@@ -1,12 +1,13 @@
 """Offline causal cash-sleeve allocation/rebalancing, indicative depth only."""
 
-from decimal import Decimal, localcontext, ROUND_FLOOR
 from collections import defaultdict
-from f4_depth_buckets import SCALE, units, PRODUCTS
+from decimal import ROUND_FLOOR, Decimal, localcontext
+
+from f4_depth_buckets import PRODUCTS, SCALE, units
 from f5_execution_depth import walk
-from post_quote_markout import IndexedBook
-from h11_covariance import RollingCovariance
 from f6_liquidity_recovery import digest
+from h11_covariance import RollingCovariance
+from post_quote_markout import IndexedBook
 
 POLICY = {
     "grid_ms": 10000,

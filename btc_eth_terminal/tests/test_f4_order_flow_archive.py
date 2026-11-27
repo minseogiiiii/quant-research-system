@@ -8,8 +8,8 @@ from collections import defaultdict
 from decimal import Decimal
 from pathlib import Path
 
-from test_f4_depth_buckets_archive import BASE, stamp, write_archive
 from f4_order_flow import build
+from test_f4_depth_buckets_archive import BASE, stamp, write_archive
 from v35_archive_ingress import ArchiveRejected
 
 

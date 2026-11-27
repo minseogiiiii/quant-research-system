@@ -2,12 +2,13 @@ import copy
 import tempfile
 import unittest
 from pathlib import Path
-from f4_ofi_markout import build
+
 from f4_ofi_independent import audit
+from f4_ofi_markout import build
 from f4_order_flow import read_packets
 from independent_soak_replay import strict_json
-from test_f4_order_flow_archive import source
 from test_f4_depth_buckets_archive import BASE
+from test_f4_order_flow_archive import source
 
 
 class Witness(unittest.TestCase):

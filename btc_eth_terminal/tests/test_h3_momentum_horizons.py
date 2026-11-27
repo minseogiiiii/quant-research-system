@@ -1,7 +1,7 @@
 import copy
 import unittest
-from decimal import Decimal
-from h3_momentum_horizons import project, POLICY
+
+from h3_momentum_horizons import POLICY, project
 from test_f4_ofi_markout import packet
 
 

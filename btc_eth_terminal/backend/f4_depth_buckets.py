@@ -13,8 +13,8 @@ import re
 from pathlib import Path
 
 from independent_soak_replay import replay
-from v35_archive_ingress import verify_capture
 from v23_causal_microstructure import read_l2
+from v35_archive_ingress import verify_capture
 
 SCALE = 10**18
 MAX_LEVELS = 200_000

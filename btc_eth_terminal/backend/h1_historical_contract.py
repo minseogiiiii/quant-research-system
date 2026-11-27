@@ -1,10 +1,11 @@
 """Versioned historical packet contract. Never equate venue time and receipt time."""
 
 from __future__ import annotations
+
 import hashlib
-import json
-from f5_independent_clock import milliseconds
+
 from f4_depth_buckets import units
+from f5_independent_clock import milliseconds
 
 PRODUCTS = ("BTC-USD", "ETH-USD")
 CHANNELS = ("l2_data", "market_trades", "subscriptions", "heartbeats")

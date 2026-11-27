@@ -5,22 +5,24 @@ witnesses. No actual strategy fitting, no holdout access, no deployment.
 """
 
 from __future__ import annotations
+
 import argparse
 import itertools
 import json
 import math
 from pathlib import Path
 from statistics import NormalDist, mean, stdev
+
 import numpy as np
-from f2_research_contract import regular_returns, psr_reference
-from f6_fincept_metrics_adapter import load, VENDOR, PIN
-from h5_experiment_registry import snapshot, series_hash, sha, need
+from f2_research_contract import psr_reference, regular_returns
+from f6_fincept_metrics_adapter import PIN, VENDOR, load
+from h5_experiment_registry import need, series_hash, sha, snapshot
 from independent_soak_replay import strict_json
 
 
 def modules():
     metrics = load()
-    from base import robustness, monte_carlo
+    from base import monte_carlo, robustness
 
     for m in (metrics, robustness, monte_carlo):
         need(Path(m.__file__).resolve().is_relative_to(VENDOR), "VENDOR_MODULE")
@@ -169,7 +171,9 @@ def evaluate(journal, plan_pin, head, payload, *, fixture=False):
             == reg["results"][tid]["return_series_sha256"],
             "SERIES_PIN",
         )
-    r, ppy = regular_returns(list(zip(*(series[t] for t in ids), strict=True)), timestamps, interval)
+    r, ppy = regular_returns(
+        list(zip(*(series[t] for t in ids), strict=True)), timestamps, interval
+    )
     need(fixture or len(r) * interval >= 30 * 86400000, "INSUFFICIENT_DURATION")
     need(np.all(np.std(r, axis=0) > 1e-8), "DEGENERATE")
     sp = payload["split_policy"]
@@ -248,7 +252,10 @@ def evaluate(journal, plan_pin, head, payload, *, fixture=False):
         need(max(train) + delay < min(test) - look, "FOLD_LEAKAGE")
         s = [metrics.sharpe_ratio(r[train, j], 0.0, 1.0) for j in range(len(ids))]
         witness = [sr(r[train, j].tolist()) for j in range(len(ids))]
-        need(all(same(a, b) for a, b in zip(s, witness, strict=True)), "TRAIN_SCORE_PARITY")
+        need(
+            all(same(a, b) for a, b in zip(s, witness, strict=True)),
+            "TRAIN_SCORE_PARITY",
+        )
         best = max(range(len(ids)), key=witness.__getitem__)
         need(best == max(range(len(ids)), key=s.__getitem__), "SELECTION_PARITY")
         out = metrics.total_return(
@@ -296,7 +303,10 @@ def evaluate(journal, plan_pin, head, payload, *, fixture=False):
     blocks = 4
     edges = np.linspace(0, len(r), blocks + 1).astype(int)
     need(
-        all(np.all(np.std(r[a:b], axis=0) > 1e-8) for a, b in zip(edges[:-1], edges[1:], strict=True)),
+        all(
+            np.all(np.std(r[a:b], axis=0) > 1e-8)
+            for a, b in zip(edges[:-1], edges[1:], strict=True)
+        ),
         "PBO_BLOCK_VARIANCE",
     )
     pb = rob.pbo_cscv(r, n_blocks=blocks)

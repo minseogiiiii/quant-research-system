@@ -3,7 +3,8 @@ import hashlib
 import tempfile
 import unittest
 from pathlib import Path
-from h2_tardis_l2 import convert, HEADER, day_bounds
+
+from h2_tardis_l2 import HEADER, convert, day_bounds
 
 DAY = "2024-01-01"
 T = day_bounds(DAY)[0]

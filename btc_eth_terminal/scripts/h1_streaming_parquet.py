@@ -5,6 +5,7 @@ No legacy limit changes. Raw data stays local, source pin is required externally
 """
 
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
@@ -12,14 +13,15 @@ import os
 import tempfile
 import time
 from pathlib import Path
+
 import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
-from independent_soak_replay import strict_json
-from v36_3_durable_archive_gate import audit
-from q293_epoch_audit import scan, Epoch, identity
-from h1_historical_contract import normalized, need
 from f5_independent_clock import milliseconds
+from h1_historical_contract import need, normalized
+from independent_soak_replay import strict_json
+from q293_epoch_audit import Epoch, identity, scan
+from v36_3_durable_archive_gate import audit
 
 PACKET = pa.schema(
     [(k, pa.string()) for k in ("source_manifest_sha256", "epoch", "venue")]

@@ -5,9 +5,9 @@ paired marks reset the window; never forward fill or bridge source gaps.
 """
 
 from collections import deque
-from decimal import Decimal, localcontext, ROUND_FLOOR
+from decimal import ROUND_FLOOR, Decimal, localcontext
+
 from f4_depth_buckets import SCALE
-from f6_liquidity_recovery import digest
 
 PRODUCTS = ("BTC-USD", "ETH-USD")
 POLICY = {
@@ -120,7 +120,10 @@ class RollingCovariance:
             ctx.prec = 80
             if self.prev is not None:
                 self.returns.append(
-                    tuple(Decimal(v - old) / old for v, old in zip(x, self.prev, strict=True))
+                    tuple(
+                        Decimal(v - old) / old
+                        for v, old in zip(x, self.prev, strict=True)
+                    )
                 )
             self.prev = x
             if len(self.returns) < self.window:

@@ -3,12 +3,13 @@ import hashlib
 import tempfile
 import unittest
 from pathlib import Path
-from h2_native_benchmark import generate
+
+from f5_independent_clock import read_independent
 from h1_streaming_parquet import convert
+from h2_native_benchmark import generate
 from h3_momentum_horizons import POLICY, project
 from h9_portfolio import collect, simulate
 from h10_feature_cache import build, load, run_cached
-from f5_independent_clock import read_independent
 from independent_soak_replay import strict_json
 
 
@@ -33,8 +34,10 @@ class Cache(unittest.TestCase):
             cache = root / "cache"
             r, cp = build(data, pin, receipt, cache, p, fixture=True)
             m = strict_json((raw / "manifest.json").read_bytes())
+
             def factory():
                 return read_independent(raw, m)
+
             for policy in (
                 p,
                 dict(p, momentum_bps="2", fee_bps="1", horizons_ms=[100, 900]),
@@ -63,6 +66,7 @@ class Cache(unittest.TestCase):
 
     def test_feature_only_does_not_call_walk(self):
         from unittest.mock import patch
+
         from test_h3_momentum_horizons import Horizon
 
         rows, p = Horizon().setup()

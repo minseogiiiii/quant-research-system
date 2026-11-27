@@ -3,16 +3,18 @@ Each horizon/cohort is a separate counterfactual portfolio, never aggregated.
 One position per product, no borrowing, no real orders or simulated maker fills.
 """
 
-from decimal import Decimal, localcontext
 from collections import defaultdict
-from f4_depth_buckets import units, SCALE, PRODUCTS
+from decimal import Decimal, localcontext
+
+from f4_depth_buckets import PRODUCTS, SCALE, units
 from f5_execution_depth import walk
-from post_quote_markout import IndexedBook
-from h3_momentum_horizons import POLICY, project as signal_project
-from h11_risk import Risk, validate_policy
-from h11_covariance import RollingCovariance, validate_sizing, size_units
-from h12_joint_risk import JointRisk, validate_budget
 from f6_liquidity_recovery import digest
+from h3_momentum_horizons import POLICY
+from h3_momentum_horizons import project as signal_project
+from h11_covariance import RollingCovariance, size_units, validate_sizing
+from h11_risk import Risk, validate_policy
+from h12_joint_risk import JointRisk, validate_budget
+from post_quote_markout import IndexedBook
 
 
 def need(ok, why):

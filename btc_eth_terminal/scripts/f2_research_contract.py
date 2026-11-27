@@ -1,10 +1,11 @@
 """Isolated research qualification adapter. No live engine import or alpha claim."""
+
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 from statistics import NormalDist
-from typing import Sequence
 
 import numpy as np
 
@@ -20,17 +21,24 @@ def need(ok, reason):
 
 def regular_returns(values, timestamps, interval_ms):
     """Explicit complete regular grid: missing returns are not zero returns."""
-    need(type(interval_ms) is int and 0 < interval_ms <= YEAR_MS,
-         "F2_INTERVAL")
+    need(type(interval_ms) is int and 0 < interval_ms <= YEAR_MS, "F2_INTERVAL")
     need(2 <= len(timestamps) <= MAX_ROWS, "F2_ROW_BOUND")
-    need(all(type(t) is int and 0 < t < 2**53 for t in timestamps),
-         "F2_TIMESTAMP")
-    need(all(b - a == interval_ms for a, b in zip(timestamps[:-1], timestamps[1:], strict=True)),
-         "F2_GRID_GAP_OR_DUPLICATE")
+    need(all(type(t) is int and 0 < t < 2**53 for t in timestamps), "F2_TIMESTAMP")
+    need(
+        all(
+            b - a == interval_ms
+            for a, b in zip(timestamps[:-1], timestamps[1:], strict=True)
+        ),
+        "F2_GRID_GAP_OR_DUPLICATE",
+    )
     r = np.asarray(values, dtype=float)
-    need(r.ndim in (1, 2) and r.shape[0] == len(timestamps)
-         and (r.ndim == 1 or 1 <= r.shape[1] <= MAX_TRIALS)
-         and r.size <= 5_000_000, "F2_SHAPE")
+    need(
+        r.ndim in (1, 2)
+        and r.shape[0] == len(timestamps)
+        and (r.ndim == 1 or 1 <= r.shape[1] <= MAX_TRIALS)
+        and r.size <= 5_000_000,
+        "F2_SHAPE",
+    )
     need(np.isfinite(r).all() and np.all(r > -1), "F2_INVALID_OR_MISSING_RETURN")
     return r, YEAR_MS / interval_ms
 
@@ -43,14 +51,19 @@ def metric_witness(values, timestamps, interval_ms):
     mean = float(np.mean(r))
     sample = float(np.std(r, ddof=1))
     population = float(np.std(r, ddof=0))
-    return {"observations": n, "periods_per_year": ppy,
-            "sample_sharpe": mean / sample * math.sqrt(ppy)
-            if n >= 20 and sample > 0 else None,
-            "population_sharpe": mean / population * math.sqrt(ppy)
-            if n >= 20 and population > 0 else None,
-            "annualization_convention": "365_DAY_CONTINUOUS_GRID",
-            "short_sample_warning": n * interval_ms < 30 * 86400000,
-            "alpha_confirmed": False}
+    return {
+        "observations": n,
+        "periods_per_year": ppy,
+        "sample_sharpe": mean / sample * math.sqrt(ppy)
+        if n >= 20 and sample > 0
+        else None,
+        "population_sharpe": mean / population * math.sqrt(ppy)
+        if n >= 20 and population > 0
+        else None,
+        "annualization_convention": "365_DAY_CONTINUOUS_GRID",
+        "short_sample_warning": n * interval_ms < 30 * 86400000,
+        "alpha_confirmed": False,
+    }
 
 
 @dataclass(frozen=True)
@@ -64,20 +77,40 @@ class Event:
 
 def chronological_split(events: Sequence[Event], start, end, embargo_ms):
     """Forward-only split. Training labels must be available before OOS starts."""
-    need(type(start) is int and type(end) is int and 0 < start < end < 2**53,
-         "F2_SPLIT_WINDOW")
+    need(
+        type(start) is int and type(end) is int and 0 < start < end < 2**53,
+        "F2_SPLIT_WINDOW",
+    )
     need(type(embargo_ms) is int and embargo_ms >= 0, "F2_EMBARGO")
     need(0 < len(events) <= MAX_ROWS, "F2_EVENT_BOUND")
     prior = -1
     train, test, purged = [], [], []
     for i, event in enumerate(events):
-        need(isinstance(event, Event) and all(type(v) is int for v in (
-            event.decision_ms, event.feature_available_ms,
-            event.label_end_ms, event.label_available_ms)), "F2_EVENT_SCHEMA")
-        need(0 < event.feature_available_ms <= event.decision_ms
-             < event.label_end_ms <= event.label_available_ms < 2**53
-             and event.decision_ms > prior and isinstance(event.session, str)
-             and 0 < len(event.session) <= 128, "F2_CAUSAL_ORDER")
+        need(
+            isinstance(event, Event)
+            and all(
+                type(v) is int
+                for v in (
+                    event.decision_ms,
+                    event.feature_available_ms,
+                    event.label_end_ms,
+                    event.label_available_ms,
+                )
+            ),
+            "F2_EVENT_SCHEMA",
+        )
+        need(
+            0
+            < event.feature_available_ms
+            <= event.decision_ms
+            < event.label_end_ms
+            <= event.label_available_ms
+            < 2**53
+            and event.decision_ms > prior
+            and isinstance(event.session, str)
+            and 0 < len(event.session) <= 128,
+            "F2_CAUSAL_ORDER",
+        )
         prior = event.decision_ms
         if event.decision_ms < start:
             if event.label_available_ms < start - embargo_ms:
@@ -90,13 +123,21 @@ def chronological_split(events: Sequence[Event], start, end, embargo_ms):
             else:
                 purged.append(i)
     need(train and test, "F2_EMPTY_SPLIT")
-    return {"train": train, "test": test, "purged": purged,
-            "future_training_allowed": False}
+    return {
+        "train": train,
+        "test": test,
+        "purged": purged,
+        "future_training_allowed": False,
+    }
 
 
 def psr_reference(sr, hurdle, n, skew, raw_kurtosis):
-    need(type(n) is int and n >= 3 and all(math.isfinite(v) for v in
-         (sr, hurdle, skew, raw_kurtosis)), "F2_PSR_INPUT")
+    need(
+        type(n) is int
+        and n >= 3
+        and all(math.isfinite(v) for v in (sr, hurdle, skew, raw_kurtosis)),
+        "F2_PSR_INPUT",
+    )
     variance = 1 - skew * sr + (raw_kurtosis - 1) * sr**2 / 4
     if variance <= 0:
         return None

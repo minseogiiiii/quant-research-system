@@ -4,6 +4,7 @@ Candidate loopback read-only routing. No exchange orders, no continuity claim.
 Both collectors share one host and Python observer failure domain in this
 version; independent-host deployment is a separate acceptance requirement.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -25,8 +26,8 @@ from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
-from independent_soak_replay import price, strict_json
 from f3_candle_bundle import candle_bundle
+from independent_soak_replay import price, strict_json
 from q25_session_isolation_guard import SourceEpochIsolatedEngine
 from q292_failover_policy import Arbiter, Source
 from q293_b4_diagnostics import ObserverJournal, reason_class
@@ -135,16 +136,19 @@ class CheckedEngine(SourceEpochIsolatedEngine):
             running = Decimal(0)
             for (px, qty), record in zip(levels, reported, strict=True):
                 running += qty
-                if (px != Decimal(record["price"])
-                        or qty != Decimal(record["quantity"])
-                        or running != Decimal(record["cumulative_base"])):
+                if (
+                    px != Decimal(record["price"])
+                    or qty != Decimal(record["quantity"])
+                    or running != Decimal(record["cumulative_base"])
+                ):
                     return False
             total_key = "bid_total_base_10" if side == "bid" else "ask_total_base_10"
             if running != Decimal(row["depth"][total_key]):
                 return False
             prefix = "best_bid" if side == "bid" else "best_ask"
-            if (levels[0][0] != Decimal(row[prefix])
-                    or levels[0][1] != Decimal(row[prefix + "_qty"])):
+            if levels[0][0] != Decimal(row[prefix]) or levels[0][1] != Decimal(
+                row[prefix + "_qty"]
+            ):
                 return False
         return Decimal(row["best_bid"]) < Decimal(row["best_ask"])
 
@@ -159,20 +163,24 @@ class CheckedEngine(SourceEpochIsolatedEngine):
                     for side, levels in book.level.items():
                         if len(book.heap[side]) > 3 * len(levels) + 1024:
                             book.heap[side] = [
-                                -px if side == "bid" else px for px in levels]
+                                -px if side == "bid" else px for px in levels
+                            ]
                             heapq.heapify(book.heap[side])
                 if self.status != "HEALTHY":
                     return
                 for p in PRODUCTS:
                     book = self.shadow.get(p)
                     primary = self.books[p].level
-                    if book is None or any(len(primary[k]) != len(book[k])
-                                           for k in ("bid", "offer")):
+                    if book is None or any(
+                        len(primary[k]) != len(book[k]) for k in ("bid", "offer")
+                    ):
                         raise ValueError("INDEPENDENT_BOOK_DIVERGENCE")
                     # Compare every modified level even between publications;
                     # retain full equality at each new publishable state.
-                    if any(primary[k].get(px) != book[k].get(px)
-                           for k, px in touched.get(p, ())):
+                    if any(
+                        primary[k].get(px) != book[k].get(px)
+                        for k, px in touched.get(p, ())
+                    ):
                         raise ValueError("INDEPENDENT_BOOK_DIVERGENCE")
                     if not self.rows[p]:
                         continue
@@ -197,17 +205,28 @@ class CheckedEngine(SourceEpochIsolatedEngine):
             if health["status"] != "HEALTHY" or self.witness_failure:
                 return None
             pair = {p: self.snapshot(p)["state"] for p in PRODUCTS}
-            if any(row is None or self.witnessed.get(p) != row["state_version"]
-                   or row["session_id"] != health["session_id"]
-                   for p, row in pair.items()):
+            if any(
+                row is None
+                or self.witnessed.get(p) != row["state_version"]
+                or row["session_id"] != health["session_id"]
+                for p, row in pair.items()
+            ):
                 return None
             # Only attach the bundle captured at this exact witnessed row's publication.
             for p, row in pair.items():
                 bundle = self.f3_candle_bundles.get(p)
-                if bundle and all(bundle[k] == row[k] for k in (
-                    "product", "run_id", "session_id", "connection_id", "state_version",
-                    "source_sequence", "source_raw_sha256"
-                )):
+                if bundle and all(
+                    bundle[k] == row[k]
+                    for k in (
+                        "product",
+                        "run_id",
+                        "session_id",
+                        "connection_id",
+                        "state_version",
+                        "source_sequence",
+                        "source_raw_sha256",
+                    )
+                ):
                     pair[p] = {**row, "completed_candles": bundle}
             return health, copy.deepcopy(pair)
 
@@ -242,7 +261,7 @@ class Collector:
             self.listener.bind(str(tap))
             os.chmod(tap, 0o600)
             self.listener.listen(1)
-            self.listener.settimeout(.25)
+            self.listener.settimeout(0.25)
             raw_budget, archive_budget = budgets(duration)
             env = {
                 "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
@@ -272,14 +291,20 @@ class Collector:
                 import sys
 
                 args = [
-                    sys.executable, str(ROOT / "scripts/q292_parent_bound_exec.py"),
-                    str(os.getpid()), *args,
+                    sys.executable,
+                    str(ROOT / "scripts/q292_parent_bound_exec.py"),
+                    str(os.getpid()),
+                    *args,
                 ]
             for name in ("stdout.log", "stderr.log"):
                 self.logs.append((work / name).open("xb"))
             self.process = subprocess.Popen(
-                args, cwd=work, env=env, stdout=self.logs[0],
-                stderr=self.logs[1], start_new_session=True,
+                args,
+                cwd=work,
+                env=env,
+                stdout=self.logs[0],
+                stderr=self.logs[1],
+                start_new_session=True,
             )
             self.thread = threading.Thread(target=self._receive, daemon=True)
             self.thread.start()
@@ -313,13 +338,16 @@ class Collector:
             checked = self.engine.checked_pair()
             if checked is None:
                 self.cached = None
-                self.last_reason = (reason_class(self.engine.reason)
-                                    if self.engine.status != "HEALTHY"
-                                    else "BOOK_WITNESS_NOT_READY")
+                self.last_reason = (
+                    reason_class(self.engine.reason)
+                    if self.engine.status != "HEALTHY"
+                    else "BOOK_WITNESS_NOT_READY"
+                )
             else:
                 self.last_reason = "READY"
-            self.diagnostic.record(self.last_reason, self.engine.connection_id,
-                                   self.engine.seq)
+            self.diagnostic.record(
+                self.last_reason, self.engine.connection_id, self.engine.seq
+            )
         if checked is None:
             return None
         health, pair = checked
@@ -328,12 +356,22 @@ class Collector:
         if self.cached is None or self.cached[0] != key:
             now_ns = time.monotonic_ns()
             now_ms = time.time_ns() // 1_000_000
-            age = max(now_ms - pair[p]["source_last_l2_receiver_ms"]
-                      for p in PRODUCTS)
-            self.cached = (key, Source(
-                self.name, health["session_id"], now_ns, age,
-                True, True, True, True, self.provenance,
-            ), pair)
+            age = max(now_ms - pair[p]["source_last_l2_receiver_ms"] for p in PRODUCTS)
+            self.cached = (
+                key,
+                Source(
+                    self.name,
+                    health["session_id"],
+                    now_ns,
+                    age,
+                    True,
+                    True,
+                    True,
+                    True,
+                    self.provenance,
+                ),
+                pair,
+            )
         return self.cached[1:]
 
     def close(self):
@@ -380,13 +418,14 @@ class DualRoute:
                 pair = observations[index][1]
                 # Recheck child lifetime at the response linearization point.
                 if self.sources[index].process.poll() is not None:
-                    route = self.arbiter.update(
-                        time.monotonic_ns(), disagreement=True)
+                    route = self.arbiter.update(time.monotonic_ns(), disagreement=True)
                     pair = None
             return {
-                **route, "schema": "q292_dual_route_v1",
+                **route,
+                "schema": "q292_dual_route_v1",
                 "gateway_run": self.run,
-                "mode": "SYNTHETIC_ONLY" if self.sources[0].synthetic
+                "mode": "SYNTHETIC_ONLY"
+                if self.sources[0].synthetic
                 else "LIVE_READ_ONLY_CANDIDATE",
                 "states": pair,
                 "exchange_attested": False,
@@ -395,8 +434,7 @@ class DualRoute:
 
 
 def cursor(body):
-    return (f'{body["gateway_run"]}:{body["generation"]}:'
-            f'{body["source_session"]}')
+    return f"{body['gateway_run']}:{body['generation']}:{body['source_session']}"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -408,8 +446,11 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def reply(self, code, body, mime="application/json"):
-        raw = body if isinstance(body, bytes) else json.dumps(
-            body, allow_nan=False).encode()
+        raw = (
+            body
+            if isinstance(body, bytes)
+            else json.dumps(body, allow_nan=False).encode()
+        )
         self.send_response(code)
         self.send_header("Content-Type", mime)
         self.send_header("Cache-Control", "no-store")
@@ -462,8 +503,11 @@ def main():
     modes.add_argument("--synthetic", action="store_true")
     modes.add_argument("--execute-public-pilot", action="store_true")
     args = p.parse_args()
-    if (not 15 <= args.duration <= 180
-            or args.execute_public_pilot and args.duration != 180):
+    if (
+        not 15 <= args.duration <= 180
+        or args.execute_public_pilot
+        and args.duration != 180
+    ):
         p.error("only bounded candidate pilot is permitted")
     if shutil.disk_usage(args.workdir.parent).free < 3 * 1024**3:
         p.error("insufficient dual collector disk budget")
@@ -478,11 +522,12 @@ def main():
     signal.signal(signal.SIGINT, halt)
     try:
         for name in ("primary", "secondary"):
-            sources.append(Collector(name, args.workdir / name,
-                                     args.duration, args.synthetic))
+            sources.append(
+                Collector(name, args.workdir / name, args.duration, args.synthetic)
+            )
         route = DualRoute(*sources)
         with server_for_dual(route, args.port) as server:
-            server.timeout = .2
+            server.timeout = 0.2
             end = time.monotonic() + args.duration
             while not stop.is_set() and time.monotonic() < end:
                 route.read()

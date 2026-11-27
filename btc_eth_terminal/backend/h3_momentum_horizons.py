@@ -5,10 +5,12 @@ portfolio backtest or independent statistical samples. No parameter selection.
 """
 
 from __future__ import annotations
+
+import heapq
 from collections import deque
 from decimal import Decimal, localcontext
-import heapq
-from f4_depth_buckets import units, SCALE, PRODUCTS
+
+from f4_depth_buckets import PRODUCTS, SCALE, units
 from f4_ofi_markout import ofi
 from f5_execution_depth import walk
 from f6_liquidity_recovery import digest

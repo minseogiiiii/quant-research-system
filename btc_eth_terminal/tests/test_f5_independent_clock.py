@@ -1,8 +1,9 @@
 import tempfile
 import unittest
 from pathlib import Path
-from f5_independent_clock import milliseconds, read_independent
+
 from f4_order_flow import read_packets
+from f5_independent_clock import milliseconds, read_independent
 from independent_soak_replay import strict_json
 from test_f4_order_flow_archive import source
 

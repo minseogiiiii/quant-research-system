@@ -1,6 +1,7 @@
 import unittest
 from decimal import Decimal
-from f7_cost_sensitivity import sensitivity, economics
+
+from f7_cost_sensitivity import economics, sensitivity
 
 
 class CostSensitivity(unittest.TestCase):

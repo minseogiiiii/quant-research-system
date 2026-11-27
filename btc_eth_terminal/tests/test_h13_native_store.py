@@ -1,8 +1,9 @@
 import tempfile
 import unittest
 from pathlib import Path
-from h13_native_store import import_archive, inventory, locked, capture
-from h2_native_benchmark import generate, BASE
+
+from h2_native_benchmark import BASE, generate
+from h13_native_store import capture, import_archive, inventory, locked
 
 
 class Store(unittest.TestCase):
@@ -44,10 +45,9 @@ class Store(unittest.TestCase):
     def test_lock_and_private_path(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d) / "store"
-            with locked(root):
-                with self.assertRaises(BlockingIOError):
-                    with locked(root):
-                        pass
+            with locked(root), self.assertRaises(BlockingIOError):
+                with locked(root):
+                    pass
             root.chmod(0o755)
             with self.assertRaises(ValueError):
                 inventory(root)

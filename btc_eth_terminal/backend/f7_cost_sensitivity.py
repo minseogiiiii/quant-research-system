@@ -4,7 +4,8 @@ maker fills. Excluded failed/unresolved trades remain excluded and counted.
 """
 
 from decimal import Decimal, localcontext
-from f7_pnl_attribution import d, fmt, need, close
+
+from f7_pnl_attribution import close, d, fmt, need
 
 FEE_BPS = ("0", "0.5", "1", "2", "5", "10", "20")
 SLIP_BPS = ("0", "1", "2", "4")

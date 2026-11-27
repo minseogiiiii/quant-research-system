@@ -10,14 +10,14 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from q13_private_fixture_gate import verify_zip, PREFIX
-from f4_ofi_markout import build
 from f4_ofi_independent import audit
+from f4_ofi_markout import build
+from f4_order_flow import read_packets
+from f5_execution_depth import build as build_depth
 from f5_independent_clock import read_independent
 from f5_predictive_diagnostics import summarize
-from f5_execution_depth import build as build_depth
-from f4_order_flow import read_packets
 from independent_soak_replay import strict_json
+from q13_private_fixture_gate import PREFIX, verify_zip
 
 PIN = "8f2e0ec88a601a92ab4c7bcd0e04b20536fbe46bbd8b3c7f67ae3c1d075c28e5"
 SOURCE = PREFIX + "backend/data/live_v14_clean_120s/coinbase_btc_eth_soak_wsgXRy/"

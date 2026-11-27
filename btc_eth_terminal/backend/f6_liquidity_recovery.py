@@ -5,15 +5,17 @@ walk the first timely later book with frozen costs; never actual fills.
 """
 
 from __future__ import annotations
+
 import hashlib
 import json
 from collections import deque
 from decimal import Decimal, localcontext
 from pathlib import Path
 from statistics import median
+
 from f4_depth_buckets import units
-from f4_order_flow import read_packets, PRODUCTS
-from f5_execution_depth import walk, SCALE
+from f4_order_flow import PRODUCTS, read_packets
+from f5_execution_depth import SCALE, walk
 from f5_independent_clock import read_independent
 from independent_soak_replay import replay, strict_json
 from post_quote_markout import IndexedBook

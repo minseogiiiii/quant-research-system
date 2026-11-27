@@ -7,11 +7,11 @@ import time
 import urllib.request
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
 from f4_depth_buckets import build as depth_build
 from f4_order_flow import build as flow_build
-from test_f4_order_flow_archive import source
+from playwright.sync_api import sync_playwright
 from test_f4_depth_buckets_archive import BASE
+from test_f4_order_flow_archive import source
 
 root = Path(__file__).resolve().parents[1] / "frontend"
 with tempfile.TemporaryDirectory() as d:

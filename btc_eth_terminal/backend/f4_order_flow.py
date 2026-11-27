@@ -11,9 +11,9 @@ import hashlib
 import json
 from pathlib import Path
 
-from f4_depth_buckets import units, decimal
+from f4_depth_buckets import decimal, units
 from independent_soak_replay import replay, strict_json
-from v35_archive_ingress import verify_capture, _utc_ms
+from v35_archive_ingress import _utc_ms, verify_capture
 
 PRODUCTS = ("BTC-USD", "ETH-USD")
 MAX_TRADES = 500_000

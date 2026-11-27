@@ -6,13 +6,15 @@ later quote substitution on insufficient depth. No orders or strategy PnL.
 """
 
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
 from decimal import Decimal, localcontext
 from pathlib import Path
+
 from f4_depth_buckets import units
-from f4_order_flow import read_packets, PRODUCTS
+from f4_order_flow import PRODUCTS, read_packets
 from independent_soak_replay import replay, strict_json
 from post_quote_markout import IndexedBook
 from v35_archive_ingress import verify_capture

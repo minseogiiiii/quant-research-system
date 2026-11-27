@@ -1,14 +1,15 @@
 """Verify strategy outputs on validated H1 packet Parquet, not vendor bars."""
 
 from __future__ import annotations
+
 import hashlib
-import json
 from pathlib import Path
+
 import duckdb
-from h1_streaming_parquet import digest, feed_hash, PACKET
 from f5_independent_clock import milliseconds
-from independent_soak_replay import strict_json
 from f6_liquidity_recovery import project
+from h1_streaming_parquet import PACKET, digest, feed_hash
+from independent_soak_replay import strict_json
 
 
 def need(ok, reason):

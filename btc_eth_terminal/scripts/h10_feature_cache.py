@@ -1,6 +1,7 @@
 """Local causal H3 feature cache; never a cache of execution or future labels."""
 
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
@@ -8,11 +9,12 @@ import os
 import tempfile
 from decimal import Decimal, localcontext
 from pathlib import Path
-from h3_momentum_horizons import POLICY, project, PRODUCTS
-from h9_portfolio import simulate
-from f4_depth_buckets import units, SCALE
+
+from f4_depth_buckets import SCALE, units
 from h1_f6_dataset_replay import replay_dataset
-from h5_experiment_registry import sha, hex64
+from h3_momentum_horizons import POLICY, PRODUCTS, project
+from h5_experiment_registry import hex64, sha
+from h9_portfolio import simulate
 from independent_soak_replay import strict_json
 
 ROOT = Path(__file__).resolve().parents[1]

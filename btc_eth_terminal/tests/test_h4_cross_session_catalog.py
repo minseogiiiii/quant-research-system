@@ -3,10 +3,11 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+
 import pyarrow as pa
 import pyarrow.parquet as pq
+from h1_streaming_parquet import LEVEL, PACKET, TRADE, digest
 from h4_cross_session_catalog import catalog
-from h1_streaming_parquet import digest, PACKET, LEVEL, TRADE
 
 
 def fixture(root, source, start, role):

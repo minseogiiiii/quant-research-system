@@ -1,6 +1,7 @@
 """Local-only Tardis Coinbase Exchange L2 CSV adapter. No native sequence claim."""
 
 from __future__ import annotations
+
 import argparse
 import csv
 import gzip
@@ -10,14 +11,15 @@ import os
 import re
 import tempfile
 from datetime import date
-from decimal import Decimal, localcontext
+from decimal import Decimal
 from pathlib import Path
+
 import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
-from f4_depth_buckets import units, decimal, SCALE
-from post_quote_markout import IndexedBook
+from f4_depth_buckets import decimal, units
 from h1_streaming_parquet import digest, feed_hash
+from post_quote_markout import IndexedBook
 
 HEADER = (
     "exchange",

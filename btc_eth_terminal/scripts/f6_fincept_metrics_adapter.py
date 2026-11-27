@@ -5,6 +5,7 @@ license remains AGPL-3.0; combined deployment is not authorized by this module.
 """
 
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
@@ -12,6 +13,7 @@ import math
 import sys
 from pathlib import Path
 from statistics import mean, stdev
+
 import numpy as np
 from f2_research_contract import regular_returns
 

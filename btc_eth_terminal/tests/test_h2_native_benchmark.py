@@ -1,8 +1,9 @@
 import tempfile
 import unittest
 from pathlib import Path
-from h2_native_benchmark import generate
+
 from h1_streaming_parquet import convert
+from h2_native_benchmark import generate
 
 
 class Benchmark(unittest.TestCase):

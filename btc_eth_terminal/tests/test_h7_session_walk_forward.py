@@ -2,9 +2,10 @@ import hashlib
 import tempfile
 import unittest
 from pathlib import Path
-from h2_native_benchmark import generate, BASE
+
 from h1_streaming_parquet import convert
-from h7_session_walk_forward import run_folds, choose
+from h2_native_benchmark import BASE, generate
+from h7_session_walk_forward import choose, run_folds
 
 
 class Forward(unittest.TestCase):
@@ -77,6 +78,7 @@ class Forward(unittest.TestCase):
         # Deterministic engineering fixture, not market alpha. Bid liquidity
         # depletes then recovers, followed by a large known price rise.
         from unittest.mock import patch
+
         from h2_native_benchmark import encode, stamp
 
         def wire(seq, levels, start_ms):

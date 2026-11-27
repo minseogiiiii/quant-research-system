@@ -1,6 +1,7 @@
 """Synthetic native-format H1 throughput benchmark; never market evidence."""
 
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
@@ -8,10 +9,11 @@ import resource
 import shutil
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
 from h1_streaming_parquet import convert
-from v35_archive_ingress import verify_capture, ArchiveRejected
+from v35_archive_ingress import ArchiveRejected, verify_capture
 
 BASE = 1_800_000_000_000
 PRODUCTS = ("BTC-USD", "ETH-USD")
@@ -30,7 +32,7 @@ def encode(x):
 
 def stamp(ms):
     return (
-        datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
+        datetime.fromtimestamp(ms / 1000, tz=UTC)
         .isoformat(timespec="milliseconds")
         .replace("+00:00", "Z")
     )

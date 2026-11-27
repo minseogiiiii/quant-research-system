@@ -104,9 +104,14 @@ class FlowContracts(unittest.TestCase):
                 project(ps)
 
     def test_epoch_gate(self):
-        with patch(
-            "f4_order_flow.verify_capture",
-            return_value={"source_eligible_for_state_replay": True, "connections": 2},
+        with (
+            patch(
+                "f4_order_flow.verify_capture",
+                return_value={
+                    "source_eligible_for_state_replay": True,
+                    "connections": 2,
+                },
+            ),
+            self.assertRaisesRegex(ValueError, "SINGLE_ADMITTED_EPOCH"),
         ):
-            with self.assertRaisesRegex(ValueError, "SINGLE_ADMITTED_EPOCH"):
-                build(".", "a" * 64)
+            build(".", "a" * 64)

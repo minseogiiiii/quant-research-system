@@ -5,14 +5,16 @@ declared holdout is unseen, statistically independent, or approved for OOS.
 """
 
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
 import re
 from pathlib import Path
+
 import duckdb
-from independent_soak_replay import strict_json
 from h1_streaming_parquet import digest
+from independent_soak_replay import strict_json
 from q293_epoch_audit import identity
 
 ROLES = {"DEVELOPMENT": 0, "VALIDATION": 1, "DECLARED_HOLDOUT": 2}

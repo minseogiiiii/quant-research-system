@@ -5,7 +5,8 @@ selection. All cashflows are hypothetical. No OOS or actual-fill claims.
 """
 
 from decimal import Decimal, localcontext
-from f6_liquidity_recovery import project, digest
+
+from f6_liquidity_recovery import digest, project
 
 COSTS = ("spread_cost", "depth_cost", "extra_slippage_cost", "fee_cost")
 
@@ -169,7 +170,10 @@ def summarize(packets, product, policy=None):
             totals.update(decision_mid_gross_quote=None, exit_latency_pnl=None)
         interval = report["policy"]["step_ms"]
         need(
-            all(b["time"] - a["time"] == interval for a, b in zip(grid[:-1], grid[1:], strict=True)),
+            all(
+                b["time"] - a["time"] == interval
+                for a, b in zip(grid[:-1], grid[1:], strict=True)
+            ),
             "GRID_GAP",
         )
         complete = bool(grid) and all(

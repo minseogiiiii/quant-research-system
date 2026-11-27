@@ -2,9 +2,10 @@ import tempfile
 import unittest
 from decimal import Decimal
 from pathlib import Path
-from f4_ofi_markout import project, build
-from test_f4_order_flow_archive import source
+
+from f4_ofi_markout import build, project
 from test_f4_depth_buckets_archive import BASE
+from test_f4_order_flow_archive import source
 
 
 def packet(i, t, kind, levels, product="BTC-USD"):

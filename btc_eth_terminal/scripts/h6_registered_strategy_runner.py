@@ -5,17 +5,19 @@ continuous regular grid to H5. No holdout files accepted. No live dependencies.
 """
 
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
 import math
-from pathlib import Path
 from decimal import Decimal
+from pathlib import Path
+
 from f6_liquidity_recovery import POLICY
 from f7_pnl_attribution import summarize
 from h1_f6_dataset_replay import replay_dataset
 from h4_cross_session_catalog import catalog
-from h5_experiment_registry import create, append, snapshot, sha, series_hash, need
+from h5_experiment_registry import append, create, need, series_hash, sha, snapshot
 from independent_soak_replay import strict_json
 
 ROOT = Path(__file__).resolve().parents[1]

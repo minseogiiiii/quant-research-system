@@ -1,10 +1,11 @@
 import unittest
 from decimal import Decimal
-from statistics import covariance, stdev, correlation
-from h11_covariance import RollingCovariance, estimate, size_units, POLICY
-from h11_risk import POLICY as RISK
-from h9_portfolio import simulate
+from statistics import correlation, covariance, stdev
+
 from f4_depth_buckets import SCALE
+from h9_portfolio import simulate
+from h11_covariance import POLICY, RollingCovariance, estimate, size_units
+from h11_risk import POLICY as RISK
 from test_h9_portfolio import fixture
 
 

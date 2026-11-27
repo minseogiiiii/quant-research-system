@@ -5,7 +5,8 @@ loss. Mark-to-mid observed risk only, stale marks reject new exposure.
 """
 
 from decimal import Decimal
-from f4_depth_buckets import SCALE, PRODUCTS
+
+from f4_depth_buckets import PRODUCTS, SCALE
 
 POLICY = {
     "per_product_fraction": "0.10",

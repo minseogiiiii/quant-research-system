@@ -7,7 +7,7 @@ import hashlib
 import json
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -19,7 +19,7 @@ BASE = 1_800_000_000_000
 
 def stamp(ms):
     return (
-        datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
+        datetime.fromtimestamp(ms / 1000, tz=UTC)
         .isoformat(timespec="milliseconds")
         .replace("+00:00", "Z")
     )

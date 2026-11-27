@@ -7,9 +7,9 @@ Fincept's single reviewed function is isolated from unrelated service imports.
 import ast
 import hashlib
 import json
-import math
-from pathlib import Path
 from decimal import Decimal, localcontext
+from pathlib import Path
+
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -96,7 +96,9 @@ def metrics(w, a, b, c):
         "variance_per_grid": float(v),
         "volatility_per_grid": float(v.sqrt()),
         "variance_contribution": dict(zip(PRODUCTS, map(float, (ca, cb)), strict=True)),
-        "risk_contribution_fraction": dict(zip(PRODUCTS, map(float, (ca / v, cb / v)), strict=True)),
+        "risk_contribution_fraction": dict(
+            zip(PRODUCTS, map(float, (ca / v, cb / v)), strict=True)
+        ),
     }
 
 

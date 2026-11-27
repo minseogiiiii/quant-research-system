@@ -7,12 +7,13 @@ import tempfile
 import time
 import urllib.request
 from pathlib import Path
-from playwright.sync_api import sync_playwright
-from h2_native_benchmark import generate
+
 from h1_streaming_parquet import convert
-from h6_registered_strategy_runner import run
+from h2_native_benchmark import generate
 from h5_experiment_registry import sha
+from h6_registered_strategy_runner import run
 from h8_qualification import assess
+from playwright.sync_api import sync_playwright
 
 root = Path(__file__).resolve().parents[1] / "frontend"
 with tempfile.TemporaryDirectory() as d:

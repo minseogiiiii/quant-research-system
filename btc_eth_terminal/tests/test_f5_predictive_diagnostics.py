@@ -1,11 +1,10 @@
-import copy
 import tempfile
 import unittest
 from pathlib import Path
-from f5_predictive_diagnostics import summarize, metric, ranks, build_diagnostics
-from test_f4_order_flow_archive import source
+
+from f5_predictive_diagnostics import build_diagnostics, ranks, summarize
 from test_f4_depth_buckets_archive import BASE
-from decimal import Decimal
+from test_f4_order_flow_archive import source
 
 
 def fixture(n=30):

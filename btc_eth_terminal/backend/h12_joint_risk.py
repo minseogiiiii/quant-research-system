@@ -1,7 +1,8 @@
 """Causal indicative joint dollar volatility admission, not a loss guarantee."""
 
 from decimal import Decimal, localcontext
-from f4_depth_buckets import SCALE, PRODUCTS
+
+from f4_depth_buckets import PRODUCTS, SCALE
 
 
 def need(ok, why):

@@ -1,7 +1,8 @@
 import unittest
 from decimal import Decimal
+
 from h9_portfolio import simulate
-from h11_risk import Risk, POLICY
+from h11_risk import POLICY
 from test_h9_portfolio import fixture
 
 

@@ -5,18 +5,20 @@ opens DECLARED_HOLDOUT. No refitting of statistical models or stitched equity.
 """
 
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
 from pathlib import Path
+
 from h4_cross_session_catalog import catalog
-from h5_experiment_registry import sha, need
+from h5_experiment_registry import need, sha
 from h6_registered_strategy_runner import (
+    MAX_TRIALS,
+    code_pin,
+    policy_for,
     run,
     run_session,
-    policy_for,
-    code_pin,
-    MAX_TRIALS,
 )
 from independent_soak_replay import strict_json
 

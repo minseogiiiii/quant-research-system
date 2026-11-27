@@ -1,6 +1,7 @@
 """Descriptive information coefficients; no model selection or OOS claim."""
 
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
@@ -9,8 +10,9 @@ import re
 from decimal import Decimal, localcontext
 from pathlib import Path
 from statistics import fmean
-from f4_ofi_markout import build
+
 from f4_ofi_independent import audit
+from f4_ofi_markout import build
 from f4_order_flow import read_packets
 from independent_soak_replay import strict_json
 
@@ -60,7 +62,9 @@ def corr(xs, ys):
     scale = math.sqrt(math.fsum(x * x for x in dx) * math.fsum(y * y for y in dy))
     if scale == 0:
         return None
-    return max(-1.0, min(1.0, math.fsum(x * y for x, y in zip(dx, dy, strict=True)) / scale))
+    return max(
+        -1.0, min(1.0, math.fsum(x * y for x, y in zip(dx, dy, strict=True)) / scale)
+    )
 
 
 def metric(rows, field):
@@ -179,7 +183,8 @@ def summarize(report):
         seen.add((t, h))
         if label["status"] != "OBSERVED_FUTURE_LABEL":
             need(
-                label["status"] in ("NO_FUTURE_OBSERVATION", "FIRST_L2_OUTSIDE_TOLERANCE")
+                label["status"]
+                in ("NO_FUTURE_OBSERVATION", "FIRST_L2_OUTSIDE_TOLERANCE")
                 and label["label_available_ms"] is None
                 and label["midquote_return_bps"] is None,
                 "MISSING_LABEL",

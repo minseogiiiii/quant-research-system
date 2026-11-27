@@ -5,12 +5,14 @@ Each candidate is frozen before execution. Failed trials remain in the inventory
 """
 
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
 import re
 import sqlite3
 from pathlib import Path
+
 from independent_soak_replay import strict_json
 
 MAX_TRIALS = 128

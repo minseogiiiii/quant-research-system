@@ -6,6 +6,7 @@ projection or its book, aggregation, decision, or future-label logic.
 
 from bisect import bisect_left
 from decimal import Decimal, localcontext
+
 from v23_causal_microstructure import Book
 
 

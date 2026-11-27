@@ -1,7 +1,8 @@
 import unittest
 from decimal import Decimal
-from h12_rebalance import shrink, weights, project, POLICY
+
 from h11_covariance import estimate
+from h12_rebalance import POLICY, project, shrink, weights
 
 
 class Rebalance(unittest.TestCase):

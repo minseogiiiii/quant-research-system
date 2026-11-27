@@ -7,15 +7,16 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from q13_private_fixture_gate import verify_zip, PREFIX
-from independent_soak_replay import strict_json
-from h1_streaming_parquet import convert
-from h1_f6_dataset_replay import replay_dataset
-from h3_momentum_horizons import project, POLICY, PRODUCTS
-from h9_portfolio import simulate, collect
-from h10_feature_cache import build, load, run_cached
+
 from f5_independent_clock import read_independent
 from f6_liquidity_recovery import digest
+from h1_f6_dataset_replay import replay_dataset
+from h1_streaming_parquet import convert
+from h3_momentum_horizons import POLICY, PRODUCTS, project
+from h9_portfolio import collect, simulate
+from h10_feature_cache import build, load, run_cached
+from independent_soak_replay import strict_json
+from q13_private_fixture_gate import PREFIX, verify_zip
 
 PIN = "8f2e0ec88a601a92ab4c7bcd0e04b20536fbe46bbd8b3c7f67ae3c1d075c28e5"
 SOURCE = PREFIX + "backend/data/live_v14_clean_120s/coinbase_btc_eth_soak_wsgXRy/"
@@ -78,9 +79,14 @@ def gate(archive, output):
             direct_signals = sorted(signals)
             direct_signal_seconds = time.perf_counter() - start
             start = time.perf_counter()
+
             def execution_projector(
-                packets, product, *, direct_signals=direct_signals,
-                policy=policy, cash=cash,
+                packets,
+                product,
+                *,
+                direct_signals=direct_signals,
+                policy=policy,
+                cash=cash,
             ):
                 return simulate(packets, direct_signals, policy, initial_cash=cash)
 

@@ -5,6 +5,7 @@ Failed attempts remain in incoming/ and are never cataloged. No remote upload.
 """
 
 from __future__ import annotations
+
 import argparse
 import fcntl
 import hashlib
@@ -17,10 +18,11 @@ import subprocess
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
+
 from h1_streaming_parquet import convert, digest
-from h4_cross_session_catalog import catalog, inspect
-from v36_3_durable_archive_gate import audit, BOUNDS
+from h4_cross_session_catalog import catalog
 from independent_soak_replay import strict_json
+from v36_3_durable_archive_gate import BOUNDS, audit
 
 ROOT = Path(__file__).resolve().parents[1]
 RESERVE = 4 * 1024**3

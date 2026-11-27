@@ -6,13 +6,14 @@ import json
 import shutil
 import tempfile
 from pathlib import Path
-from q13_private_fixture_gate import verify_zip, PREFIX
-from independent_soak_replay import strict_json
-from h1_streaming_parquet import convert
-from h1_f6_dataset_replay import replay_dataset
+
 from f5_independent_clock import read_independent
-from h3_momentum_horizons import project, POLICY
+from h1_f6_dataset_replay import replay_dataset
+from h1_streaming_parquet import convert
+from h3_momentum_horizons import project
 from h9_portfolio import collect, simulate
+from independent_soak_replay import strict_json
+from q13_private_fixture_gate import PREFIX, verify_zip
 
 PIN = "8f2e0ec88a601a92ab4c7bcd0e04b20536fbe46bbd8b3c7f67ae3c1d075c28e5"
 SOURCE = PREFIX + "backend/data/live_v14_clean_120s/coinbase_btc_eth_soak_wsgXRy/"
@@ -53,8 +54,10 @@ def gate(archive, output):
         dest = Path(d) / "dataset"
         convert(root, PIN, dest)
         receipt_pin = hashlib.sha256((dest / "dataset.json").read_bytes()).hexdigest()
+
         def factory():
             return read_independent(root, m)
+
         sig, reports = collect(factory)
         other = []
         for product in reports:

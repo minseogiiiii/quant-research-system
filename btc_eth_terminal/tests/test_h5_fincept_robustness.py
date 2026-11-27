@@ -2,8 +2,9 @@ import copy
 import tempfile
 import unittest
 from pathlib import Path
+
 import numpy as np
-from h5_experiment_registry import create, append, sha, series_hash
+from h5_experiment_registry import append, create, series_hash, sha
 from h5_fincept_robustness import evaluate
 from test_h5_experiment_registry import plan
 

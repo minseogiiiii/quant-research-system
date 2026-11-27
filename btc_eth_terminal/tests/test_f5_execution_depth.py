@@ -1,12 +1,13 @@
-import unittest
 import tempfile
-from pathlib import Path
+import unittest
 from decimal import Decimal
-from f5_execution_depth import walk, project, build, SCALE
+from pathlib import Path
+
 from f4_depth_buckets import units
+from f5_execution_depth import SCALE, build, project, walk
+from test_f4_depth_buckets_archive import BASE
 from test_f4_ofi_markout import packet
 from test_f4_order_flow_archive import source
-from test_f4_depth_buckets_archive import BASE
 
 POLICY = dict(
     latency_ms=100,

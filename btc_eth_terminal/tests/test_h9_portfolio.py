@@ -1,8 +1,9 @@
 import copy
 import unittest
 from decimal import Decimal
-from h9_portfolio import simulate, collect
+
 from h3_momentum_horizons import POLICY
+from h9_portfolio import simulate
 
 
 def fixture():
@@ -64,8 +65,8 @@ class Portfolio(unittest.TestCase):
             simulate(rows, sig, p)
 
     def test_h3_signal_sink_does_not_change_results(self):
-        from test_h3_momentum_horizons import Horizon
         from h3_momentum_horizons import project
+        from test_h3_momentum_horizons import Horizon
 
         rows, p = Horizon().setup()
         sink = []
