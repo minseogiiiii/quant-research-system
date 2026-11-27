@@ -301,7 +301,7 @@ def project(
                         s["positive_net"] += int(net > 0)
                         s["gross_bps_sum"] += gross
                         s["net_bps_sum"] += net
-        for _, _, kind, signal, h, _ in pending:
+        for _, _, _kind, signal, h, _ in pending:
             tally(signal[2], "source_ended", h)
         need(first is not None, "EMPTY")
         if features_only:

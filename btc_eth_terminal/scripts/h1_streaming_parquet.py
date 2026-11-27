@@ -101,7 +101,7 @@ def rows(root, m, pin):
                 count += 1
                 row = strict_json(line)
                 wire = strict_json(row["raw_text"])
-                p, l, t = normalized(row, wire, pin, c["file"])
+                p, levels, t = normalized(row, wire, pin, c["file"])
                 need(
                     p["sequence"] == prior + 1
                     and (last is None or p["receiver_ms"] >= last)
@@ -111,7 +111,7 @@ def rows(root, m, pin):
                 prior = p["sequence"]
                 last = p["receiver_ms"]
                 mono = p["receiver_monotonic_ns"]
-                yield p, l, t
+                yield p, levels, t
         need(
             identity(path) == before
             and h.hexdigest() == c["archive_sha256"]
@@ -254,8 +254,8 @@ def convert(root, pin, destination, *, fixture=False, timings=None):
                 sizes[name] = 0
 
         try:
-            for p, l, t in rows(root, m, pin):
-                for name, items in (("packets", [p]), ("l2", l), ("trades", t)):
+            for p, levels, t in rows(root, m, pin):
+                for name, items in (("packets", [p]), ("l2", levels), ("trades", t)):
                     for item in items:
                         size = sum(
                             len(v.encode()) if isinstance(v, str) else 8

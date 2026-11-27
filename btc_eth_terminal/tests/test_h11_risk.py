@@ -46,7 +46,7 @@ class RiskTests(unittest.TestCase):
     def test_stale_and_invalid_policy(self):
         rows, sig, p = fixture()
         # Remove ETH updates after its initial snapshot; BTC remains fresh.
-        for seq, t, w in rows[1:]:
+        for _seq, _t, w in rows[1:]:
             w["events"] = [e for e in w["events"] if e["product_id"] == "BTC-USD"]
         p["max_age_ms"] = 80
         r = simulate(

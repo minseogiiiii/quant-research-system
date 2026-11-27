@@ -46,7 +46,7 @@ def witness(packets, window):
     points = missing = ready = 0
     latest = None
     last_ready = None
-    for seq, t, w in packets:
+    for _seq, t, w in packets:
         if decision is None:
             decision = ((t + grid - 1) // grid) * grid
         while decision <= t:

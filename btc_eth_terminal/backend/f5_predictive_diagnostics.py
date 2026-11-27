@@ -167,25 +167,25 @@ def summarize(report):
             }
     groups = {h: [] for h in horizons}
     seen = set()
-    for l in report["future_labels"]:
-        t, h = l["decision_ms"], l["horizon_ms"]
+    for label in report["future_labels"]:
+        t, h = label["decision_ms"], label["horizon_ms"]
         need(
             t in fdict
             and h in groups
             and (t, h) not in seen
-            and l["target_ms"] == t + h,
+            and label["target_ms"] == t + h,
             "LABEL_KEY",
         )
         seen.add((t, h))
-        if l["status"] != "OBSERVED_FUTURE_LABEL":
+        if label["status"] != "OBSERVED_FUTURE_LABEL":
             need(
-                l["status"] in ("NO_FUTURE_OBSERVATION", "FIRST_L2_OUTSIDE_TOLERANCE")
-                and l["label_available_ms"] is None
-                and l["midquote_return_bps"] is None,
+                label["status"] in ("NO_FUTURE_OBSERVATION", "FIRST_L2_OUTSIDE_TOLERANCE")
+                and label["label_available_ms"] is None
+                and label["midquote_return_bps"] is None,
                 "MISSING_LABEL",
             )
             continue
-        a = l["label_available_ms"]
+        a = label["label_available_ms"]
         need(
             type(a) is int
             and t + h <= a <= t + h + p["tolerance_ms"]
@@ -193,7 +193,7 @@ def summarize(report):
             "LABEL_TIME",
         )
         groups[h].append(
-            {"t": t, "a": a, "y": dec(l["midquote_return_bps"]), **fdict[t]}
+            {"t": t, "a": a, "y": dec(label["midquote_return_bps"]), **fdict[t]}
         )
     need(seen == {(t, h) for t in fdict for h in horizons}, "LABEL_INVENTORY")
     results = []

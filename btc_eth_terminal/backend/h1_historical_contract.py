@@ -58,7 +58,8 @@ def normalized(row, wire, pin, chunk):
                 "L2_EVENT",
             )
             for j, u in enumerate(e["updates"]):
-                p, q = units(u["price_level"]), units(u["new_quantity"])
+                p = units(u["price_level"])
+                units(u["new_quantity"])
                 need(p > 0 and u["side"] in ("bid", "offer"), "L2_LEVEL")
                 levels.append(
                     dict(

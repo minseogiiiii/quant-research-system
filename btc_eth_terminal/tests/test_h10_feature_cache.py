@@ -33,7 +33,8 @@ class Cache(unittest.TestCase):
             cache = root / "cache"
             r, cp = build(data, pin, receipt, cache, p, fixture=True)
             m = strict_json((raw / "manifest.json").read_bytes())
-            factory = lambda: read_independent(raw, m)
+            def factory():
+                return read_independent(raw, m)
             for policy in (
                 p,
                 dict(p, momentum_bps="2", fee_bps="1", horizons_ms=[100, 900]),

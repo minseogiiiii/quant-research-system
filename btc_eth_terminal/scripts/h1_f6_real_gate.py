@@ -49,7 +49,7 @@ def run(archive, output):
                 with z.open(info) as src, (root / name).open("xb") as dst:
                     shutil.copyfileobj(src, dst)
         dest = Path(d) / "dataset"
-        receipt = convert(root, PIN, dest)
+        convert(root, PIN, dest)
         products = {}
         for p in ("BTC-USD", "ETH-USD"):
             direct = build(root, PIN, p)

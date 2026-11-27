@@ -65,7 +65,7 @@ def weights(e, method):
 
 def validate(p):
     need(type(p) is dict and set(p) == set(POLICY), "POLICY")
-    g, w, a, l, t = (
+    g, w, a, latency, t = (
         p[k]
         for k in (
             "grid_ms",
@@ -76,11 +76,11 @@ def validate(p):
         )
     )
     need(
-        all(type(v) is int for v in (g, w, a, l, t))
+        all(type(v) is int for v in (g, w, a, latency, t))
         and 100 <= g <= 60000
         and 2 <= w <= 120
         and 0 <= a <= 5000
-        and 1 <= l <= 5000
+        and 1 <= latency <= 5000
         and 0 <= t <= 10000,
         "CLOCK",
     )
@@ -223,7 +223,7 @@ def project(packets, policy=None, *, initial_cash="10000"):
         counts["batches"] += 1
         need(len(plans) < 200000, "PLAN_BOUND")
         plans.append((t, [(k, s, q, seq, m, c) for k, s, q, seq, m, c in intent]))
-        for k, side, q, stamp, m, c in intent:
+        for k, side, q, stamp, _m, _c in intent:
             pending[k] = (side, q, t + lat, t, stamp)
             counts["intents"] += 1
 

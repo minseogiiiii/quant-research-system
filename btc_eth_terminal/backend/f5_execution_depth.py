@@ -289,7 +289,7 @@ def project(packets, intents, policy):
                 **r,
             }
         pending = waiting
-    for target, i, qty, signal_time, signal_seq, _ in pending:
+    for target, i, _qty, signal_time, signal_seq, _ in pending:
         reject(
             i,
             "NO_TIMELY_TARGET_QUOTE",
