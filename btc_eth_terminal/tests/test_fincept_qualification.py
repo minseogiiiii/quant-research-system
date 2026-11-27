@@ -1,4 +1,7 @@
-"""Standalone qualification of unmodified Fincept algorithms, not a strategy backtest."""
+"""Standalone qualification of unmodified Fincept algorithms.
+
+Not a strategy backtest.
+"""
 
 import math
 import sys

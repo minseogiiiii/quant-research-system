@@ -78,13 +78,17 @@ def gate(archive, output):
             direct_signals = sorted(signals)
             direct_signal_seconds = time.perf_counter() - start
             start = time.perf_counter()
+            def execution_projector(
+                packets, product, *, direct_signals=direct_signals,
+                policy=policy, cash=cash,
+            ):
+                return simulate(packets, direct_signals, policy, initial_cash=cash)
+
             direct = replay_dataset(
                 dest,
                 PIN,
                 "BTC-USD",
-                projector=lambda packets, product, direct_signals=direct_signals, policy=policy, cash=cash: simulate(
-                    packets, direct_signals, policy, initial_cash=cash
-                ),
+                projector=execution_projector,
                 receipt_pin=dp,
             )
             direct_execution_seconds = time.perf_counter() - start

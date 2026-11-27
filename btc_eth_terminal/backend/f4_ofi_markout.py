@@ -245,7 +245,9 @@ def project(
             "tolerance_ms": tolerance_ms,
             "feature_boundary": "STRICTLY_BEFORE_DECISION_MS",
             "ofi_definition": "L1_PACKET_FINAL_STATE_TRANSITION_BASE_UNITS",
-            "label_definition": "FIRST_SAME_PRODUCT_L2_AT_OR_AFTER_TARGET_WITHIN_TOLERANCE",
+            "label_definition": (
+                "FIRST_SAME_PRODUCT_L2_AT_OR_AFTER_TARGET_WITHIN_TOLERANCE"
+            ),
         },
         "source_first_receiver_ms": first,
         "source_last_receiver_ms": last,

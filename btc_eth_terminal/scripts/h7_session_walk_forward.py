@@ -86,7 +86,9 @@ def run_folds(
         "embargo_ms": embargo_ms,
         "seed": seed,
         "windows": windows,
-        "selection": "HIGHEST_POSITIVE_MEAN_NET_SESSION_RETURN_ALL_TRAIN_SESSIONS_ACTIVE",
+        "selection": (
+            "HIGHEST_POSITIVE_MEAN_NET_SESSION_RETURN_ALL_TRAIN_SESSIONS_ACTIVE"
+        ),
         "capital_reset": True,
         "source_kind": cat["source_kind"],
     }

@@ -315,7 +315,9 @@ def evaluate(journal, plan_pin, head, payload, *, fixture=False):
         "observations": len(r),
         "periods_per_year": ppy,
         "folds": folds,
-        "walk_forward_scope": "PRECOMPUTED_FIXED_RETURN_DEVELOPMENT_DIAGNOSTIC_NO_REFIT_NO_STITCH",
+        "walk_forward_scope": (
+            "PRECOMPUTED_FIXED_RETURN_DEVELOPMENT_DIAGNOSTIC_NO_REFIT_NO_STITCH"
+        ),
         "development_best_trial": ids[best],
         "dsr": ds,
         "pbo": pb,

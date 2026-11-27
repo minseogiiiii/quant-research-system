@@ -11,16 +11,25 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "vendor" / "fincept"))
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT.parent / "src"))
-from base import metrics, robustness
-from f2_research_contract import (
-    Event,
-    chronological_split,
-    metric_witness,
-    psr_reference,
-    qualified_pbo,
-    regular_returns,
-)
-from world_quant_system.backtest.metrics import _sharpe_ratio
+def _load_after_path_setup():
+    from base import metrics, robustness
+    from f2_research_contract import (
+        Event,
+        chronological_split,
+        metric_witness,
+        psr_reference,
+        qualified_pbo,
+        regular_returns,
+    )
+    from world_quant_system.backtest.metrics import _sharpe_ratio
+
+    return (metrics, robustness, Event, chronological_split, metric_witness,
+            psr_reference, qualified_pbo, regular_returns, _sharpe_ratio)
+
+
+(metrics, robustness, Event, chronological_split, metric_witness, psr_reference,
+ qualified_pbo, regular_returns, _sharpe_ratio) = _load_after_path_setup()
+del _load_after_path_setup
 
 
 class ResearchContracts(unittest.TestCase):

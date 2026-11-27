@@ -100,13 +100,16 @@ def create(path, plan):
         pass
     with connect(path) as db:
         db.execute(
-            "CREATE TABLE journal (idx INTEGER PRIMARY KEY, prev TEXT NOT NULL, body BLOB NOT NULL, digest TEXT NOT NULL)"
+            "CREATE TABLE journal (idx INTEGER PRIMARY KEY, prev TEXT NOT NULL, "
+            "body BLOB NOT NULL, digest TEXT NOT NULL)"
         )
         db.execute(
-            "CREATE TRIGGER no_update BEFORE UPDATE ON journal BEGIN SELECT RAISE(ABORT,'append only'); END"
+            "CREATE TRIGGER no_update BEFORE UPDATE ON journal BEGIN "
+            "SELECT RAISE(ABORT,'append only'); END"
         )
         db.execute(
-            "CREATE TRIGGER no_delete BEFORE DELETE ON journal BEGIN SELECT RAISE(ABORT,'append only'); END"
+            "CREATE TRIGGER no_delete BEFORE DELETE ON journal BEGIN "
+            "SELECT RAISE(ABORT,'append only'); END"
         )
         body = {"event": "PLAN", "plan": plan}
         head = sha({"idx": 0, "prev": ZERO, "body": body})

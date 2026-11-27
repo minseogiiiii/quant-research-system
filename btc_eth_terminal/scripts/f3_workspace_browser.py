@@ -46,7 +46,8 @@ with subprocess.Popen(
             assert page.locator("article").count() == 0
             browser.close()
         print(
-            "F3_BROWSER_PASS (blocked feed, persistence, reorder, allowlist, unconnected view)"
+            "F3_BROWSER_PASS (blocked feed, persistence, reorder, "
+            "allowlist, unconnected view)"
         )
     finally:
         server.terminate()

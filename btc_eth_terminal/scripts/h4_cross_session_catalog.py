@@ -94,7 +94,8 @@ def inspect(root, pin, role, fixture):
             ).fetchone()[0]
             need(n == r["tables"][table]["rows"], "TABLE_COUNT")
         n, lo, hi, seq0, seq1, source_bad, epoch_bad, connection_bad = db.execute(
-            """SELECT count(*),min(receiver_ms),max(receiver_ms),min(sequence),max(sequence),
+            """SELECT count(*),min(receiver_ms),max(receiver_ms),
+              min(sequence),max(sequence),
               count(*) FILTER (WHERE source_manifest_sha256 IS DISTINCT FROM ?),
               count(*) FILTER (WHERE epoch IS DISTINCT FROM ?),
               count(*) FILTER (WHERE connection_id IS DISTINCT FROM 0)
