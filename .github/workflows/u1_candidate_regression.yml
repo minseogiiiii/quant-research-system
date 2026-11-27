@@ -1,0 +1,78 @@
+name: U1 candidate regression (not release approval)
+on:
+  push:
+    branches: ['integration/u1-operational-reconciled-20261127']
+    paths: ['.github/workflows/u1_candidate_regression.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  root:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.12
+      - run: ./scripts/check.sh
+  terminal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts:btc_eth_terminal/tests:.github/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install pyarrow==19.0.1 duckdb==1.2.2 numpy==2.2.6 pandas==2.2.3 scipy==1.15.3 scikit-learn==1.6.1
+      - run: python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+      - run: python -m unittest discover -s btc_eth_terminal/tests -p 'test_*.py' -v
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: btc_eth_terminal/frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - run: npx --no-install vite build --config vite.workspace.config.ts
+      - run: |
+          npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/workspace-compiled src/workspace/model.ts
+          node --test tests/workspace.test.mjs
+          npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/compiled src/datahub/resilientStore.ts src/datahub/resilientClient.ts
+          node --test tests/resilientStore.test.mjs
+          npx --no-install tsc --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/candle-compiled src/workspace/candleContract.ts
+          node --test tests/candleContract.test.mjs
+          node --experimental-strip-types --test tests/marketStateIntegrity.test.mjs tests/v36_1_completed_candle_feed.test.mjs
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --prefix btc_eth_terminal/frontend
+      - run: python -m pip install playwright==1.51.0
+      - run: python -m playwright install --with-deps chromium
+      - run: python btc_eth_terminal/scripts/f3_workspace_browser.py
