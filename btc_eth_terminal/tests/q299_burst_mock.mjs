@@ -81,10 +81,13 @@ class Fixture {
    }else throw Error('Q299_MODE');
   }
   if(this.rateTicks>0){
-   for(let i=0;i<20;i++)this.small();
+   // One 80-message microburst plus normal 20-message batches.
+   // The measured trailing 100ms window must independently meet 70.
+   const n=this.rateTicks===120?80:20;
+   for(let i=0;i<n;i++)this.small();
    this.rateTicks--;
    if(this.rateTicks===0)this.receipt('q299_done.json',{
-    end_sequence:this.seq-1,rate_messages:2400,max_frame_bytes:this.maxFrame
+    end_sequence:this.seq-1,rate_messages:2460,max_frame_bytes:this.maxFrame
    });
   }else this.small();
   this.emit('heartbeats',[{heartbeat_counter:++this.hb}]);

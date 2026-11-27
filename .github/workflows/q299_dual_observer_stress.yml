@@ -72,3 +72,5 @@ jobs:
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/q299" "$RUNNER_TEMP/q299-output"
 # No real market capture or five-hour approval.
+
+# Q299: repair nested-if lint and exercise the 100ms message-count target.

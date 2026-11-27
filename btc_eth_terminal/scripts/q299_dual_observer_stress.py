@@ -215,16 +215,16 @@ def run(root, output, mode):
                 baseline = cursor(body)
                 clients.start()
                 streaming = True
-            if injected is None and baseline is not None:
-                if both_ready(body) and clients.ready(baseline) == CLIENTS:
-                    injected = now
-                    selected = sources if mode == "burst" else [
-                        s for s in sources if s.name == body["active_source"]]
-                    report["injected_source"] = (
-                        selected[0].name if mode == "overflow" else "both")
-                    for s in selected:
-                        (s.worker.work / "q299_go").write_text(mode)
-                    print("Q299_INJECTION", mode, flush=True)
+            if (injected is None and baseline is not None
+                    and both_ready(body) and clients.ready(baseline) == CLIENTS):
+                injected = now
+                selected = sources if mode == "burst" else [
+                    s for s in sources if s.name == body["active_source"]]
+                report["injected_source"] = (
+                    selected[0].name if mode == "overflow" else "both")
+                for s in selected:
+                    (s.worker.work / "q299_go").write_text(mode)
+                print("Q299_INJECTION", mode, flush=True)
             if injected is None:
                 need(now - start <= 20, "Q299_BASELINE_TIMEOUT")
             elif mode == "burst":
