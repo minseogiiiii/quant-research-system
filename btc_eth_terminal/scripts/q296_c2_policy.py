@@ -7,6 +7,7 @@ endpoint is degraded. Every published epoch must be fresh and monotone.
 from __future__ import annotations
 
 import math
+import re
 
 from q292_dual_gateway import PRODUCTS, cursor
 from q293_dual_1800s import need
@@ -64,7 +65,21 @@ class RecoveryMonitor:
              and generation >= max(0, self.generation), "C2_GENERATION")
         self.generation = generation
         ready = body["states"] is not None
+        if ready:
+            need(body["status"] == "HEALTHY"
+                 and body["active_source"] in ("primary", "secondary")
+                 and isinstance(body["source_session"], str)
+                 and re.fullmatch("[0-9a-f]{32}", body["source_session"]) is not None
+                 and set(body["states"]) == set(PRODUCTS), "C2_HEALTHY_SCHEMA")
+        else:
+            need(body["status"] == "QUARANTINED"
+                 and body["active_source"] is None
+                 and body["source_session"] is None, "C2_QUARANTINE_SCHEMA")
         checks = body.get("checkpoint_comparison", {})
+        if ready:
+            need(set(checks) == set(PRODUCTS) and set(checks.values()) <= {
+                "MATCH", "NOT_COMPARABLE", "SOURCE_UNAVAILABLE", "DIVERGENCE",
+            }, "C2_CHECKPOINT_SCHEMA")
         need("DIVERGENCE" not in checks.values(), "C2_CROSS_SOURCE_DIVERGENCE")
         both = ready and set(checks) == set(PRODUCTS) and (
             set(checks.values()) <= {"MATCH", "NOT_COMPARABLE"}
