@@ -45,9 +45,8 @@ class Store(unittest.TestCase):
     def test_lock_and_private_path(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d) / "store"
-            with locked(root), self.assertRaises(BlockingIOError):
-                with locked(root):
-                    pass
+            with locked(root), self.assertRaises(BlockingIOError), locked(root):
+                pass
             root.chmod(0o755)
             with self.assertRaises(ValueError):
                 inventory(root)
