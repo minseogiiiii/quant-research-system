@@ -272,3 +272,5 @@ jobs:
         if: always()
         run: rm -rf -- "$RUNNER_TEMP/p0-b5-private"
 # No five-hour job in this workflow. C1/C2 require a separately verified exact B5 and all preflights.
+
+# Exact lint correction and requalification, no five-hour activation.

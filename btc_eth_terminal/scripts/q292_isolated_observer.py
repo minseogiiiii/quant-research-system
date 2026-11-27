@@ -231,7 +231,9 @@ def worker(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker", action="store_true")
-    parser.add_argument("--fixture-fault", choices=("duplicate", "sequence", "heartbeat"))
+    parser.add_argument(
+        "--fixture-fault", choices=("duplicate", "sequence", "heartbeat")
+    )
     parser.add_argument("--fd", type=int)
     parser.add_argument("--name", choices=("primary", "secondary"))
     parser.add_argument("--workdir", type=Path, required=True)
