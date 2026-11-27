@@ -1,0 +1,63 @@
+name: Q298 historical replay and index capacity stress (offline)
+on:
+  push:
+    branches: ['remediation/u1-ast-format-20261127']
+    paths: ['.github/workflows/q298_capacity_stress.yml']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: q298-offline-capacity
+  cancel-in-progress: false
+jobs:
+  stress:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      PYTHONPATH: ${{ github.workspace }}/btc_eth_terminal/backend:${{ github.workspace }}/btc_eth_terminal/scripts:${{ github.workspace }}/btc_eth_terminal/tests:${{ github.workspace }}/.github/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install ruff==0.15.22 pytest numpy==2.2.6 pandas==2.2.3 scipy==1.15.3 pyarrow==19.0.1 duckdb==1.2.2 scikit-learn==1.6.1
+      - run: ruff check .
+      - run: python btc_eth_terminal/scripts/verify_fincept_vendor.py
+      - name: Verify unchanged runtime and exact immutable receipts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python btc_eth_terminal/scripts/q297_p0_preflight.py --directory "$RUNNER_TEMP/q298-receipts"
+      - name: Download authorized Q7 private release
+        env:
+          Q13_PRIVATE_RELEASE_URL: ${{ secrets.Q13_PRIVATE_RELEASE_URL }}
+          Q13_GITHUB_ARCHIVE_TOKEN: ${{ secrets.Q13_GITHUB_ARCHIVE_TOKEN }}
+        run: |
+          umask 077
+          mkdir "$RUNNER_TEMP/q298-output"
+          python .github/scripts/q16_secure_private_archive_download.py --output "$RUNNER_TEMP/q298-q7.zip"
+      - name: Offline network-isolated contracts and bounded capacity stress
+        run: |
+          set -euo pipefail
+          PY="$(command -v python)"
+          RUNNER_USER="$(id -un)"
+          sudo --preserve-env=PATH,PYTHONPATH,GITHUB_SHA,GITHUB_RUN_ID unshare --net bash -c '
+            set -e
+            ip link set lo up
+            sudo --preserve-env=PATH,PYTHONPATH,GITHUB_SHA,GITHUB_RUN_ID -u "$1" "$2" -m pytest -c /dev/null -q btc_eth_terminal/tests/test_q298_capacity_stress.py btc_eth_terminal/tests/test_q296_c2_policy.py
+            sudo --preserve-env=PATH,PYTHONPATH,GITHUB_SHA,GITHUB_RUN_ID -u "$1" timeout 2450 "$2" -u btc_eth_terminal/scripts/q298_capacity_stress.py --q7 "$3/q298-q7.zip" --receipts "$3/q298-receipts" --workdir "$3/q298-stress" --output "$3/q298-output/stress.json"
+          ' bash "$RUNNER_USER" "$PY" "$RUNNER_TEMP"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: q298-redacted-stress-receipt
+          path: ${{ runner.temp }}/q298-output/stress.json
+          if-no-files-found: warn
+          retention-days: 14
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/q298-output" "$RUNNER_TEMP/q298-q7.zip" "$RUNNER_TEMP/q298-receipts" "$RUNNER_TEMP/q298-stress"
+# Offline only: no 5h live entry point or approval.

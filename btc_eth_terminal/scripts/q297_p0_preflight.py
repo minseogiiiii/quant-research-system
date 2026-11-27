@@ -33,6 +33,9 @@ ALLOWED_DIFF = {
     "btc_eth_terminal/scripts/q297_p0_preflight.py",
     ".github/scripts/test_q297_p0_preflight.py",
     ".github/workflows/q297_p0_preflight.yml",
+    ".github/workflows/q298_capacity_stress.yml",
+    "btc_eth_terminal/scripts/q298_capacity_stress.py",
+    "btc_eth_terminal/tests/test_q298_capacity_stress.py",
 }
 
 
