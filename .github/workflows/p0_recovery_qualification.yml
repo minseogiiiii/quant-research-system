@@ -1,0 +1,274 @@
+name: P0 strict recovery qualification and B5
+on:
+  push:
+    branches: ['remediation/u1-ast-format-20261127']
+    paths: ['.github/workflows/p0_recovery_qualification.yml']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: p0-recovery-qualification
+  cancel-in-progress: false
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: src:btc_eth_terminal:btc_eth_terminal/backend:btc_eth_terminal/scripts:btc_eth_terminal/tests:.github/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install ruff==0.15.22 pytest pyarrow==19.0.1 duckdb==1.2.2 numpy==2.2.6 pandas==2.2.3 scipy==1.15.3 scikit-learn==1.6.1 pydantic pydantic-settings
+      - run: python btc_eth_terminal/scripts/verify_fincept_vendor.py
+      - run: ruff check .
+      - run: python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests .github/scripts
+      - name: Standby fencing and original duplicate, failover and C1 contracts
+        run: |
+          python -m pytest -c /dev/null -q \
+            btc_eth_terminal/tests/test_u1_standby_epoch_fence.py \
+            btc_eth_terminal/tests/test_q294_duplicate_snapshot.py \
+            btc_eth_terminal/tests/test_q292_resilient_gateway.py \
+            btc_eth_terminal/tests/test_q292_failover_policy.py \
+            btc_eth_terminal/tests/test_q293_c1_contract.py \
+            btc_eth_terminal/tests/test_h13_native_store.py \
+            btc_eth_terminal/tests/test_p0_gateway_edges.py \
+            btc_eth_terminal/tests/test_p0_dual_wire_faults.py \
+            btc_eth_terminal/tests/test_q293_long_contracts.py \
+            btc_eth_terminal/tests/test_q293_b4_diagnostics.py
+      - name: Actual synthetic B5 process loss, eight SSE clients and archive audit
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/b5-synthetic-output"
+          python -u btc_eth_terminal/scripts/q293_b5_resilience.py --synthetic --workdir "$RUNNER_TEMP/b5-synthetic" --output "$RUNNER_TEMP/b5-synthetic-output/b5.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p0-b5-synthetic-receipt
+          path: ${{ runner.temp }}/b5-synthetic-output/b5.json
+          if-no-files-found: warn
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/b5-synthetic"
+  root:
+    needs: contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.12
+      - run: ./scripts/check.sh
+  frontend:
+    needs: contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Recover and pin actual v34.1 L2 projection without publishing source data
+        env:
+          Q13_PRIVATE_RELEASE_URL: ${{ secrets.Q13_PRIVATE_RELEASE_URL }}
+          Q13_GITHUB_ARCHIVE_TOKEN: ${{ secrets.Q13_GITHUB_ARCHIVE_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "$RUNNER_TEMP/p0-node-private"
+          python .github/scripts/q16_secure_private_archive_download.py --output "$RUNNER_TEMP/p0-node-private/q7.zip"
+          python - <<'PY'
+          import hashlib, os, zipfile
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'p0-node-private'
+          with zipfile.ZipFile(root/'q7.zip') as z:
+              p='btc_eth_unified_terminal_v36_candidate/backend/data/v34_l2_depth/projection.json'
+              raw=z.read(p)
+          assert hashlib.sha256(raw).hexdigest()=='9c93c9a53ea4c03937198886ede3df71c03af03691349c245d0d8506246b88de'
+          (root/'projection.json').write_bytes(raw)
+          print('PASS_EXACT_V34_1_REAL_PROJECTION')
+          PY
+          echo "V34_L2_PROJECTION=$RUNNER_TEMP/p0-node-private/projection.json" >> "$GITHUB_ENV"
+      - run: npm ci --ignore-scripts --no-audit --no-fund --prefix btc_eth_terminal/frontend
+      - working-directory: btc_eth_terminal/frontend
+        run: |
+          npm run build
+          npx --no-install vite build --config vite.workspace.config.ts
+          npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/workspace-compiled src/workspace/model.ts
+          node --test tests/workspace.test.mjs
+          npx --no-install tsc --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/compiled src/datahub/resilientStore.ts src/datahub/resilientClient.ts
+          node --test tests/resilientStore.test.mjs
+          npx --no-install tsc --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir tests/candle-compiled src/workspace/candleContract.ts
+          node --test tests/candleContract.test.mjs
+          set -o pipefail
+          node --experimental-strip-types --test tests/marketStateIntegrity.test.mjs tests/v36_1_completed_candle_feed.test.mjs | tee "$RUNNER_TEMP/p0-node-private/node.log"
+          grep -Fx '# skipped 0' "$RUNNER_TEMP/p0-node-private/node.log"
+          grep -Fx '# fail 0' "$RUNNER_TEMP/p0-node-private/node.log"
+      - run: python -m pip install playwright==1.51.0
+      - run: python -m playwright install --with-deps chromium
+      - run: python btc_eth_terminal/scripts/f3_workspace_browser.py
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/p0-node-private"
+  private-runtime:
+    needs: contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install pytest pyarrow==19.0.1 duckdb==1.2.2 numpy==2.2.6 pandas==2.2.3 scipy==1.15.3 scikit-learn==1.6.1
+      - name: Recover previously authorized immutable Q7 release
+        env:
+          Q13_PRIVATE_RELEASE_URL: ${{ secrets.Q13_PRIVATE_RELEASE_URL }}
+          Q13_GITHUB_ARCHIVE_TOKEN: ${{ secrets.Q13_GITHUB_ARCHIVE_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "$RUNNER_TEMP/u1-private"
+          python .github/scripts/q16_secure_private_archive_download.py --output "$RUNNER_TEMP/u1-private/q7.zip"
+          python .github/scripts/u1_restore_fixtures.py "$RUNNER_TEMP/u1-private/q7.zip" btc_eth_terminal
+          git diff --exit-code
+      - name: Run all Q7-backed terminal tests (v34 ZIP restore separately required)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PY="$(command -v python)"
+          RUNNER_USER="$(id -un)"
+          export PYTHONPATH="$PWD/btc_eth_terminal:$PWD/btc_eth_terminal/backend:$PWD/btc_eth_terminal/scripts:$PWD/btc_eth_terminal/tests:$PWD/.github/scripts"
+          export PATH
+          export V35_CLEAN_ARCHIVE="$PWD/btc_eth_terminal/backend/data/live_v14_clean_120s/coinbase_btc_eth_soak_wsgXRy"
+          export V35_DISCONNECT_ARCHIVE="$PWD/btc_eth_terminal/backend/data/live_v14_disconnect_120s/coinbase_btc_eth_soak_gEF6uZ"
+          test -f "$V35_CLEAN_ARCHIVE/manifest.json"
+          test -f "$V35_DISCONNECT_ARCHIVE/manifest.json"
+          set +e
+          sudo --preserve-env=PATH,PYTHONPATH,V35_CLEAN_ARCHIVE,V35_DISCONNECT_ARCHIVE unshare --net bash -c '
+            set -e
+            ip link set lo up
+            sudo --preserve-env=PATH,PYTHONPATH,V35_CLEAN_ARCHIVE,V35_DISCONNECT_ARCHIVE -u "$1" "$2" -c "import socket; s=socket.socket(); s.bind((\"127.0.0.1\",0)); s.close(); import sys; exec(\"try:\\n socket.getaddrinfo(\\\"advanced-trade-ws.coinbase.com\\\",443)\\nexcept socket.gaierror:\\n sys.exit(0)\\nelse:\\n sys.exit(9)\")"
+            sudo --preserve-env=PATH,PYTHONPATH,V35_CLEAN_ARCHIVE,V35_DISCONNECT_ARCHIVE -u "$1" "$2" -m pytest -c /dev/null -q btc_eth_terminal/tests --ignore=btc_eth_terminal/tests/test_v35_restore_frozen_source.py --junitxml="$3"
+          ' bash "$RUNNER_USER" "$PY" "$RUNNER_TEMP/u1-private/results.xml" > "$RUNNER_TEMP/u1-private/test.log" 2>&1
+          rc=$?
+          set -e
+          python - "$RUNNER_TEMP/u1-private/results.xml" "$rc" <<'PY'
+          import json, sys, xml.etree.ElementTree as ET
+          from pathlib import Path
+          path=Path(sys.argv[1])
+          if not path.exists():
+              print("BLOCKED_OFFLINE_EXECUTION_OR_COLLECTION")
+              raise SystemExit(1)
+          root=ET.parse(path).getroot()
+          suites=[root] if root.tag=="testsuite" else list(root.findall("testsuite"))
+          print("U1_PRIVATE_REGRESSION", json.dumps({k:sum(int(s.get(k,0)) for s in suites) for k in ("tests","failures","errors","skipped")}))
+          for case in root.iter("testcase"):
+              for tag in ("failure","error","skipped"):
+                  if case.find(tag) is not None:
+                      print(tag.upper(),case.get("classname"),case.get("name"))
+          raise SystemExit(int(sys.argv[2]) or (1 if any(int(s.get("skipped",0)) for s in suites) else 0))
+          PY
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/u1-private"
+
+
+  frozen-v34:
+    # Separate mandatory source-restore suite, not a waived skip.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest
+      - name: Fetch the exact original from the existing private release
+        env:
+          Q13_GITHUB_ARCHIVE_TOKEN: ${{ secrets.Q13_GITHUB_ARCHIVE_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "$RUNNER_TEMP/p0-v34"
+          python .github/scripts/p0_fetch_v34.py "$RUNNER_TEMP/p0-v34/original.zip"
+      - name: Run all six source-restore tests without skip
+        env:
+          FROZEN_V34_1_ZIP: ${{ runner.temp }}/p0-v34/original.zip
+        run: |
+          python -m pytest -c /dev/null -q btc_eth_terminal/tests/test_v35_restore_frozen_source.py --junitxml="$RUNNER_TEMP/p0-v34/result.xml"
+          python - <<'PY'
+          import os, xml.etree.ElementTree as ET
+          from pathlib import Path
+          suites=ET.parse(Path(os.environ['RUNNER_TEMP'])/'p0-v34/result.xml').getroot().findall('testsuite')
+          assert sum(int(s.get('tests',0)) for s in suites)==6
+          assert all(not int(s.get(k,0)) for s in suites for k in ('failures','errors','skipped'))
+          print('PASS_V34_EXACT_RESTORE_ZERO_SKIP')
+          PY
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/p0-v34"
+  live-b5:
+    # B5 is a 30-minute diagnostic, not a five-hour approval.
+    # Historical ZIP restore is unrelated to the live path and stays a separate gate.
+    needs: [contracts, root, frontend, private-runtime]
+    if: github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Actual 30 minute controlled dual-source recovery
+        id: capture
+        run: |
+          set -euo pipefail
+          mkdir -m 700 "$RUNNER_TEMP/p0-b5-public"
+          python -u btc_eth_terminal/scripts/q293_b5_resilience.py --execute-real-public-b5 --workdir "$RUNNER_TEMP/p0-b5-private" --output "$RUNNER_TEMP/p0-b5-public/b5.json"
+          echo "digest=$(sha256sum "$RUNNER_TEMP/p0-b5-public/b5.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: q293-b5-live-resilience
+          path: ${{ runner.temp }}/p0-b5-public/b5.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Exact B5 artifact roundtrip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
+          RECEIPT_SHA: ${{ steps.capture.outputs.digest }}
+        run: python btc_eth_terminal/scripts/q293_b5_transport.py --id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --receipt-sha "$RECEIPT_SHA" --directory "$RUNNER_TEMP/p0-b5-downloaded"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: p0-b5-failure
+          path: ${{ runner.temp }}/p0-b5-public/b5.json
+          if-no-files-found: warn
+      - name: Remove private captures
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/p0-b5-private"
+# No five-hour job in this workflow. C1/C2 require a separately verified exact B5 and all preflights.
