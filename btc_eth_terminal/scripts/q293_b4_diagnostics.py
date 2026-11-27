@@ -98,12 +98,43 @@ def manifest_receipt(path):
             if cid is not None and (type(cid) is not int or not 0 <= cid < 16):
                 raise ValueError("MANIFEST_CONNECTION")
             faults.append({"connection": cid, "class": fault_class(f["reason"])})
+        duplicate_snapshots = []
+        for c in m["connections"]:
+            r = c.get("duplicate_snapshot_receipt")
+            if r is None:
+                continue
+            if not isinstance(r, dict):
+                raise ValueError("DUP_SNAPSHOT_RECEIPT_SCHEMA")
+            keys = ("connection_id", "sequence", "event_index", "event_count",
+                    "level_count", "prior_updates")
+            prev = r.get("previous_committed_sequence")
+            if (r.get("schema") != "q294_dup_snapshot_v1"
+                    or not all(type(r.get(k)) is int and 0 <= r[k] < 10**9
+                               for k in keys)
+                    or r["connection_id"] != c["id"]
+                    or "previous_committed_sequence" not in r
+                    or not (prev is None and r["sequence"] == 0
+                            or type(prev) is int and 0 <= prev < 10**9
+                            and r["sequence"] == prev + 1)
+                    or not 0 <= r["event_index"] < r["event_count"]
+                    or r["product"] not in ("BTC-USD", "ETH-USD")
+                    or type(r.get("already_committed_snapshot")) is not bool
+                    or r.get("same_socket") is not True
+                    or r.get("root_cause_proven") is not False
+                    or not isinstance(r.get("raw_sha256"), str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", r["raw_sha256"])):
+                raise ValueError("DUP_SNAPSHOT_RECEIPT_SCHEMA")
+            public_keys = (*keys, "previous_committed_sequence", "product",
+                           "already_committed_snapshot", "same_socket",
+                           "root_cause_proven", "raw_sha256")
+            duplicate_snapshots.append({k: r[k] for k in public_keys})
         finish = m.get("finish_reason")
         return {"status": "MANIFEST_READ", "manifest_sha256":
                 hashlib.sha256(raw).hexdigest(), "faults": faults,
                 "first_fault_class": faults[0]["class"] if faults else None,
                 "finish_class": finish if finish in FINISH else "OTHER_REDACTED",
                 "connections": len(m["connections"]),
+                "duplicate_snapshot_receipts": duplicate_snapshots,
                 "network_root_cause_proven": False}
     except (OSError, ValueError, KeyError, TypeError):
         return {"status": "MANIFEST_UNAVAILABLE_OR_REJECTED",

@@ -250,7 +250,7 @@ class Collector:
                 "SOAK_RAW_BUDGET_BYTES": str(raw_budget),
                 "SOAK_ARCHIVE_BUDGET_BYTES": str(archive_budget),
                 "SOAK_DISK_RESERVE_BYTES": str(DISK_RESERVE),
-                "SOAK_CHUNK_LIMIT_BYTES": "8000000",
+                "SOAK_CHUNK_LIMIT_BYTES": "16000" if synthetic else "8000000",
                 "SOAK_TEST_FIXTURE": "1" if synthetic else "0",
                 "SOAK_TEST_DISCONNECT_AFTER_MESSAGES": "0",
                 "V36_LIVE_TAP_SOCKET": str(tap),

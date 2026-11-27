@@ -2,9 +2,9 @@
 if(process.env.SOAK_TEST_FIXTURE!=='1')throw Error('SYNTHETIC_ONLY');
 const products=['BTC-USD','ETH-USD'];
 const levels=n=>Array.from({length:10},(_,i)=>({
- side:'bid',price_level:String(n-i),new_quantity:String(i+1)
+ side:'bid',price_level:String(n-i),new_quantity:String(i+1),event_time:'2026-01-01T00:00:00Z'
 })).concat(Array.from({length:10},(_,i)=>({
- side:'offer',price_level:String(n+1+i),new_quantity:String(i+1)
+ side:'offer',price_level:String(n+1+i),new_quantity:String(i+1),event_time:'2026-01-01T00:00:00Z'
 })));
 class Fixture {
  constructor(url){
@@ -37,7 +37,7 @@ class Fixture {
     this.emit('heartbeats',[{heartbeat_counter:++hb}]);
     this.emit('l2_data',products.map((product_id,i)=>({
      product_id,type:'update',updates:[{
-      side:'bid',price_level:String(100*(i+1)),new_quantity:'1'
+      side:'bid',price_level:String(100*(i+1)),new_quantity:'1',event_time:'2026-01-01T00:00:00Z'
      }]
     })));
    };

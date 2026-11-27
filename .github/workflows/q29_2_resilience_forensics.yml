@@ -290,3 +290,81 @@ jobs:
       - name: Delete private captures
         if: always()
         run: rm -rf -- "$RUNNER_TEMP/q293_b4_private"
+  b5-synthetic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: B5 controlled local failures on original synthetic collectors
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q293_b5_resilience.py btc_eth_terminal/scripts/q293_b5_transport.py
+          python -u btc_eth_terminal/scripts/q293_b5_resilience.py --synthetic --workdir "$RUNNER_TEMP/b5s" --output "$RUNNER_TEMP/b5s.json"
+      - name: Synthetic receipt summary
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/b5s.json"; then cat "$RUNNER_TEMP/b5s.json"; fi
+  b5-live:
+    if: >-
+      github.event.head_commit.message == 'Q29.3-B5: arm controlled real dual resilience'
+    needs: [synthetic-regression, journal-failover-contracts, dual-collector-integration, independent-observer-integration, durable-stream-integration, managed-source-integration, integrated-stress, long-run-contracts, b5-synthetic]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify immutable B4.1 prior evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python btc_eth_terminal/scripts/q293_b5_transport.py --prior --directory "$RUNNER_TEMP/b5_prior"
+      - name: Real 30m dual source controlled local faults and sealed-prefix audits
+        id: capture
+        timeout-minutes: 80
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          mkdir -m 700 "$RUNNER_TEMP/b5_public"
+          python -u btc_eth_terminal/scripts/q293_b5_resilience.py --execute-real-public-b5 --workdir "$RUNNER_TEMP/b5_private" --output "$RUNNER_TEMP/b5_public/b5.json"
+          echo "digest=$(sha256sum "$RUNNER_TEMP/b5_public/b5.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: q293-b5-live-resilience
+          path: ${{ runner.temp }}/b5_public/b5.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Exact B5 artifact roundtrip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
+          RECEIPT_SHA: ${{ steps.capture.outputs.digest }}
+        run: |
+          set -euo pipefail
+          python btc_eth_terminal/scripts/q293_b5_transport.py --id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --receipt-sha "$RECEIPT_SHA" --directory "$RUNNER_TEMP/b5_downloaded"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: q293-b5-failure
+          path: ${{ runner.temp }}/b5_public/b5.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Delete private captures
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/b5_private"

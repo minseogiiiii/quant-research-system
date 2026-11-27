@@ -1,0 +1,457 @@
+name: Q294 requalify diagnostic collector then C1
+on:
+  push:
+    branches: ['p0/q294-c1-dup-snapshot-20261124']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: q293-c1-five-hour
+  cancel-in-progress: false
+jobs:
+  synthetic-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Frozen source and readonly pin verification
+        run: |
+          python - <<'PY'
+          import json, pathlib, subprocess
+          m=json.loads(pathlib.Path('.github/release-evidence/q14_candidate_source_git_blobs.json').read_text())
+          assert len(m['source_git_blobs'])==278
+          assert all(m[k] is False for k in ('real_orders_enabled','release_approved','merge_approved'))
+          collector='btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs'
+          assert m['source_git_blobs'][collector]=='e6dc2f2da319775c911249ec2b3b44f0c3e7910c'
+          for p,sha in m['source_git_blobs'].items():
+              expected='3bd505d29f1727575eb24cf884453890b3663ec9' if p==collector else sha
+              assert subprocess.check_output(['git','hash-object',p],text=True).strip()==expected,p
+          assert subprocess.check_output(['git','hash-object','btc_eth_terminal/scripts/q293_b4_diagnostics.py'],text=True).strip()=='b9febbd728b393e4ec63c56e72867b3d4c95aa1a'
+          assert subprocess.check_output(['git','hash-object','btc_eth_terminal/scripts/q292_dual_gateway.py'],text=True).strip()=='fda68d7b01abdb0c4dc45fc099c8941743b05218'
+          PY
+      - name: Lint changed Python and verify new diagnostic regression
+        run: |
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q24_ws_diagnostic_receipt.py btc_eth_terminal/scripts/q27_heartbeat_receipt.py btc_eth_terminal/scripts/q22_ci_5h_supervisor.py btc_eth_terminal/tests/test_q28_termination_incident.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q28_termination_incident.py' -v
+      - name: Existing fault recovery and evidence gates
+        run: |
+          set -euo pipefail
+          for pattern in test_q22_ci_5h_contract.py test_q23_diagnostics_and_replay.py test_q24_ws_close_forensics.py test_q25_session_gap_isolation.py test_q26_three_fault_recovery.py test_q27_heartbeat_guard.py test_q29_artifact_transport.py test_q29_evidence_gate.py test_v36_2_transport_gap.py test_v36_2_sse_backpressure.py test_v36_2_storage_faults.py test_v36_3_durable_archive_gate.py; do
+            python -m unittest discover -s btc_eth_terminal/tests -p "$pattern" -v
+          done
+          node --test btc_eth_terminal/tests/q24_ws_close_probe.test.mjs
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q294_duplicate_snapshot.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q293_c1_contract.py' -v
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q293_b4_diagnostics.py' -v
+  journal-failover-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned linter
+        run: python -m pip install --disable-pip-version-check ruff==0.15.22
+      - name: Independent durable incident journal and epoch audit
+        run: |
+          set -euo pipefail
+          ruff check btc_eth_terminal/scripts/q292_incident_journal.py btc_eth_terminal/tests/test_q292_incident_journal.py btc_eth_terminal/scripts/q22_ci_5h_supervisor.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_incident_journal.py' -v
+      - name: Conservative dual source selection policy (synthetic)
+        run: |
+          ruff check btc_eth_terminal/scripts/q292_failover_policy.py btc_eth_terminal/tests/test_q292_failover_policy.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_failover_policy.py' -v
+  dual-collector-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Dual collector process and routing contracts
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q292_dual_gateway.py btc_eth_terminal/tests/test_q292_dual_gateway.py
+          node --check btc_eth_terminal/tests/q292_dual_source_mock.mjs
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_dual_gateway.py' -v
+  independent-observer-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Observer process isolation, timeout and orphan cleanup
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q292_dual_gateway.py btc_eth_terminal/scripts/q292_parent_bound_exec.py btc_eth_terminal/scripts/q292_isolated_observer.py btc_eth_terminal/tests/test_q292_isolated_observer.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_isolated_observer.py' -v
+  durable-stream-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Durable transitions and bounded SSE
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q292_stream_gateway.py btc_eth_terminal/tests/test_q292_stream_gateway.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_stream_gateway.py' -v
+  managed-source-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Bounded restart and comparable-input audit
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q292_resilient_gateway.py btc_eth_terminal/tests/test_q292_resilient_gateway.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_resilient_gateway.py' -v
+  integrated-stress:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Integrated dual process, stream saturation and fault recovery
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q292_stream_gateway.py btc_eth_terminal/scripts/q292_dual_gateway.py btc_eth_terminal/tests/test_q292_integrated_stress.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q292_integrated_stress.py' -v
+          python -m py_compile btc_eth_terminal/scripts/q293_dual_180s.py btc_eth_terminal/scripts/q293_pilot_transport.py
+          ruff check btc_eth_terminal/scripts/q293_dual_180s.py btc_eth_terminal/scripts/q293_pilot_transport.py
+  live-dual-180s:
+    # Run once on the explicitly armed pilot commit, never on routine pushes.
+    if: >-
+      github.event.head_commit.message == 'Q29.3-A: arm gated real dual 180s baseline'
+    needs: [synthetic-regression, journal-failover-contracts, dual-collector-integration, independent-observer-integration, durable-stream-integration, managed-source-integration, integrated-stress]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Real public dual pilot and independent archive gates
+        id: capture
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          mkdir -m 700 "$RUNNER_TEMP/q293_public"
+          python -u btc_eth_terminal/scripts/q293_dual_180s.py --execute-real-public-180s --workdir "$RUNNER_TEMP/q293_private" --output "$RUNNER_TEMP/q293_public/dual_180s.json"
+          echo "digest=$(sha256sum "$RUNNER_TEMP/q293_public/dual_180s.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Upload only redacted verified receipt
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: q293-dual-180s-baseline
+          path: ${{ runner.temp }}/q293_public/dual_180s.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Download by immutable artifact ID and verify exact receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
+          RECEIPT_SHA: ${{ steps.capture.outputs.digest }}
+        run: |
+          set -euo pipefail
+          python btc_eth_terminal/scripts/q293_pilot_transport.py --id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --receipt-sha "$RECEIPT_SHA" --directory "$RUNNER_TEMP/q293_downloaded"
+      - name: Preserve redacted failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q293-dual-180s-failure
+          path: ${{ runner.temp }}/q293_public/dual_180s.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Remove private market payloads
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/q293_private"
+  long-run-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: B1 B2 B3 bounded resource and epoch contracts
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q293_long_policy.py btc_eth_terminal/scripts/q293_source_ledger.py btc_eth_terminal/scripts/q293_epoch_audit.py btc_eth_terminal/scripts/q293_dual_1800s.py btc_eth_terminal/scripts/q293_b4_transport.py btc_eth_terminal/tests/test_q293_long_contracts.py btc_eth_terminal/scripts/q292_dual_gateway.py btc_eth_terminal/scripts/q292_isolated_observer.py btc_eth_terminal/scripts/q292_resilient_gateway.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q293_long_contracts.py' -v
+          ruff check btc_eth_terminal/scripts/q293_b4_diagnostics.py btc_eth_terminal/tests/test_q293_b4_diagnostics.py
+          python -m unittest discover -s btc_eth_terminal/tests -p 'test_q293_b4_diagnostics.py' -v
+  live-dual-1800s:
+    if: >-
+      github.event.head_commit.message == 'Q29.3-B4: arm gated real dual 1800s baseline'
+    needs: [synthetic-regression, journal-failover-contracts, dual-collector-integration, independent-observer-integration, durable-stream-integration, managed-source-integration, integrated-stress, long-run-contracts]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      zip_sha: ${{ steps.upload.outputs.artifact-digest }}
+      receipt_sha: ${{ steps.capture.outputs.digest }}
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Revalidate immutable previous 180s receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python btc_eth_terminal/scripts/q293_b4_transport.py --prior --directory "$RUNNER_TEMP/q293_prior"
+      - name: Real dual 1800s baseline and per-epoch replay
+        id: capture
+        timeout-minutes: 80
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          mkdir -m 700 "$RUNNER_TEMP/q293_b4_public"
+          python -u btc_eth_terminal/scripts/q293_dual_1800s.py --execute-real-public-1800s --workdir "$RUNNER_TEMP/q293_b4_private" --output "$RUNNER_TEMP/q293_b4_public/dual_1800s.json"
+          echo "digest=$(sha256sum "$RUNNER_TEMP/q293_b4_public/dual_1800s.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Upload validated receipt
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: q293-dual-1800s-baseline
+          path: ${{ runner.temp }}/q293_b4_public/dual_1800s.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify same-run artifact by immutable ID and SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
+          RECEIPT_SHA: ${{ steps.capture.outputs.digest }}
+        run: |
+          set -euo pipefail
+          python btc_eth_terminal/scripts/q293_b4_transport.py --id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --receipt-sha "$RECEIPT_SHA" --directory "$RUNNER_TEMP/q293_b4_downloaded"
+      - name: Upload redacted failure receipt (not acceptance)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q293-dual-1800s-failure
+          path: ${{ runner.temp }}/q293_b4_public/dual_1800s.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Delete private captures
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/q293_b4_private"
+  b5-synthetic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: B5 controlled local failures on original synthetic collectors
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check ruff==0.15.22
+          ruff check btc_eth_terminal/scripts/q293_b5_resilience.py btc_eth_terminal/scripts/q293_b5_transport.py
+          python -u btc_eth_terminal/scripts/q293_b5_resilience.py --synthetic --workdir "$RUNNER_TEMP/b5s" --output "$RUNNER_TEMP/b5s.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          r=json.loads((Path(os.environ['RUNNER_TEMP'])/'b5s.json').read_text())
+          assert set(r['transport_incidents'])==set(r['archives'])
+          assert len(r['transport_incidents'])==4
+          for v in r['transport_incidents'].values():
+              assert v['schema']=='q28_public_termination_incident_v1'
+              assert v['raw_payload_or_close_reason_published'] is False
+              assert v['network_root_cause_proven'] is False
+              assert v['source_continuity_certified'] is False
+              assert v['q24_trace_validation']=='COMMITTED_PREFIX_SCHEMA_VALID'
+              assert v['q27_trace_validation']=='COMMITTED_PREFIX_SCHEMA_VALID'
+          PY
+      - name: Synthetic receipt summary
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/b5s.json"; then cat "$RUNNER_TEMP/b5s.json"; fi
+  b5-live:
+    if: >-
+      github.event.head_commit.message == 'Q294: arm same-source B5 requalification then C1 clean five-hour baseline'
+    needs: [synthetic-regression, journal-failover-contracts, dual-collector-integration, independent-observer-integration, durable-stream-integration, managed-source-integration, integrated-stress, long-run-contracts, b5-synthetic]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify immutable B4.1 prior evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python btc_eth_terminal/scripts/q293_b5_transport.py --prior --directory "$RUNNER_TEMP/b5_prior"
+      - name: Real 30m dual source controlled local faults and sealed-prefix audits
+        id: capture
+        timeout-minutes: 80
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          mkdir -m 700 "$RUNNER_TEMP/b5_public"
+          python -u btc_eth_terminal/scripts/q293_b5_resilience.py --execute-real-public-b5 --workdir "$RUNNER_TEMP/b5_private" --output "$RUNNER_TEMP/b5_public/b5.json"
+          echo "digest=$(sha256sum "$RUNNER_TEMP/b5_public/b5.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: q293-b5-live-resilience
+          path: ${{ runner.temp }}/b5_public/b5.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Exact B5 artifact roundtrip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
+          RECEIPT_SHA: ${{ steps.capture.outputs.digest }}
+        run: |
+          set -euo pipefail
+          python btc_eth_terminal/scripts/q293_b5_transport.py --id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --receipt-sha "$RECEIPT_SHA" --directory "$RUNNER_TEMP/b5_downloaded"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: q293-b5-failure
+          path: ${{ runner.temp }}/b5_public/b5.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Delete private captures
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/b5_private"
+  live-c1:
+    if: >-
+      github.event.head_commit.message == 'Q294: arm same-source B5 requalification then C1 clean five-hour baseline'
+    needs: b5-live
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify same-commit B5 immutable evidence on C1 host
+        env:
+          GH_TOKEN: ${{ github.token }}
+          B5_ID: ${{ needs.b5-live.outputs.artifact_id }}
+          B5_ZIP_SHA: ${{ needs.b5-live.outputs.zip_sha }}
+          B5_RECEIPT_SHA: ${{ needs.b5-live.outputs.receipt_sha }}
+        run: |
+          set -euo pipefail
+          python btc_eth_terminal/scripts/q293_b5_transport.py --id "$B5_ID" --zip-sha "$B5_ZIP_SHA" --receipt-sha "$B5_RECEIPT_SHA" --directory "$RUNNER_TEMP/c1_prior"
+      - name: Real clean dual source capture and independent replay
+        id: capture
+        timeout-minutes: 350
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          mkdir -m 700 "$RUNNER_TEMP/c1_public"
+          python -u btc_eth_terminal/scripts/q293_c1_dual_18000s.py --execute-real-public-c1 --workdir "$RUNNER_TEMP/c1_private" --output "$RUNNER_TEMP/c1_public/c1.json"
+          echo "digest=$(sha256sum "$RUNNER_TEMP/c1_public/c1.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: q293-c1-dual-18000s-baseline
+          path: ${{ runner.temp }}/c1_public/c1.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Exact C1 artifact roundtrip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ZIP_SHA: ${{ steps.upload.outputs.artifact-digest }}
+          RECEIPT_SHA: ${{ steps.capture.outputs.digest }}
+        run: python btc_eth_terminal/scripts/q293_c1_transport.py --id "$ARTIFACT_ID" --zip-sha "$ZIP_SHA" --receipt-sha "$RECEIPT_SHA" --directory "$RUNNER_TEMP/c1_downloaded"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: q293-c1-failure
+          path: ${{ runner.temp }}/c1_public/c1.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Delete private capture
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/c1_private"
