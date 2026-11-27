@@ -50,10 +50,11 @@ class DualWireFaultContracts(unittest.TestCase):
                               factory=factory, max_restarts=0)
             route = ResilientRoute(p, s)
             try:
+                # Start the standby only after a confirmed primary route.
+                s.next_start = float("inf")
+                until(route, lambda x: x["active_source"] == "primary", 8)
+                s.next_start = 0.0
                 first = until(route, ready, 8)
-                # Guarantee active source remains healthy during standby recovery.
-                # If initial arbitration preferred secondary, this fixture cannot
-                # certify the intended standby scenario.
                 self.assertEqual(first["active_source"], "primary")
                 old = s.admitted_session
                 self.assertIsNotNone(old)
@@ -85,7 +86,11 @@ class DualWireFaultContracts(unittest.TestCase):
             elif kind == "sequence":
                 self.assertEqual(receipt["first_fault_class"], "SEQUENCE_GAP")
             observer = observer_receipt(s.root / "attempt_01/observer_events.jsonl")
-            self.assertEqual(observer["status"], "OBSERVER_JOURNAL_READ")
+            self.assertEqual(observer["status"], "VERIFIED")
+            self.assertTrue(any(
+                event["reason"] == "COLLECTOR_REPORTED_WEBSOCKET_SOURCE_GAP"
+                for event in observer["events"]
+            ))
 
     def test_duplicate_snapshot_standby(self):
         self._fault("duplicate")
