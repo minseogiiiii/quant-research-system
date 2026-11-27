@@ -1,0 +1,57 @@
+name: U1 targeted remediation contracts
+on:
+  push:
+    branches: ['remediation/u1-ast-format-20261127']
+    paths: ['.github/workflows/u1_remediation_targeted.yml', 'btc_eth_terminal/backend/**', 'btc_eth_terminal/scripts/**', 'btc_eth_terminal/tests/**']
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install pytest ruff==0.15.22 pyarrow==19.0.1 duckdb==1.2.2 numpy==2.2.6 pandas==2.2.3 scipy==1.15.3 scikit-learn==1.6.1
+      - name: Preserve vendor files and compile current candidate
+        run: |
+          python btc_eth_terminal/scripts/verify_fincept_vendor.py
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests
+      - name: Run affected synthetic numerical and provenance contracts
+        env:
+          PYTHONPATH: btc_eth_terminal:btc_eth_terminal/backend:btc_eth_terminal/scripts:btc_eth_terminal/tests:.github/scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pytest -c /dev/null -q \
+            btc_eth_terminal/tests/test_f5_predictive_diagnostics.py \
+            btc_eth_terminal/tests/test_f7_pnl_attribution.py \
+            btc_eth_terminal/tests/test_h1_replay_physical_order.py \
+            btc_eth_terminal/tests/test_h1_streaming_parquet.py \
+            btc_eth_terminal/tests/test_h2_native_benchmark.py \
+            btc_eth_terminal/tests/test_h2_tardis_l2.py \
+            btc_eth_terminal/tests/test_h4_cross_session_catalog.py \
+            btc_eth_terminal/tests/test_h5_fincept_robustness.py \
+            btc_eth_terminal/tests/test_h8_qualification.py \
+            btc_eth_terminal/tests/test_h9_portfolio.py \
+            btc_eth_terminal/tests/test_h10_feature_cache.py \
+            btc_eth_terminal/tests/test_h11_covariance.py \
+            btc_eth_terminal/tests/test_h11_risk.py \
+            btc_eth_terminal/tests/test_h12_joint_risk.py \
+            btc_eth_terminal/tests/test_h12_portfolio_allocation.py \
+            btc_eth_terminal/tests/test_h12_rebalance.py
+      - name: Check duplicate snapshot quarantine, bounded restart, and C1 contract
+        env:
+          PYTHONPATH: btc_eth_terminal:btc_eth_terminal/backend:btc_eth_terminal/scripts:btc_eth_terminal/tests
+        run: |
+          python -m pytest -c /dev/null -q btc_eth_terminal/tests/test_q294_duplicate_snapshot.py btc_eth_terminal/tests/test_q292_resilient_gateway.py btc_eth_terminal/tests/test_q293_c1_contract.py
+      - name: Inventory residual first-party lint (fail if nonzero)
+        if: always()
+        run: ruff check btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests --statistics
