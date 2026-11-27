@@ -1,4 +1,4 @@
-"""Independent, offline admission audit of immutable P0 receipts. Never opens market I/O."""
+"""Offline admission audit of immutable P0 receipts. No market I/O."""
 from __future__ import annotations
 
 import argparse

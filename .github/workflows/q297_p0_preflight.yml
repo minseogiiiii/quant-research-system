@@ -79,3 +79,5 @@ jobs:
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/q297-v34"
 # No 5-hour or live order execution step exists in this workflow.
+
+# Resolve preflight-only formatting errors; no runtime changes.

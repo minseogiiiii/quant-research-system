@@ -26,7 +26,8 @@ class PreflightEvidence(unittest.TestCase):
 
     def test_forged_c2_pass_without_actual_data_rejected(self):
         for field, value in (
-            ("synthetic", True), ("run_id", 123), ("five_hour_resilience_certified", True),
+            ("synthetic", True), ("run_id", 123),
+            ("five_hour_resilience_certified", True),
             ("observed_seconds", 100), ("source_sha", "a" * 40),
             ("trade_index_rows", 1),
         ):
