@@ -243,6 +243,7 @@ echo "3/18 Running tests..."
 
 echo "4/18 Running Ruff..."
 rm -rf build dist
+"$PYTHON" btc_eth_terminal/scripts/verify_fincept_vendor.py
 "$RUFF" check .
 
 echo "5/18 Running mypy..."
