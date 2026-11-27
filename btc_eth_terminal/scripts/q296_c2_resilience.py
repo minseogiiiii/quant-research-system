@@ -30,7 +30,7 @@ from q293_b5_resilience import (
     validate,
 )
 from q293_dual_1800s import capture_path, need, write_report
-from q293_epoch_audit import TradeIndex, scan
+from q293_epoch_audit import MAX_MESSAGES, MAX_TRADES, TradeIndex, scan
 from q293_long_policy import DISK_RESERVE, GIB, admission, process_sample
 from q293_source_ledger import SourceLedger
 from q293_source_ledger import audit as audit_source_ledger
@@ -107,7 +107,7 @@ def audit_archives(root, sources, synthetic, report):
 
 def run(root, output, duration, synthetic, *, inject=False):
     need((duration, synthetic, inject) in (
-        (90, True, False), (1800, False, True), (18000, False, False),
+        (90, True, False), (1800, False, True),
     ), "C2_MODE_DURATION")
     required = admission(180 if synthetic else duration, 1)
     report = {
@@ -244,9 +244,26 @@ def run(root, output, duration, synthetic, *, inject=False):
             failure = failure or fixed_reason(exc)
     report["failure"] = failure
     report["status"] = "PASS" if failure is None else "FAIL"
-    report["five_hour_resilience_certified"] = (
-        failure is None and duration == 18000 and not synthetic
-    )
+    report["five_hour_resilience_certified"] = False
+    if failure is None and not synthetic:
+        # An empirical capacity estimate with 2x headroom, not long-run proof.
+        scale = 2 * 18000 / duration
+        max_archive_messages = max(
+            v["audit"]["sealed_messages"] for v in report["archives"].values()
+        )
+        report["capacity_estimate"] = {
+            "time_scale_with_margin": scale,
+            "projected_max_archive_messages": int(max_archive_messages * scale),
+            "projected_trade_index_rows": int(report["trade_index_rows"] * scale),
+            "projected_audit_seconds": round(report["audit_seconds"] * scale, 3),
+            "required_disk_bytes_at_start": admission(18000, 1),
+            "within_configured_caps": (
+                max_archive_messages * scale <= MAX_MESSAGES
+                and report["trade_index_rows"] * scale <= MAX_TRADES
+                and report["audit_seconds"] * scale <= 2400
+            ),
+            "five_hour_approved": False,
+        }
     write_report(output, report)
     print("C2_" + report["status"], failure or "", flush=True)
     return failure is None

@@ -41,11 +41,24 @@ jobs:
             btc_eth_terminal/tests/test_p0_gateway_edges.py \
             btc_eth_terminal/tests/test_p0_dual_wire_faults.py \
             btc_eth_terminal/tests/test_q293_long_contracts.py \
-            btc_eth_terminal/tests/test_q293_b4_diagnostics.py
+            btc_eth_terminal/tests/test_q293_b4_diagnostics.py \
+            btc_eth_terminal/tests/test_q296_c2_policy.py
       - name: Actual synthetic B5 process loss, eight SSE clients and archive audit
         run: |
           mkdir -m 700 "$RUNNER_TEMP/b5-synthetic-output"
           python -u btc_eth_terminal/scripts/q293_b5_resilience.py --synthetic --workdir "$RUNNER_TEMP/b5-synthetic" --output "$RUNNER_TEMP/b5-synthetic-output/b5.json"
+      - name: Actual C2 synthetic pilot with independent epoch and ledger audit
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/c2-synthetic-output"
+          python -u btc_eth_terminal/scripts/q296_c2_resilience.py --synthetic --workdir "$RUNNER_TEMP/c2-synthetic" --output "$RUNNER_TEMP/c2-synthetic-output/c2.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p0-c2-synthetic-receipt
+          path: ${{ runner.temp }}/c2-synthetic-output/c2.json
+          if-no-files-found: warn
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/c2-synthetic"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -271,6 +284,39 @@ jobs:
       - name: Remove private captures
         if: always()
         run: rm -rf -- "$RUNNER_TEMP/p0-b5-private"
-# No five-hour job in this workflow. C1/C2 require a separately verified exact B5 and all preflights.
+
+  live-c2-pilot:
+    needs: live-b5
+    if: github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: btc_eth_terminal/backend:btc_eth_terminal/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Actual 30 minute C2 pilot with standby and active process loss
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/p0-c2-public"
+          python -u btc_eth_terminal/scripts/q296_c2_resilience.py --execute-real-public-c2-pilot --workdir "$RUNNER_TEMP/p0-c2-private" --output "$RUNNER_TEMP/p0-c2-public/c2.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p0-c2-pilot-receipt
+          path: ${{ runner.temp }}/p0-c2-public/c2.json
+          if-no-files-found: warn
+          retention-days: 7
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/p0-c2-private"
+# No five-hour job in this workflow. C1/C2 require separately verified exact B5,
+# C2 pilot capacity evidence and the frozen-v34 prerequisite.
+
 
 # Exact lint correction and requalification, no five-hour activation.
