@@ -98,7 +98,11 @@ def decode_observation(value, name, synthetic):
 class ObserverProcess:
     """Independent process with a permanent quarantine on IPC protocol failure."""
 
-    def __init__(self, name, work, duration, synthetic):
+    def __init__(self, name, work, duration, synthetic, *, fixture_fault=None):
+        if fixture_fault not in (None, "duplicate", "sequence", "heartbeat"):
+            raise ValueError("INVALID_FIXTURE_FAULT")
+        if fixture_fault is not None and not synthetic:
+            raise ValueError("FIXTURE_FAULT_REQUIRES_SYNTHETIC_MODE")
         self.name, self.work, self.synthetic = name, Path(work), synthetic
         self.failed = False
         self.last_reason = "OBSERVER_STARTING"
@@ -114,6 +118,8 @@ class ObserverProcess:
                 "--workdir", str(self.work), "--duration", str(duration),
                 "--synthetic" if synthetic else "--execute-public-pilot",
             ]
+            if fixture_fault is not None:
+                command.extend(("--fixture-fault", fixture_fault))
             self.process = subprocess.Popen(
                 command, pass_fds=(child.fileno(),), start_new_session=True,
                 stdin=subprocess.DEVNULL,
@@ -194,7 +200,8 @@ def worker(args):
         child = None
         try:
             child = Collector(args.name, args.workdir, args.duration,
-                              args.synthetic, parent_bound=True)
+                              args.synthetic, parent_bound=True,
+                              fixture_fault=args.fixture_fault)
             (args.workdir / "observer_ready").touch(mode=0o600, exist_ok=False)
             # Bounded even if the parent has a bug and never sends EOF.
             # Original collector starts duration after snapshots (45s setup)
@@ -224,6 +231,7 @@ def worker(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker", action="store_true")
+    parser.add_argument("--fixture-fault", choices=("duplicate", "sequence", "heartbeat"))
     parser.add_argument("--fd", type=int)
     parser.add_argument("--name", choices=("primary", "secondary"))
     parser.add_argument("--workdir", type=Path, required=True)
@@ -233,6 +241,8 @@ def main():
     modes.add_argument("--synthetic", action="store_true")
     modes.add_argument("--execute-public-pilot", action="store_true")
     args = parser.parse_args()
+    if args.fixture_fault is not None and not (args.worker and args.synthetic):
+        parser.error("fault injection requires a synthetic worker")
     if args.worker:
         if not 15 <= args.duration <= 18000:
             parser.error("worker duration outside bounded policy")

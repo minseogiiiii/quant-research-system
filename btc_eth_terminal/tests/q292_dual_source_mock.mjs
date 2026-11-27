@@ -1,6 +1,9 @@
 /* Synthetic only. Stable dual L2 books and ongoing valid heartbeats. */
 if(process.env.SOAK_TEST_FIXTURE!=='1')throw Error('SYNTHETIC_ONLY');
 const products=['BTC-USD','ETH-USD'];
+const fault=process.env.Q292_SYNTHETIC_FAULT??'';
+if(!['','duplicate','sequence','heartbeat'].includes(fault))throw Error('BAD_FIXTURE_FAULT');
+let sockets=0;
 const levels=n=>Array.from({length:10},(_,i)=>({
  side:'bid',price_level:String(n-i),new_quantity:String(i+1),event_time:'2026-01-01T00:00:00Z'
 })).concat(Array.from({length:10},(_,i)=>({
@@ -10,6 +13,7 @@ class Fixture {
  constructor(url){
   if(url!=='wss://advanced-trade-ws.coinbase.com')throw Error('BAD_ENDPOINT');
   this.events={};this.sent=0;this.seq=0;this.closed=false;this.timer=null;
+  this.index=sockets++;
   setImmediate(()=>this.fire('open',{}));
  }
  addEventListener(k,fn){(this.events[k]??=[]).push(fn);}
@@ -32,9 +36,18 @@ class Fixture {
    this.emit('subscriptions',[{subscriptions:{
     level2:products,market_trades:products,heartbeats:['heartbeats']
    }}]);
-   let hb=0;
+   let hb=0,ticks=0;
    const tick=()=>{
-    this.emit('heartbeats',[{heartbeat_counter:++hb}]);
+    ticks++;
+    const inject=this.index===0&&ticks===9;
+    if(inject&&fault==='duplicate'){
+      this.emit('l2_data',[{product_id:'ETH-USD',type:'snapshot',updates:levels(200)}]);
+      return;
+    }
+    if(inject&&fault==='sequence')this.seq++;
+    if(!(this.index===0&&fault==='heartbeat'&&ticks>=9)){
+      this.emit('heartbeats',[{heartbeat_counter:++hb}]);
+    }
     this.emit('l2_data',products.map((product_id,i)=>({
      product_id,type:'update',updates:[{
       side:'bid',price_level:String(100*(i+1)),new_quantity:'1',event_time:'2026-01-01T00:00:00Z'

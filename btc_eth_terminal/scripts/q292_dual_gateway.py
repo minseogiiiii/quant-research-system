@@ -234,7 +234,12 @@ class CheckedEngine(SourceEpochIsolatedEngine):
 class Collector:
     """A real original Node collector, with its own IPC and archive directory."""
 
-    def __init__(self, name, work, duration, synthetic, *, parent_bound=False):
+    def __init__(self, name, work, duration, synthetic, *, parent_bound=False,
+                 fixture_fault=None):
+        if fixture_fault not in (None, "duplicate", "sequence", "heartbeat"):
+            raise ValueError("INVALID_FIXTURE_FAULT")
+        if fixture_fault is not None and not synthetic:
+            raise ValueError("FIXTURE_FAULT_REQUIRES_SYNTHETIC_MODE")
         self.name = name
         self.work = work
         self.synthetic = synthetic
@@ -283,6 +288,8 @@ class Collector:
             args = [node]
             if synthetic:
                 env["V36_TAP_FIXTURE_MODE"] = "1"
+                if fixture_fault is not None:
+                    env["Q292_SYNTHETIC_FAULT"] = fixture_fault
                 args += ["--import", str(ROOT / "tests/q292_dual_source_mock.mjs")]
             for preload in ("q27_heartbeat_guard.mjs", "q24_ws_close_probe.mjs"):
                 args += ["--import", str(ROOT / "scripts" / preload)]
