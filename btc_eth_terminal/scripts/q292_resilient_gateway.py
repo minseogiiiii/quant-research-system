@@ -17,7 +17,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from q292_dual_gateway import PRODUCTS
-from q292_failover_policy import Arbiter
+from q292_failover_policy import Arbiter, Source
 from q292_isolated_observer import ObserverProcess
 from q292_stream_gateway import BoundedServer, Publisher, TransitionLedger
 from q293_long_policy import remaining
@@ -27,6 +27,12 @@ STARTUP_LIMIT = 12
 ABSENCE_LIMIT = 8
 MAX_RETIRED_SOURCE_EPOCHS = 128
 EXPLICIT_SOURCE_GAP = "COLLECTOR_REPORTED_WEBSOCKET_SOURCE_GAP"
+TERMINAL_REASONS = frozenset({
+    "LIVE_ADMISSION_REJECTED", "COLLECTOR_OBSERVATION_SOCKET_CLOSED",
+    "LOCAL_OBSERVER_BACKPRESSURE_EXCEEDED", "INVALID_OBSERVER_TRANSPORT_CONTROL",
+    "INDEPENDENT_SOURCE_WITNESS_FAILED", "OBSERVER_SOCKET_FAILURE",
+    "COLLECTOR_EXITED", "DUAL_IPC_FAILED",
+})
 
 
 def ladder(row):
@@ -136,9 +142,19 @@ class ManagedSource:
                 return None
         value = self.worker.observation()
         reason = getattr(self.worker, "last_reason", None)
+        if self.worker.failed or reason in TERMINAL_REASONS:
+            self.retire()
+            return None
         if reason == EXPLICIT_SOURCE_GAP:
             self.fence_session()
             value = None
+        if value is not None:
+            source = value[0]
+            if not isinstance(source, Source) or source.name != self.name:
+                self.retire()
+                return None
+            if not source.admissible(time.monotonic_ns(), 3_000_000_000):
+                value = None
         if value is not None:
             session = value[0].session
             if session != self.admitted_session:
@@ -154,15 +170,7 @@ class ManagedSource:
             return value
         # An observer that stopped its tap reader cannot become healthy on
         # the same IPC stream; retire immediately, not after absence timeout.
-        terminal = reason in {
-            "LIVE_ADMISSION_REJECTED", "COLLECTOR_OBSERVATION_SOCKET_CLOSED",
-            "LOCAL_OBSERVER_BACKPRESSURE_EXCEEDED",
-            "INVALID_OBSERVER_TRANSPORT_CONTROL",
-            "INDEPENDENT_SOURCE_WITNESS_FAILED", "OBSERVER_SOCKET_FAILURE",
-            "COLLECTOR_EXITED", "DUAL_IPC_FAILED",
-        }
-        if (self.worker.failed or terminal
-                or not self.seen_ready and now - self.started > STARTUP_LIMIT
+        if (not self.seen_ready and now - self.started > STARTUP_LIMIT
                 or self.last_good is not None
                 and now - self.last_good > ABSENCE_LIMIT):
             self.retire()
@@ -208,14 +216,18 @@ class ResilientRoute:
             ) in self.arbiter.retired:
                 self.sources[index].retire()
                 observations[index] = None
-        if self.source_ledger is not None:
-            self.source_ledger.observe(self.sources, observations)
+        # IPC is sequential; the first reply may expire while waiting for the second.
+        now_ns = time.monotonic_ns()
+        for index, value in enumerate(observations):
+            if value is not None and not value[0].admissible(
+                now_ns, self.arbiter.max_age_ns
+            ):
+                observations[index] = None
         checks = compare(*observations)
         divergent = "DIVERGENCE" in checks.values()
         before = self.arbiter.active
         candidates = [v[0] if v is not None else None for v in observations]
-        route = self.arbiter.update(
-            time.monotonic_ns(), *candidates, disagreement=divergent)
+        route = self.arbiter.update(now_ns, *candidates, disagreement=divergent)
         if divergent:
             for source in self.sources:
                 source.retire()
@@ -234,6 +246,17 @@ class ResilientRoute:
             else:
                 route = self.arbiter.update(
                     time.monotonic_ns(), disagreement=True)
+        # A newly observed standby is not hot until the arbiter has received
+        # distinct fresh confirmations. Never advertise unqualified coverage.
+        qualified = [
+            value if source.name in self.arbiter.qualified and source.alive()
+            else None
+            for source, value in zip(self.sources, observations, strict=True)
+        ]
+        if self.source_ledger is not None:
+            self.source_ledger.observe(self.sources, qualified)
+        if not divergent and any(value is None for value in qualified):
+            checks = dict.fromkeys(PRODUCTS, "SOURCE_UNAVAILABLE")
         return {
             **route, "gateway_run": self.run, "schema": "q292_resilient_route_v1",
             "mode": "SYNTHETIC_ONLY" if self.sources[0].synthetic

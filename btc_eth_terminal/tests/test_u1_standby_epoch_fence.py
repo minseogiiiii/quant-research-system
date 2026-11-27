@@ -78,6 +78,10 @@ class StandbyEpochFence(unittest.TestCase):
         self.assertIn(old, self.secondary.retired_sessions)
         worker.session = "c" * 32
         worker.last_reason = "READY"
+        for _ in range(2):
+            confirming = self.route.read()
+            self.assertEqual(set(confirming["checkpoint_comparison"].values()),
+                             {"SOURCE_UNAVAILABLE"})
         recovered = self.route.read()
         self.assertEqual(recovered["generation"], self.initial["generation"])
         self.assertEqual(set(recovered["checkpoint_comparison"].values()),

@@ -33,6 +33,7 @@ class Source:
             and type(self.observed_ns) is int
             and 0 <= now_ns - self.observed_ns <= max_age_ns
             and type(self.receiver_age_ms) is int
+            and self.receiver_age_ms >= 0
             and 0 <= self.receiver_age_ms * 1_000_000
             + now_ns - self.observed_ns <= max_age_ns
             and self.both_books_valid is True
@@ -58,6 +59,7 @@ class Arbiter:
         self.last_seen = {}
         self.candidates = {}
         self.retired = set()
+        self.qualified = frozenset()
 
     def update(self, now_ns, primary=None, secondary=None, *, disagreement=False):
         if type(now_ns) is not int or now_ns <= self.last_ns:
@@ -106,10 +108,13 @@ class Arbiter:
             self.active = None
             self.generation += 1
             revoked = True
+        self.qualified = frozenset(
+            name for name in valid
+            if self.candidates.get(name, (None, 0))[1] >= self.confirmations
+        )
         if self.active is None and not disagreement:
             for name in ("primary", "secondary"):
-                if (name in valid and self.candidates.get(name, (None, 0))[1]
-                        >= self.confirmations):
+                if name in self.qualified:
                     self.active = valid[name]
                     self.generation += 1
                     break
