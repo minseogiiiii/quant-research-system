@@ -106,7 +106,7 @@ def build(dataset, source, receipt, dest, policy=None, *, fixture=False):
             n = valid = 0
             with path.open("xb") as f:
 
-                def emit(row):
+                def emit(row, *, h=h):
                     nonlocal n, valid
                     raw = canonical(row) + b"\n"
                     n += 1

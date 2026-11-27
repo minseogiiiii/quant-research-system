@@ -71,7 +71,7 @@ def gate(archive, output):
             signals = []
             for prod in PRODUCTS:
 
-                def projector(packets, product):
+                def projector(packets, product, *, policy=policy, signals=signals):
                     return project(packets, product, policy, signal_sink=signals.append)
 
                 replay_dataset(dest, PIN, prod, projector=projector, receipt_pin=dp)
@@ -82,7 +82,7 @@ def gate(archive, output):
                 dest,
                 PIN,
                 "BTC-USD",
-                projector=lambda packets, product: simulate(
+                projector=lambda packets, product, direct_signals=direct_signals, policy=policy, cash=cash: simulate(
                     packets, direct_signals, policy, initial_cash=cash
                 ),
                 receipt_pin=dp,

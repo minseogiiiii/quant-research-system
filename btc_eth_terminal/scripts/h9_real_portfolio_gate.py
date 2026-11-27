@@ -53,13 +53,14 @@ def gate(archive, output):
         dest = Path(d) / "dataset"
         convert(root, PIN, dest)
         receipt_pin = hashlib.sha256((dest / "dataset.json").read_bytes()).hexdigest()
-        factory = lambda: read_independent(root, m)
+        def factory():
+            return read_independent(root, m)
         sig, reports = collect(factory)
         other = []
         for product in reports:
             signals = []
 
-            def projector(packets, product):
+            def projector(packets, product, *, signals=signals):
                 return project(packets, product, signal_sink=signals.append)
 
             r = replay_dataset(

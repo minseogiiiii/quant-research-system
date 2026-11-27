@@ -20,7 +20,7 @@ class Covariance(unittest.TestCase):
             ]
         ]
         e = estimate(rows)
-        x, y = map(list, zip(*rows))
+        x, y = map(list, zip(*rows, strict=True))
         xf = list(map(float, x))
         yf = list(map(float, y))
         self.assertAlmostEqual(float(e["covariance"]), covariance(xf, yf), places=14)

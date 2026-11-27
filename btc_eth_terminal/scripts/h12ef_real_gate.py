@@ -67,7 +67,7 @@ def gate(archive, output):
                 dest,
                 PIN,
                 "BTC-USD",
-                projector=lambda packets, product: project(packets, p),
+                projector=lambda packets, product, p=p: project(packets, p),
                 receipt_pin=dp,
             )
             require(

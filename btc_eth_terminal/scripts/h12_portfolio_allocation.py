@@ -92,11 +92,11 @@ def metrics(w, a, b, c):
     v = ca + cb
     need(v > 0 and abs(x + y - 1) < Decimal("1e-12") and min(x, y) >= 0, "WEIGHTS")
     return {
-        "weights": dict(zip(PRODUCTS, map(float, w))),
+        "weights": dict(zip(PRODUCTS, map(float, w), strict=True)),
         "variance_per_grid": float(v),
         "volatility_per_grid": float(v.sqrt()),
-        "variance_contribution": dict(zip(PRODUCTS, map(float, (ca, cb)))),
-        "risk_contribution_fraction": dict(zip(PRODUCTS, map(float, (ca / v, cb / v)))),
+        "variance_contribution": dict(zip(PRODUCTS, map(float, (ca, cb)), strict=True)),
+        "risk_contribution_fraction": dict(zip(PRODUCTS, map(float, (ca / v, cb / v)), strict=True)),
     }
 
 
@@ -149,7 +149,7 @@ def allocate(e):
             "equal_weight": eq,
             "minimum_variance_kkt_and_grid": True,
             "fincept_erc_witness": True,
-            "fincept_weights": dict(zip(PRODUCTS, map(float, actual))),
+            "fincept_weights": dict(zip(PRODUCTS, map(float, actual), strict=True)),
             "vendor_commit": PIN,
             "vendor_blob": BLOB,
             "annualized": False,

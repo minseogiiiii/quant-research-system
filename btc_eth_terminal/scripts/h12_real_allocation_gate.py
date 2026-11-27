@@ -59,7 +59,8 @@ def gate(archive, output):
         cache = Path(d) / "cache"
         _, cp = build(dest, PIN, dp, cache)
         sig, _, _ = load(cache, cp, PIN, dp)
-        factory = lambda: read_independent(root, m)
+        def factory():
+            return read_independent(root, m)
         native, _ = collect(factory)
         require(sig == native, "H12_SIGNAL_PARITY")
         results = {}
@@ -79,7 +80,7 @@ def gate(archive, output):
                 dest,
                 PIN,
                 "BTC-USD",
-                projector=lambda packets, product: simulate(
+                projector=lambda packets, product, budget=budget: simulate(
                     packets,
                     sig,
                     risk_policy=RISK,

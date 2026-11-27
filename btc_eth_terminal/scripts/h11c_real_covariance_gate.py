@@ -67,12 +67,12 @@ def witness(packets, window):
                 ]
                 if prev is not None:
                     returns.append(
-                        tuple(float((v - old) / old) for v, old in zip(mid, prev))
+                        tuple(float((v - old) / old) for v, old in zip(mid, prev, strict=True))
                     )
                     returns = returns[-window:]
                 prev = mid
                 if len(returns) == window:
-                    a, b = map(list, zip(*returns))
+                    a, b = map(list, zip(*returns, strict=True))
                     sa, sb = stdev(a), stdev(b)
                     latest = (
                         covariance(a, b),
@@ -134,7 +134,8 @@ def gate(archive, output):
         cache = Path(d) / "cache"
         _, cp = build(dest, PIN, dp, cache)
         sig, _, _ = load(cache, cp, PIN, dp)
-        factory = lambda: read_independent(root, m)
+        def factory():
+            return read_independent(root, m)
         native, _ = collect(factory)
         require(sig == native, "H11C_SIGNAL_PARITY")
         results = {}
@@ -148,7 +149,7 @@ def gate(archive, output):
                 dest,
                 PIN,
                 "BTC-USD",
-                projector=lambda packets, product: simulate(
+                projector=lambda packets, product, p=p: simulate(
                     packets, sig, risk_policy=RISK, sizing_policy=p
                 ),
                 receipt_pin=dp,
@@ -189,7 +190,7 @@ def gate(archive, output):
                         or x is not None
                         and y is not None
                         and math.isclose(x, y, rel_tol=1e-9, abs_tol=1e-12)
-                        for x, y in zip(actual, latest)
+                        for x, y in zip(actual, latest, strict=True)
                     ),
                     "H11C_NUMERIC_PARITY",
                 )

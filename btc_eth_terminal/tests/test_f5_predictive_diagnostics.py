@@ -61,6 +61,18 @@ def fixture(n=30):
 
 
 class Diagnostics(unittest.TestCase):
+    def test_correlation_length_mismatch_is_rejected(self):
+        from f5_predictive_diagnostics import corr
+
+        with self.assertRaisesRegex(ValueError, "CORRELATION_LENGTH_MISMATCH"):
+            corr(list(range(30)), list(range(29)))
+
+    def test_correlation_short_mismatch_is_rejected(self):
+        from f5_predictive_diagnostics import corr
+
+        with self.assertRaisesRegex(ValueError, "CORRELATION_LENGTH_MISMATCH"):
+            corr([1], [])
+
     def test_perfect_and_constant(self):
         r = summarize(fixture())["results"][0]
         self.assertEqual(r["disjoint_pairs"], 30)
