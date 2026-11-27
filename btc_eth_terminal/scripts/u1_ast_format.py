@@ -1,4 +1,5 @@
 """First-pass mechanical remediation; never edit pinned or vendor files."""
+
 from __future__ import annotations
 
 import ast
@@ -51,7 +52,12 @@ def main():
     output = Path(sys.argv[1])
     before = lint(*SCOPES)
     files = sorted({Path(row["filename"]).relative_to(Path.cwd()) for row in before})
-    result = {"before": dict(counts(before)), "changed": [], "pinned": [], "rejected": []}
+    result = {
+        "before": dict(counts(before)),
+        "changed": [],
+        "pinned": [],
+        "rejected": [],
+    }
     for path in files:
         if path.suffix != ".py" or not any(path.is_relative_to(s) for s in SCOPES):
             raise RuntimeError("Unexpected lint path")
@@ -83,8 +89,12 @@ def main():
     result["before_total"] = len(before)
     result["after_total"] = len(after)
     result["remaining"] = [
-        {"file": str(Path(r["filename"]).relative_to(Path.cwd())),
-         "code": r["code"], "line": r["location"]["row"], "message": r["message"]}
+        {
+            "file": str(Path(r["filename"]).relative_to(Path.cwd())),
+            "code": r["code"],
+            "line": r["location"]["row"],
+            "message": r["message"],
+        }
         for r in after
     ]
     if counts(after) - counts(before):

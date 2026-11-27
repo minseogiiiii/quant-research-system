@@ -3,6 +3,7 @@
 One admitted connection per invocation; no forward-fill, no exchange clock or
 execution claim. Last L2 observation per occupied bucket, not bucket-end state.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,7 +25,9 @@ PRODUCTS = ("BTC-USD", "ETH-USD")
 
 
 def units(value):
-    if not isinstance(value, str) or not re.fullmatch(r"[0-9]{1,18}(?:\.[0-9]{1,18})?", value):
+    if not isinstance(value, str) or not re.fullmatch(
+        r"[0-9]{1,18}(?:\.[0-9]{1,18})?", value
+    ):
         raise ValueError("F4_DECIMAL_DOMAIN")
     whole, _, frac = value.partition(".")
     return int(whole) * SCALE + int(frac.ljust(18, "0") or "0")
@@ -36,16 +39,28 @@ def decimal(value):
 
 
 def project(events, *, product, epoch, start_ms, end_ms, bucket_ms, low, high, width):
-    if product not in PRODUCTS or not isinstance(epoch, str) or not re.fullmatch(r"[0-9a-f]{64}:0", epoch):
+    if (
+        product not in PRODUCTS
+        or not isinstance(epoch, str)
+        or not re.fullmatch(r"[0-9a-f]{64}:0", epoch)
+    ):
         raise ValueError("F4_EPOCH")
     if not all(type(x) is int for x in (start_ms, end_ms, bucket_ms)) or not (
-        0 < start_ms < end_ms < 2**53 and 100 <= bucket_ms <= 60_000
-        and start_ms % bucket_ms == 0 and end_ms % bucket_ms == 0
-        and (end_ms-start_ms)//bucket_ms <= MAX_BUCKETS
+        0 < start_ms < end_ms < 2**53
+        and 100 <= bucket_ms <= 60_000
+        and start_ms % bucket_ms == 0
+        and end_ms % bucket_ms == 0
+        and (end_ms - start_ms) // bucket_ms <= MAX_BUCKETS
     ):
         raise ValueError("F4_TIME_BOUNDS")
     lo, hi, step = map(units, (low, high, width))
-    if not 0 < lo < hi or not step or lo % step or hi % step or (hi-lo)//step > MAX_PRICE_BINS:
+    if (
+        not 0 < lo < hi
+        or not step
+        or lo % step
+        or hi % step
+        or (hi - lo) // step > MAX_PRICE_BINS
+    ):
         raise ValueError("F4_PRICE_GRID")
     book = {"bid": {}, "offer": {}}
     initialized = False
@@ -63,25 +78,52 @@ def project(events, *, product, epoch, start_ms, end_ms, bucket_ms, low, high, w
         work += sum(len(side) for side in book.values())
         if work > MAX_WORK:
             raise ValueError("F4_AGGREGATION_BUDGET")
-        if not book["bid"] or not book["offer"] or max(book["bid"]) >= min(book["offer"]):
+        if (
+            not book["bid"]
+            or not book["offer"]
+            or max(book["bid"]) >= min(book["offer"])
+        ):
             raise ValueError("F4_INVALID_BOOK")
         cells = {}
         for side, levels in book.items():
             for p, q in levels.items():
                 if lo <= p < hi:
-                    k = (side, (p-lo)//step)
+                    k = (side, (p - lo) // step)
                     cells[k] = cells.get(k, 0) + q
-        rows.append({"bucket_start_ms": current_bucket, "observed_receiver_ms": t,
-                     "source_sequence": seq, "best_bid": decimal(max(book["bid"])),
-                     "best_ask": decimal(min(book["offer"])),
-                     "cells": [{"side": s, "price_low": decimal(lo+i*step), "quantity": decimal(q)}
-                               for (s, i), q in sorted(cells.items())]})
+        rows.append(
+            {
+                "bucket_start_ms": current_bucket,
+                "observed_receiver_ms": t,
+                "source_sequence": seq,
+                "best_bid": decimal(max(book["bid"])),
+                "best_ask": decimal(min(book["offer"])),
+                "cells": [
+                    {
+                        "side": s,
+                        "price_low": decimal(lo + i * step),
+                        "quantity": decimal(q),
+                    }
+                    for (s, i), q in sorted(cells.items())
+                ],
+            }
+        )
 
     for t, seq, p, kind, updates in events:
         if p != product:
             continue
-        if type(t) is not int or type(seq) is not int or t <= 0 or seq < 0 or (
-            prior_ms is not None and (t < prior_ms or seq < prior_seq or (seq == prior_seq and t != prior_ms))
+        if (
+            type(t) is not int
+            or type(seq) is not int
+            or t <= 0
+            or seq < 0
+            or (
+                prior_ms is not None
+                and (
+                    t < prior_ms
+                    or seq < prior_seq
+                    or (seq == prior_seq and t != prior_ms)
+                )
+            )
         ):
             raise ValueError("F4_ORDER")
         prior_ms, prior_seq = t, seq
@@ -114,14 +156,26 @@ def project(events, *, product, epoch, start_ms, end_ms, bucket_ms, low, high, w
             last = (t, seq)
     emit()
     observed = {r["bucket_start_ms"] for r in rows}
-    return {"schema": "f4_observed_depth_buckets_v1", "mode": "ARCHIVE_REPLAY",
-            "product": product, "epoch": epoch, "time_bucket_ms": bucket_ms,
-            "price_low": decimal(lo), "price_high_exclusive": decimal(hi),
-            "price_width": decimal(step), "definition": "LAST_L2_OBSERVATION_PER_OCCUPIED_RECEIVER_BUCKET",
-            "coverage": "ALL_OBSERVED_L2_LEVELS_INSIDE_REQUESTED_PRICE_WINDOW",
-            "missing_buckets_ms": [t for t in range(start_ms, end_ms, bucket_ms) if t not in observed],
-            "rows": rows, "live_feed": False, "execution_authorized": False,
-            "zero_gap_certified": False, "oos_approved": False}
+    return {
+        "schema": "f4_observed_depth_buckets_v1",
+        "mode": "ARCHIVE_REPLAY",
+        "product": product,
+        "epoch": epoch,
+        "time_bucket_ms": bucket_ms,
+        "price_low": decimal(lo),
+        "price_high_exclusive": decimal(hi),
+        "price_width": decimal(step),
+        "definition": "LAST_L2_OBSERVATION_PER_OCCUPIED_RECEIVER_BUCKET",
+        "coverage": "ALL_OBSERVED_L2_LEVELS_INSIDE_REQUESTED_PRICE_WINDOW",
+        "missing_buckets_ms": [
+            t for t in range(start_ms, end_ms, bucket_ms) if t not in observed
+        ],
+        "rows": rows,
+        "live_feed": False,
+        "execution_authorized": False,
+        "zero_gap_certified": False,
+        "oos_approved": False,
+    }
 
 
 def build(root, pin, **kwargs):
@@ -136,7 +190,7 @@ def build(root, pin, **kwargs):
     if witness["connections"] != 1 or witness["messages"] != cert["messages"]:
         raise ValueError("F4_INDEPENDENT_REPLAY_MISMATCH")
     manifest = json.loads(manifest_bytes)
-    result = project(read_l2(root, manifest["chunks"]), epoch=pin+":0", **kwargs)
+    result = project(read_l2(root, manifest["chunks"]), epoch=pin + ":0", **kwargs)
     if (root / "manifest.json").read_bytes() != manifest_bytes:
         raise ValueError("F4_MANIFEST_CHANGED")
     result["source_manifest_sha256"] = pin
@@ -151,12 +205,14 @@ def main():
     p.add_argument("--manifest-sha256", required=True)
     p.add_argument("--product", choices=PRODUCTS, required=True)
     for name in ("start-ms", "end-ms", "bucket-ms"):
-        p.add_argument("--"+name, type=int, required=True)
+        p.add_argument("--" + name, type=int, required=True)
     for name in ("low", "high", "width"):
-        p.add_argument("--"+name, required=True)
+        p.add_argument("--" + name, required=True)
     p.add_argument("--output", type=Path, required=True)
     args = vars(p.parse_args())
-    archive, pin, output = (args.pop(k) for k in ("archive", "manifest_sha256", "output"))
+    archive, pin, output = (
+        args.pop(k) for k in ("archive", "manifest_sha256", "output")
+    )
     result = build(archive, pin, **args)
     with output.open("x") as stream:
         json.dump(result, stream, sort_keys=True, separators=(",", ":"))

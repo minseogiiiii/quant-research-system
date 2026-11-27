@@ -4,6 +4,7 @@ Clean dual-source admission requires separate sealed archives, independent
 replays, complete close diagnostics and observed HTTP/SSE freshness. No
 claim of fault resilience or continuous exchange-signed history.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -73,66 +74,90 @@ def check_archive(attempt):
     raw = manifest_path.read_bytes()
     manifest = json.loads(raw)
     pin = hashlib.sha256(raw).hexdigest()
-    need(manifest["required_duration_seconds"] == DURATION
-         and manifest.get("synthetic_fixture") is False
-         and manifest.get("orders_enabled") is False
-         and manifest.get("finish_reason") == "DURATION_REACHED"
-         and manifest.get("total_reconnects") == 0
-         and manifest.get("faults") == [], "PILOT_ARCHIVE_NOT_CLEAN")
+    need(
+        manifest["required_duration_seconds"] == DURATION
+        and manifest.get("synthetic_fixture") is False
+        and manifest.get("orders_enabled") is False
+        and manifest.get("finish_reason") == "DURATION_REACHED"
+        and manifest.get("total_reconnects") == 0
+        and manifest.get("faults") == [],
+        "PILOT_ARCHIVE_NOT_CLEAN",
+    )
     gate = archive_audit(source, pin)
-    need(gate["eligible_for_archived_replay"] is True
-         and gate["source_connections"] == 1
-         and gate["monotonic_source_span_seconds"] >= DURATION - 5,
-         "PILOT_DURABLE_ARCHIVE_REJECTED")
+    need(
+        gate["eligible_for_archived_replay"] is True
+        and gate["source_connections"] == 1
+        and gate["monotonic_source_span_seconds"] >= DURATION - 5,
+        "PILOT_DURABLE_ARCHIVE_REJECTED",
+    )
     started = time.monotonic()
     main = _worker_run(source, pin, "primary")["data"]
     independent = _worker_run(source, pin, "independent")["data"]
     replay_seconds = time.monotonic() - started
     _book_agreement(main, independent)
     for result in (main, independent):
-        need(result["messages"] == gate["sealed_messages_verified"]
-             and result["chunks"] == gate["sealed_chunks_verified"]
-             and result["connections"] == 1, "PILOT_REPLAY_COUNT_MISMATCH")
+        need(
+            result["messages"] == gate["sealed_messages_verified"]
+            and result["chunks"] == gate["sealed_chunks_verified"]
+            and result["connections"] == 1,
+            "PILOT_REPLAY_COUNT_MISMATCH",
+        )
     ws = ws_receipt(attempt / "ws.jsonl")
     hb = hb_receipt(attempt / "hb.jsonl")
-    close = incident_receipt(attempt / "ws.jsonl", attempt / "hb.jsonl",
-                             collector_failed=False)
-    need(ws["trace_schema_verified"] is True and ws["probe_exited"] is True
-         and ws["observed_connections"] == 1
-         and ws["websocket_error_events"] == 0
-         and hb["trace_schema_verified"] is True
-         and hb["synthetic_fixture"] is False
-         and hb["collector_stop_observed"] is True
-         and hb["opened_sockets_constructed"] == 1
-         and hb["interventions_total"] == 0
-         and hb["heartbeat_timeout_events"] == 0
-         and ws["last_reported_message_count"] == independent["messages"]
-         and ws["last_reported_heartbeat_count"] == hb["last_heartbeat_count"]
-         and close["observed_termination_class"] ==
-         "LOCAL_NON_GUARD_CLOSE_OBSERVED", "PILOT_FORENSICS_REJECTED")
-    return {"messages": independent["messages"],
-            "chunks": independent["chunks"], "bytes": gate["sealed_bytes_verified"],
-            "source_span_seconds": gate["monotonic_source_span_seconds"],
-            "manifest_sha256": pin, "independent_replay_agrees": True,
-            "two_replays_seconds": round(replay_seconds, 3),
-            "independent_books_sha256": {
-                p: independent["products"][p]["sha256"] for p in PRODUCTS},
-            "close_trace_verified": True}
+    close = incident_receipt(
+        attempt / "ws.jsonl", attempt / "hb.jsonl", collector_failed=False
+    )
+    need(
+        ws["trace_schema_verified"] is True
+        and ws["probe_exited"] is True
+        and ws["observed_connections"] == 1
+        and ws["websocket_error_events"] == 0
+        and hb["trace_schema_verified"] is True
+        and hb["synthetic_fixture"] is False
+        and hb["collector_stop_observed"] is True
+        and hb["opened_sockets_constructed"] == 1
+        and hb["interventions_total"] == 0
+        and hb["heartbeat_timeout_events"] == 0
+        and ws["last_reported_message_count"] == independent["messages"]
+        and ws["last_reported_heartbeat_count"] == hb["last_heartbeat_count"]
+        and close["observed_termination_class"] == "LOCAL_NON_GUARD_CLOSE_OBSERVED",
+        "PILOT_FORENSICS_REJECTED",
+    )
+    return {
+        "messages": independent["messages"],
+        "chunks": independent["chunks"],
+        "bytes": gate["sealed_bytes_verified"],
+        "source_span_seconds": gate["monotonic_source_span_seconds"],
+        "manifest_sha256": pin,
+        "independent_replay_agrees": True,
+        "two_replays_seconds": round(replay_seconds, 3),
+        "independent_books_sha256": {
+            p: independent["products"][p]["sha256"] for p in PRODUCTS
+        },
+        "close_trace_verified": True,
+    }
 
 
 def validate_snapshot(body):
-    need(body["mode"] == "LIVE_READ_ONLY_CANDIDATE"
-         and body["execution_authorized"] is False
-         and body["real_orders_enabled"] is False
-         and body["zero_gap_certified"] is False
-         and body["exchange_attested"] is False
-         and set(body["states"]) == set(PRODUCTS), "PILOT_PUBLIC_SCHEMA")
+    need(
+        body["mode"] == "LIVE_READ_ONLY_CANDIDATE"
+        and body["execution_authorized"] is False
+        and body["real_orders_enabled"] is False
+        and body["zero_gap_certified"] is False
+        and body["exchange_attested"] is False
+        and set(body["states"]) == set(PRODUCTS),
+        "PILOT_PUBLIC_SCHEMA",
+    )
     for p, row in body["states"].items():
-        need(row["product"] == p and row["session_id"] == body["source_session"]
-             and row["mode"] == "LIVE_SOURCE"
-             and row["live_feed"] is True and row["trading_enabled"] is False
-             and row["execution_authorized"] is False,
-             "PILOT_PUBLIC_EPOCH")
+        need(
+            row["product"] == p
+            and row["session_id"] == body["source_session"]
+            and row["mode"] == "LIVE_SOURCE"
+            and row["live_feed"] is True
+            and row["trading_enabled"] is False
+            and row["execution_authorized"] is False,
+            "PILOT_PUBLIC_EPOCH",
+        )
 
 
 def run(root, output):
@@ -140,11 +165,18 @@ def run(root, output):
     root.mkdir(mode=0o700)
     sources = []
     ledger = source_ledger = publisher = server = thread = None
-    report = {"schema": "q293_c1_dual_18000s_baseline_v1", "status": "FAIL",
-              "duration_seconds": DURATION, "source_sha": os.environ["GITHUB_SHA"],
-              "run_id": int(os.environ["GITHUB_RUN_ID"]),
-              "real_orders_enabled": False, "five_hour_certified": False, "zero_gap_certified": False,
-              "resilience_5h_certified": False, "exchange_attested": False}
+    report = {
+        "schema": "q293_c1_dual_18000s_baseline_v1",
+        "status": "FAIL",
+        "duration_seconds": DURATION,
+        "source_sha": os.environ["GITHUB_SHA"],
+        "run_id": int(os.environ["GITHUB_RUN_ID"]),
+        "real_orders_enabled": False,
+        "five_hour_certified": False,
+        "zero_gap_certified": False,
+        "resilience_5h_certified": False,
+        "exchange_attested": False,
+    }
     samples = good = unavailable = 0
     both_ready_samples = http_sse_checks = 0
     peak_rss, min_free = 0, shutil.disk_usage(root).free
@@ -155,15 +187,27 @@ def run(root, output):
     max_poll_gap = 0.0
     first_good = last_good = None
     raw_cap, archive_cap = budgets(DURATION)
-    comparison = {"MATCH": 0, "NOT_COMPARABLE": 0,
-                  "SOURCE_UNAVAILABLE": 0, "DIVERGENCE": 0}
+    comparison = {
+        "MATCH": 0,
+        "NOT_COMPARABLE": 0,
+        "SOURCE_UNAVAILABLE": 0,
+        "DIVERGENCE": 0,
+    }
     failure = None
     first_failure_sample = None
     try:
         deadline = time.monotonic() + DURATION + 65
         for name in ("primary", "secondary"):
-            sources.append(ManagedSource(name, root / name, DURATION, False,
-                                         deadline=deadline, max_restarts=0))
+            sources.append(
+                ManagedSource(
+                    name,
+                    root / name,
+                    DURATION,
+                    False,
+                    deadline=deadline,
+                    max_restarts=0,
+                )
+            )
         source_ledger = SourceLedger(root / "sources.jsonl")
         route = ResilientRoute(*sources, source_ledger=source_ledger)
         ledger = TransitionLedger(root / "transitions.jsonl")
@@ -187,18 +231,23 @@ def run(root, output):
             if last_sample is not None:
                 max_poll_gap = max(max_poll_gap, elapsed - last_sample)
             last_sample = elapsed
-            need(min_free >= DISK_RESERVE and peak_rss <= RSS_LIMIT,
-                 "PILOT_RESOURCE_LIMIT")
-            need(not publisher.failure and publisher.thread.is_alive(),
-                 "PILOT_PUBLISHER_FAILURE")
+            need(
+                min_free >= DISK_RESERVE and peak_rss <= RSS_LIMIT,
+                "PILOT_RESOURCE_LIMIT",
+            )
+            need(
+                not publisher.failure and publisher.thread.is_alive(),
+                "PILOT_PUBLISHER_FAILURE",
+            )
             if body["states"] is not None:
                 validate_snapshot(body)
                 good += 1
                 first_good = elapsed if first_good is None else first_good
                 last_good = elapsed
                 if 20 <= elapsed <= DURATION - 8:
-                    need(resources["process_count"] >= 5,
-                         "PILOT_PROCESS_TREE_INCOMPLETE")
+                    need(
+                        resources["process_count"] >= 5, "PILOT_PROCESS_TREE_INCOMPLETE"
+                    )
                     if "SOURCE_UNAVAILABLE" in body["checkpoint_comparison"].values():
                         first_failure_sample = {
                             "elapsed_seconds": round(elapsed, 3),
@@ -210,12 +259,16 @@ def run(root, output):
                     both_ready_samples += 1
                 if baseline is None:
                     baseline = (body["generation"], body["source_session"])
-                need((body["generation"], body["source_session"]) == baseline,
-                     "PILOT_BASELINE_GENERATION_CHANGED")
+                need(
+                    (body["generation"], body["source_session"]) == baseline,
+                    "PILOT_BASELINE_GENERATION_CHANGED",
+                )
                 for value in body["checkpoint_comparison"].values():
                     comparison[value] += 1
-                need("DIVERGENCE" not in body["checkpoint_comparison"].values(),
-                     "PILOT_CROSS_SOURCE_DIVERGENCE")
+                need(
+                    "DIVERGENCE" not in body["checkpoint_comparison"].values(),
+                    "PILOT_CROSS_SOURCE_DIVERGENCE",
+                )
             elif 20 <= elapsed <= DURATION - 8:
                 unavailable += 1
             # Verify the actual public HTTP and SSE paths while both run.
@@ -223,32 +276,51 @@ def run(root, output):
                 with urlopen(url + "/snapshot", timeout=3) as response:
                     validate_snapshot(json.load(response))
                 with urlopen(url + "/events", timeout=3) as response:
-                    need(response.readline().startswith(b"id:")
-                         and response.readline() == b"event: snapshot\n",
-                         "PILOT_SSE_SNAPSHOT_MISSING")
+                    need(
+                        response.readline().startswith(b"id:")
+                        and response.readline() == b"event: snapshot\n",
+                        "PILOT_SSE_SNAPSHOT_MISSING",
+                    )
                     validate_snapshot(json.loads(response.readline()[6:]))
                 http_sse_checks += 1
-            need(all(source.attempts <= 1 for source in sources),
-                 "PILOT_BASELINE_RESTARTED")
+            need(
+                all(source.attempts <= 1 for source in sources),
+                "PILOT_BASELINE_RESTARTED",
+            )
             if elapsed >= DURATION - 5 and all(
                 completed(source.root / "attempt_01") for source in sources
             ):
                 break
             if samples % 240 == 0:
-                print(f"C1_PROGRESS seconds={elapsed:.1f} samples={samples} "
-                      f"rss={peak_rss} free={min_free}", flush=True)
-            time.sleep(.25)
-        need(time.monotonic() - start >= DURATION - 5
-             and all(completed(source.root / "attempt_01") for source in sources),
-             "PILOT_FULL_CAPTURE_NOT_COMPLETED")
-        need(good >= 30000 and unavailable == 0 and both_ready_samples >= 30000
-             and http_sse_checks >= 1000 and max_poll_gap <= 5
-             and first_good is not None and last_good - first_good >= DURATION - 30
-             and peak_processes >= 5, "PILOT_PUBLIC_AVAILABILITY")
+                print(
+                    f"C1_PROGRESS seconds={elapsed:.1f} samples={samples} "
+                    f"rss={peak_rss} free={min_free}",
+                    flush=True,
+                )
+            time.sleep(0.25)
+        need(
+            time.monotonic() - start >= DURATION - 5
+            and all(completed(source.root / "attempt_01") for source in sources),
+            "PILOT_FULL_CAPTURE_NOT_COMPLETED",
+        )
+        need(
+            good >= 30000
+            and unavailable == 0
+            and both_ready_samples >= 30000
+            and http_sse_checks >= 1000
+            and max_poll_gap <= 5
+            and first_good is not None
+            and last_good - first_good >= DURATION - 30
+            and peak_processes >= 5,
+            "PILOT_PUBLIC_AVAILABILITY",
+        )
     except Exception as exc:
         # Fixed diagnostic labels only; never serialize private prices/paths.
-        failure = str(exc) if isinstance(exc, ValueError) and str(exc).startswith(
-            "PILOT_") else type(exc).__name__
+        failure = (
+            str(exc)
+            if isinstance(exc, ValueError) and str(exc).startswith("PILOT_")
+            else type(exc).__name__
+        )
     finally:
         if server is not None:
             server.shutdown()
@@ -263,22 +335,28 @@ def run(root, output):
             ledger.close()
         if source_ledger is not None:
             source_ledger.close()
-    report.update({"poll_samples": samples, "healthy_samples": good,
-                   "unavailable_middle_samples": unavailable,
-                   "peak_process_tree_rss_bytes": peak_rss,
-                   "min_free_disk_bytes": min_free,
-                   "checkpoint_comparison_counts": comparison,
-                   "both_ready_samples": both_ready_samples,
-                   "http_sse_checks": http_sse_checks,
-                   "peak_process_count": peak_processes,
-                   "max_poll_gap_seconds": round(max_poll_gap, 3),
-                   "healthy_span_seconds": round(last_good - first_good, 3)
-                   if first_good is not None else 0,
-                   "cpu_seconds_live_tree_max_sample": round(cpu_seconds, 3),
-                   "disk_consumed_peak_bytes": initial_free - min_free,
-                   "per_source_raw_cap_bytes": raw_cap,
-                   "per_source_archive_cap_bytes": archive_cap,
-                   "disk_preflight_required_bytes": MIN_FREE})
+    report.update(
+        {
+            "poll_samples": samples,
+            "healthy_samples": good,
+            "unavailable_middle_samples": unavailable,
+            "peak_process_tree_rss_bytes": peak_rss,
+            "min_free_disk_bytes": min_free,
+            "checkpoint_comparison_counts": comparison,
+            "both_ready_samples": both_ready_samples,
+            "http_sse_checks": http_sse_checks,
+            "peak_process_count": peak_processes,
+            "max_poll_gap_seconds": round(max_poll_gap, 3),
+            "healthy_span_seconds": round(last_good - first_good, 3)
+            if first_good is not None
+            else 0,
+            "cpu_seconds_live_tree_max_sample": round(cpu_seconds, 3),
+            "disk_consumed_peak_bytes": initial_free - min_free,
+            "per_source_raw_cap_bytes": raw_cap,
+            "per_source_archive_cap_bytes": archive_cap,
+            "disk_preflight_required_bytes": MIN_FREE,
+        }
+    )
     try:
         if ledger is not None:
             report["ledger"] = audit_ledger(root / "transitions.jsonl")
@@ -287,19 +365,27 @@ def run(root, output):
         if failure is None:
             report["archives"] = {
                 source.name: check_archive(source.root / "attempt_01")
-                for source in sources}
-            need(len(report["archives"]) == 2
-                 and report["ledger"]["torn_tail"] is False,
-                 "PILOT_INCOMPLETE_EVIDENCE")
-            need(report["source_ledger"]["torn_tail"] is False
-                 and report["source_ledger"]["attempts"] ==
-                 {"primary": 1, "secondary": 1}, "PILOT_SOURCE_LEDGER")
+                for source in sources
+            }
+            need(
+                len(report["archives"]) == 2 and report["ledger"]["torn_tail"] is False,
+                "PILOT_INCOMPLETE_EVIDENCE",
+            )
+            need(
+                report["source_ledger"]["torn_tail"] is False
+                and report["source_ledger"]["attempts"]
+                == {"primary": 1, "secondary": 1},
+                "PILOT_SOURCE_LEDGER",
+            )
             for counts in report["source_ledger"]["states"].values():
                 need(counts.get("READY") == 1, "PILOT_SOURCE_EPOCH_CHANGED")
             report["status"] = "ARCHIVES_PASS"
     except Exception as exc:
-        failure = str(exc) if isinstance(exc, ValueError) and str(exc).startswith(
-            "PILOT_") else type(exc).__name__
+        failure = (
+            str(exc)
+            if isinstance(exc, ValueError) and str(exc).startswith("PILOT_")
+            else type(exc).__name__
+        )
     # Even on failed capture, preserve bounded sealed-prefix evidence.
     report["epoch_audits"] = {}
     try:
@@ -317,8 +403,10 @@ def run(root, output):
                         value = scan(archive, pin.hexdigest(), source.name, index)
                         report["epoch_audits"][key] = value
                     except Exception as exc:
-                        report["epoch_audits"][key] = {"status": "REJECTED",
-                                                       "reason": type(exc).__name__}
+                        report["epoch_audits"][key] = {
+                            "status": "REJECTED",
+                            "reason": type(exc).__name__,
+                        }
             report["trade_id_crosscheck"] = index.compare()
         finally:
             index.close()
@@ -326,27 +414,33 @@ def run(root, output):
             need(len(report["epoch_audits"]) == 2, "PILOT_EPOCH_COUNT")
             for key, value in report["epoch_audits"].items():
                 name = key.split(":")[0]
-                need(value.get("schema") == "q293_sealed_epoch_forensics_v1"
-                     and value["unsealed_entries_excluded"] == 0
-                     and value["manifest_tmp_excluded"] is False
-                     and value["sealed_messages"] ==
-                     report["archives"][name]["messages"]
-                     and value["manifest_sha256"] ==
-                     report["archives"][name]["manifest_sha256"]
-                     and len(value["epochs"]) == 1
-                     and value["epochs"][0]["both_books_initialized_and_updated"]
-                     and value["epochs"][0]["book_sha256"] ==
-                     report["archives"][name]["independent_books_sha256"],
-                     "PILOT_EPOCH_AUDIT")
+                need(
+                    value.get("schema") == "q293_sealed_epoch_forensics_v1"
+                    and value["unsealed_entries_excluded"] == 0
+                    and value["manifest_tmp_excluded"] is False
+                    and value["sealed_messages"] == report["archives"][name]["messages"]
+                    and value["manifest_sha256"]
+                    == report["archives"][name]["manifest_sha256"]
+                    and len(value["epochs"]) == 1
+                    and value["epochs"][0]["both_books_initialized_and_updated"]
+                    and value["epochs"][0]["book_sha256"]
+                    == report["archives"][name]["independent_books_sha256"],
+                    "PILOT_EPOCH_AUDIT",
+                )
             for result in report["trade_id_crosscheck"].values():
-                need(result["common_ids"] > 0 and result["divergent_ids"] == 0,
-                     "PILOT_TRADE_CROSSCHECK")
+                need(
+                    result["common_ids"] > 0 and result["divergent_ids"] == 0,
+                    "PILOT_TRADE_CROSSCHECK",
+                )
             report["status"] = "PASS"
             report["five_hour_certified"] = True
     except Exception as exc:
         if failure is None:
-            failure = str(exc) if isinstance(exc, ValueError) and str(exc).startswith(
-                "PILOT_") else type(exc).__name__
+            failure = (
+                str(exc)
+                if isinstance(exc, ValueError) and str(exc).startswith("PILOT_")
+                else type(exc).__name__
+            )
     if failure is not None:
         report["status"] = "FAIL"
         report["failure"] = failure
@@ -356,11 +450,13 @@ def run(root, output):
         for source in sources:
             attempt = source.root / "attempt_01"
             report["incident_receipts"][source.name] = incident_receipt(
-                attempt / "ws.jsonl", attempt / "hb.jsonl")
+                attempt / "ws.jsonl", attempt / "hb.jsonl"
+            )
             archive = capture_path(attempt)
             report["collector_fault_receipts"][source.name] = {
                 "manifest": manifest_receipt(archive / "manifest.json")
-                if archive is not None else {"status": "NO_ARCHIVE"},
+                if archive is not None
+                else {"status": "NO_ARCHIVE"},
                 "observer": observer_receipt(attempt / "observer_events.jsonl"),
             }
     write_report(output, report)

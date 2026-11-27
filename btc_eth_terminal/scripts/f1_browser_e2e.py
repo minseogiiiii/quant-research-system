@@ -1,4 +1,5 @@
 """F1-C: actual loopback gateway / Chromium parity, not trading certification."""
+
 from __future__ import annotations
 
 import argparse
@@ -25,19 +26,32 @@ def need(ok, code):
 
 
 def key(body):
-    return (body["gateway_run"], body["generation"], body["source_session"],
-            *(body["states"][p]["state_version"] for p in PRODUCTS))
+    return (
+        body["gateway_run"],
+        body["generation"],
+        body["source_session"],
+        *(body["states"][p]["state_version"] for p in PRODUCTS),
+    )
 
 
 def projection(body):
-    return {"run": body["gateway_run"], "generation": body["generation"],
-            "session": body["source_session"], "source": body["active_source"],
-            "rows": {p: {"version": row["state_version"],
-                         "sequence": row["source_sequence"],
-                         "hash": row["source_raw_sha256"],
-                         "receiver": row["receiver_time_ms"],
-                         "bid": row["best_bid"], "ask": row["best_ask"]}
-                     for p, row in body["states"].items()}}
+    return {
+        "run": body["gateway_run"],
+        "generation": body["generation"],
+        "session": body["source_session"],
+        "source": body["active_source"],
+        "rows": {
+            p: {
+                "version": row["state_version"],
+                "sequence": row["source_sequence"],
+                "hash": row["source_raw_sha256"],
+                "receiver": row["receiver_time_ms"],
+                "bid": row["best_bid"],
+                "ask": row["best_ask"],
+            }
+            for p, row in body["states"].items()
+        },
+    }
 
 
 DOM = """() => {
@@ -75,8 +89,10 @@ WATCH = """() => {
 
 def run(root, synthetic):
     root.mkdir(mode=0o700)
-    sources = [ManagedSource(n, root / n, 180, synthetic, max_restarts=1)
-               for n in ("primary", "secondary")]
+    sources = [
+        ManagedSource(n, root / n, 180, synthetic, max_restarts=1)
+        for n in ("primary", "secondary")
+    ]
     route = ResilientRoute(*sources)
     ledger = TransitionLedger(root / "route.jsonl")
     publisher = Publisher(route, ledger)
@@ -85,13 +101,25 @@ def run(root, synthetic):
     vite = None
     publisher.start()
     thread.start()
-    result = {"mode": "SYNTHETIC_REJECTION" if synthetic else "REAL_PUBLIC",
-              "status": "FAIL", "real_orders_enabled": False,
-              "zero_gap_certified": False, "dom_matches": 0}
+    result = {
+        "mode": "SYNTHETIC_REJECTION" if synthetic else "REAL_PUBLIC",
+        "status": "FAIL",
+        "real_orders_enabled": False,
+        "zero_gap_certified": False,
+        "dom_matches": 0,
+    }
     try:
         vite = subprocess.Popen(
-            ["node", "node_modules/vite/bin/vite.js", "--config", "vite.fincept.config.ts"],
-            cwd=FRONTEND, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            [
+                "node",
+                "node_modules/vite/bin/vite.js",
+                "--config",
+                "vite.fincept.config.ts",
+            ],
+            cwd=FRONTEND,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         end = time.monotonic() + 20
         while time.monotonic() < end:
             need(vite.poll() is None, "F1_VITE_EXIT")
@@ -100,7 +128,7 @@ def run(root, synthetic):
                     if r.status == 200:
                         break
             except OSError:
-                time.sleep(.2)
+                time.sleep(0.2)
         else:
             raise ValueError("F1_VITE_TIMEOUT")
         with sync_playwright() as playwright:
@@ -134,7 +162,9 @@ def run(root, synthetic):
             cdp = page.context.new_cdp_session(page)
             cdp.send("Network.enable")
             cdp.on("Network.eventSourceMessageReceived", event)
-            page.goto("http://127.0.0.1:5174/resilient.html", wait_until="domcontentloaded")
+            page.goto(
+                "http://127.0.0.1:5174/resilient.html", wait_until="domcontentloaded"
+            )
             page.evaluate(WATCH)
             if synthetic:
                 end = time.monotonic() + 15
@@ -147,8 +177,10 @@ def run(root, synthetic):
                     raise ValueError("F1_SYNTHETIC_SOURCE_NOT_READY")
                 for _ in range(30):
                     dom = page.evaluate(DOM)
-                    need(dom["status"] == "BLOCKED" and dom["rows"] == 0,
-                         "F1_SYNTHETIC_DISPLAYED")
+                    need(
+                        dom["status"] == "BLOCKED" and dom["rows"] == 0,
+                        "F1_SYNTHETIC_DISPLAYED",
+                    )
                     page.wait_for_timeout(100)
                 result["synthetic_rejected"] = True
             else:
@@ -161,8 +193,12 @@ def run(root, synthetic):
                         need(not errors and not publisher.failure, "F1_RUNTIME")
                         dom = page.evaluate(DOM)
                         if dom["status"] == "READY":
-                            k = (dom["run"], dom["generation"], dom["session"],
-                                 *(dom["rows"][p]["version"] for p in PRODUCTS))
+                            k = (
+                                dom["run"],
+                                dom["generation"],
+                                dom["session"],
+                                *(dom["rows"][p]["version"] for p in PRODUCTS),
+                            )
                             actual = {k1: v for k1, v in dom.items() if k1 != "status"}
                             if k in frames:
                                 need(actual == frames[k], "F1_DOM_MISMATCH")
@@ -180,10 +216,12 @@ def run(root, synthetic):
                 end = time.monotonic() + 12
                 while time.monotonic() < end:
                     body = publisher.read()
-                    if (body["source_session"] == first["session"]
-                            and set(body.get("checkpoint_comparison", {}).values())
-                            <= {"MATCH", "NOT_COMPARABLE"}
-                            and len(body.get("checkpoint_comparison", {})) == 2):
+                    if (
+                        body["source_session"] == first["session"]
+                        and set(body.get("checkpoint_comparison", {}).values())
+                        <= {"MATCH", "NOT_COMPARABLE"}
+                        and len(body.get("checkpoint_comparison", {})) == 2
+                    ):
                         break
                     page.wait_for_timeout(100)
                 else:
@@ -193,32 +231,52 @@ def run(root, synthetic):
                 t0 = time.monotonic()
                 target.worker.process.kill()
                 second = observe(30, 8, first["session"])
-                need(second["source"] != first["source"]
-                     and second["generation"] > first["generation"], "F1_FAILOVER")
+                need(
+                    second["source"] != first["source"]
+                    and second["generation"] > first["generation"],
+                    "F1_FAILOVER",
+                )
                 history = page.evaluate("window.__f1Transitions")
                 ready_old = False
                 cleared = False
                 switched = False
                 for item in history:
-                    if item["status"] == "READY" and item["session"] == first["session"]:
+                    if (
+                        item["status"] == "READY"
+                        and item["session"] == first["session"]
+                    ):
                         need(not switched, "F1_RETIRED_SESSION_RETURNED")
                         ready_old = True
                     if ready_old and item["status"] == "BLOCKED":
                         need(item["rows"] == 0, "F1_BLOCKED_DOM_LEAK")
                         cleared = True
-                    if ready_old and item["status"] == "READY" and item["session"] == second["session"]:
+                    if (
+                        ready_old
+                        and item["status"] == "READY"
+                        and item["session"] == second["session"]
+                    ):
                         need(cleared, "F1_SWITCH_WITHOUT_CLEAR")
                         switched = True
                 need(switched and cleared, "F1_TRANSITION_NOT_OBSERVED")
-                result.update({"dom_matches": len(matched), "failover_dom_cleared": True,
-                               "second_source_observed": True,
-                               "post_fault_observation_seconds": round(time.monotonic() - t0, 3)})
+                result.update(
+                    {
+                        "dom_matches": len(matched),
+                        "failover_dom_cleared": True,
+                        "second_source_observed": True,
+                        "post_fault_observation_seconds": round(
+                            time.monotonic() - t0, 3
+                        ),
+                    }
+                )
             need(not errors, "F1_PAGE_ERRORS")
             browser.close()
         result["status"] = "PASS"
     except Exception as exc:
-        result["failure"] = str(exc) if isinstance(exc, ValueError) and str(exc).startswith(
-            "F1_") else type(exc).__name__
+        result["failure"] = (
+            str(exc)
+            if isinstance(exc, ValueError) and str(exc).startswith("F1_")
+            else type(exc).__name__
+        )
     finally:
         if vite is not None:
             vite.terminate()
@@ -254,8 +312,13 @@ def main():
         out.write(raw)
         out.flush()
         os.fsync(out.fileno())
-    print("F1_C_RECEIPT", result["status"], hashlib.sha256(raw).hexdigest(),
-          result.get("failure", ""), flush=True)
+    print(
+        "F1_C_RECEIPT",
+        result["status"],
+        hashlib.sha256(raw).hexdigest(),
+        result.get("failure", ""),
+        flush=True,
+    )
     raise SystemExit(0 if result["status"] == "PASS" else 2)
 
 

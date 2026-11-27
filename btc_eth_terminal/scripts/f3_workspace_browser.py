@@ -1,4 +1,5 @@
 """Isolated browser UI contract; no real feed or trading authorization."""
+
 import subprocess
 import time
 import urllib.request
@@ -6,7 +7,10 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 root = Path(__file__).resolve().parents[1] / "frontend"
-with subprocess.Popen(["npm", "exec", "--no", "--", "vite", "--config", "vite.workspace.config.ts"], cwd=root) as server:
+with subprocess.Popen(
+    ["npm", "exec", "--no", "--", "vite", "--config", "vite.workspace.config.ts"],
+    cwd=root,
+) as server:
     try:
         url = "http://127.0.0.1:5175/workspace.html"
         for _ in range(60):
@@ -41,6 +45,8 @@ with subprocess.Popen(["npm", "exec", "--no", "--", "vite", "--config", "vite.wo
             page.get_by_text("No qualified widgets connected", exact=False).wait_for()
             assert page.locator("article").count() == 0
             browser.close()
-        print("F3_BROWSER_PASS (blocked feed, persistence, reorder, allowlist, unconnected view)")
+        print(
+            "F3_BROWSER_PASS (blocked feed, persistence, reorder, allowlist, unconnected view)"
+        )
     finally:
         server.terminate()
