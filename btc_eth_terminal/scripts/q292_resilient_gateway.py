@@ -25,6 +25,8 @@ from q293_long_policy import remaining
 MAX_RESTARTS = 3
 STARTUP_LIMIT = 12
 ABSENCE_LIMIT = 8
+MAX_RETIRED_SOURCE_EPOCHS = 128
+EXPLICIT_SOURCE_GAP = "COLLECTOR_REPORTED_WEBSOCKET_SOURCE_GAP"
 
 
 def ladder(row):
@@ -84,8 +86,17 @@ class ManagedSource:
         self.seen_ready = False
         self.closed = False
         self.retiring = False
+        self.admitted_session = None
+        self.retired_sessions = set()
+
+    def fence_session(self):
+        """Retire observed epochs, including an inactive standby epoch."""
+        if self.admitted_session is not None:
+            self.retired_sessions.add(self.admitted_session)
+            self.admitted_session = None
 
     def retire(self):
+        self.fence_session()
         if self.worker is not None and not self.retiring:
             self.retiring = True
             if self.worker.process.poll() is None:
@@ -97,6 +108,7 @@ class ManagedSource:
         now = time.monotonic()
         if self.worker is not None:
             if self.worker.process.poll() is not None:
+                self.fence_session()
                 self.worker.close()
                 self.worker = None
                 self.retiring = False
@@ -104,6 +116,8 @@ class ManagedSource:
             elif self.retiring:
                 return None
         if self.worker is None:
+            if len(self.retired_sessions) >= MAX_RETIRED_SOURCE_EPOCHS:
+                return None
             if self.attempts > self.max_restarts or now < self.next_start:
                 return None
             duration = remaining(self.deadline, self.duration)
@@ -121,13 +135,26 @@ class ManagedSource:
                 self.next_start = now + min(2 ** (self.attempts - 1), 8)
                 return None
         value = self.worker.observation()
+        reason = getattr(self.worker, "last_reason", None)
+        if reason == EXPLICIT_SOURCE_GAP:
+            self.fence_session()
+            value = None
         if value is not None:
+            session = value[0].session
+            if session != self.admitted_session:
+                self.fence_session()
+            if (session in self.retired_sessions
+                    or len(self.retired_sessions) >= MAX_RETIRED_SOURCE_EPOCHS):
+                self.worker.last_reason = "RETIRED_SOURCE_EPOCH_REJECTED"
+                self.retire()
+                return None
+            self.admitted_session = session
             self.seen_ready = True
             self.last_good = now
             return value
         # An observer that stopped its tap reader cannot become healthy on
         # the same IPC stream; retire immediately, not after absence timeout.
-        terminal = getattr(self.worker, "last_reason", None) in {
+        terminal = reason in {
             "LIVE_ADMISSION_REJECTED", "COLLECTOR_OBSERVATION_SOCKET_CLOSED",
             "LOCAL_OBSERVER_BACKPRESSURE_EXCEEDED",
             "INVALID_OBSERVER_TRANSPORT_CONTROL",
