@@ -20,7 +20,10 @@ def until(route, predicate, seconds=15):
         if predicate(body):
             return body
         time.sleep(.06)
-    raise AssertionError("SYNTHETIC_DUAL_SOURCE_DEADLINE")
+    raise AssertionError((
+        "SYNTHETIC_DUAL_SOURCE_DEADLINE", body.get("source_diagnostics"),
+        body.get("source_attempts"), body.get("checkpoint_comparison"),
+    ))
 
 
 def ready(body):
@@ -58,6 +61,7 @@ class DualWireFaultContracts(unittest.TestCase):
                 self.assertEqual(first["active_source"], "primary")
                 old = s.admitted_session
                 self.assertIsNotNone(old)
+                (s.worker.work / "inject_fault").touch(mode=0o600, exist_ok=False)
                 lost = until(route, lambda x: not ready(x), 12)
                 self.assertEqual(lost["active_source"], "primary")
                 self.assertEqual(lost["generation"], first["generation"])
@@ -72,6 +76,11 @@ class DualWireFaultContracts(unittest.TestCase):
             finally:
                 p.close()
                 s.close()
+                # Only redacted synthetic fault diagnostics may enter CI logs.
+                found = capture_path(s.root / "attempt_01")
+                if found is not None:
+                    print("SYNTHETIC_FAULT_RECEIPT", kind,
+                          manifest_receipt(found / "manifest.json"))
             archive = capture_path(s.root / "attempt_01")
             self.assertIsNotNone(archive)
             manifest = json.loads((archive / "manifest.json").read_bytes())
