@@ -61,7 +61,7 @@ class RecoveryMonitor:
         if self.run is None:
             self.run = run
         need(run == self.run and type(generation) is int
-             and generation >= self.generation, "C2_GENERATION")
+             and generation >= max(0, self.generation), "C2_GENERATION")
         self.generation = generation
         ready = body["states"] is not None
         checks = body.get("checkpoint_comparison", {})
@@ -87,6 +87,9 @@ class RecoveryMonitor:
                 self.retired.add(old)
                 changed = old
             self.current_cursor = key
+        elif self.current_cursor is not None:
+            # Once unavailable, an old public cursor can never return.
+            self.retired.add(self.current_cursor)
         if self.started is None:
             need(elapsed <= MAX_STARTUP_SECONDS, "C2_STARTUP_TIMEOUT")
             if both:
@@ -96,7 +99,7 @@ class RecoveryMonitor:
             return changed
         if not ready or not self.previous_health[0]:
             self.outage_seconds += dt
-        if not both or not self.previous_health[1]:
+        if not both or not self.previous_health[1] or changed is not None:
             self.degraded_seconds += dt
         if not ready:
             if self.outage_since is None:
