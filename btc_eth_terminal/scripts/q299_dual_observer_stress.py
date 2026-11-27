@@ -111,6 +111,7 @@ def audit_attempts(sources, workers, root, report):
                 "observer": journal,
                 "workload": read_receipt(attempt / "q299_offered.json"),
                 "completion": read_receipt(attempt / "q299_done.json"),
+                "phase_profile": read_receipt(attempt / "q299_profile.json"),
                 "max_ipc_seconds": round(worker.max_ipc_seconds, 6),
                 "windows": archive_windows(archive, manifest, worker.witness),
             }
@@ -228,6 +229,17 @@ def run(root, output, mode):
             if injected is None:
                 need(now - start <= 20, "Q299_BASELINE_TIMEOUT")
             elif mode == "burst":
+                if not both_ready(body) or cursor(body) != baseline:
+                    report["first_degraded_observation"] = {
+                        "elapsed": round(now - injected, 6),
+                        "status": body.get("status"),
+                        "active_source": body.get("active_source"),
+                        "generation": body.get("generation"),
+                        "diagnostics": body.get("source_diagnostics"),
+                        "checkpoints": body.get("checkpoint_comparison"),
+                        "attempts": body.get("source_attempts"),
+                        "has_states": body.get("states") is not None,
+                    }
                 need(both_ready(body) and cursor(body) == baseline,
                      "Q299_UNPLANNED_DEGRADATION")
                 need(all(s.attempts == 1 for s in sources), "Q299_RESTART")
