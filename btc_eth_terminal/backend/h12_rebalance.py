@@ -48,7 +48,7 @@ def shrink(e, lam):
         )
         z = (1 - lam) * b
         need(a * c > z * z and a * c - z * z > a * c * Decimal("1e-8"), "DEGENERATE")
-        return {"variance": dict(zip(PRODUCTS, (a, c))), "covariance": z}
+        return {"variance": dict(zip(PRODUCTS, (a, c), strict=True)), "covariance": z}
 
 
 def weights(e, method):
@@ -60,7 +60,7 @@ def weights(e, method):
         x = c.sqrt() / (a.sqrt() + c.sqrt())
     else:
         x = Decimal(".5")
-    return dict(zip(PRODUCTS, (x, 1 - x)))
+    return dict(zip(PRODUCTS, (x, 1 - x), strict=True))
 
 
 def validate(p):

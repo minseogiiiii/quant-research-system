@@ -50,6 +50,8 @@ def ranks(xs):
 
 
 def corr(xs, ys):
+    if len(xs) != len(ys):
+        raise ValueError("CORRELATION_LENGTH_MISMATCH")
     if len(xs) < MIN_N:
         return None
     a, b = fmean(xs), fmean(ys)
@@ -58,7 +60,7 @@ def corr(xs, ys):
     scale = math.sqrt(math.fsum(x * x for x in dx) * math.fsum(y * y for y in dy))
     if scale == 0:
         return None
-    return max(-1.0, min(1.0, math.fsum(x * y for x, y in zip(dx, dy)) / scale))
+    return max(-1.0, min(1.0, math.fsum(x * y for x, y in zip(dx, dy, strict=True)) / scale))
 
 
 def metric(rows, field):
@@ -72,9 +74,9 @@ def metric(rows, field):
         ("zero", lambda z: z == 0),
         ("positive", lambda z: z > 0),
     ):
-        a = [float(v) for u, v in zip(x, y) if predicate(u)]
+        a = [float(v) for u, v in zip(x, y, strict=True) if predicate(u)]
         groups[name] = {"n": len(a), "mean_markout_bps": fmean(a) if a else None}
-    directional = [(a, b) for a, b in zip(x, y) if a != 0 and b != 0]
+    directional = [(a, b) for a, b in zip(x, y, strict=True) if a != 0 and b != 0]
     return {
         "n": len(rows),
         "pearson_ic": corr(xv, yv),

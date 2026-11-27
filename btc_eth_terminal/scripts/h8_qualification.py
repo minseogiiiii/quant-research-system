@@ -64,7 +64,7 @@ def assess(report, journal, plan_pin, head, report_pin):
         "H8_SOURCE_KIND",
     )
     output = []
-    for t, r in zip(trials, results):
+    for t, r in zip(trials, results, strict=True):
         tid = t["trial_id"]
         state = reg["state"][tid]
         receipt = reg["results"][tid]
@@ -84,7 +84,7 @@ def assess(report, journal, plan_pin, head, report_pin):
                 }
             )
             need(segment_hash == receipt["return_series_sha256"], "H8_SERIES_PIN")
-            for a, b in zip(r["sessions"], sessions):
+            for a, b in zip(r["sessions"], sessions, strict=True):
                 need(
                     a["source_manifest_sha256"] == b["source_manifest_sha256"]
                     and a["dataset_receipt_sha256"] == b["dataset_receipt_sha256"]

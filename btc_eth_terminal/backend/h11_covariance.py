@@ -120,7 +120,7 @@ class RollingCovariance:
             ctx.prec = 80
             if self.prev is not None:
                 self.returns.append(
-                    tuple(Decimal(v - old) / old for v, old in zip(x, self.prev))
+                    tuple(Decimal(v - old) / old for v, old in zip(x, self.prev, strict=True))
                 )
             self.prev = x
             if len(self.returns) < self.window:

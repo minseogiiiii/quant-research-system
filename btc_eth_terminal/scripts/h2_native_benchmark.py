@@ -39,7 +39,7 @@ def stamp(ms):
 def wire(seq, levels, start_ms=BASE):
     t = stamp(start_ms + seq * 10)
     events = []
-    for p, base in zip(PRODUCTS, (50000, 2000)):
+    for p, base in zip(PRODUCTS, (50000, 2000), strict=True):
         rows = []
         for side in ("bid", "offer"):
             for i in range(levels):

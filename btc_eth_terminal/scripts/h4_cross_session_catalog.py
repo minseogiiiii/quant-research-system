@@ -153,7 +153,7 @@ def catalog(entries, embargo_ms, *, fixture=False):
         seen.add(row["source_manifest_sha256"])
         rows.append(row)
     rows.sort(key=lambda r: r["first_receiver_ms"])
-    for a, b in zip(rows, rows[1:]):
+    for a, b in zip(rows[:-1], rows[1:], strict=True):
         need(a["last_receiver_ms"] < b["first_receiver_ms"], "OVERLAP")
         need(ROLES[a["role"]] <= ROLES[b["role"]], "ROLE_ORDER")
         if a["role"] != b["role"]:

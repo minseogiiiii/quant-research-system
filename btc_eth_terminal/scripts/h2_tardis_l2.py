@@ -254,7 +254,7 @@ def convert(source, pin, out, *, symbol, day, fixture=False):
             )
             while batch := cursor.fetchmany(4096):
                 for vals in batch:
-                    row = dict(zip(SCHEMA.names, vals))
+                    row = dict(zip(SCHEMA.names, vals, strict=True))
                     feed_hash(h, row)
                     count += 1
                     need(row["row_number"] == last_row + 1, "WITNESS_ROW")

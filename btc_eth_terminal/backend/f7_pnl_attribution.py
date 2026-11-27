@@ -169,7 +169,7 @@ def summarize(packets, product, policy=None):
             totals.update(decision_mid_gross_quote=None, exit_latency_pnl=None)
         interval = report["policy"]["step_ms"]
         need(
-            all(b["time"] - a["time"] == interval for a, b in zip(grid, grid[1:])),
+            all(b["time"] - a["time"] == interval for a, b in zip(grid[:-1], grid[1:], strict=True)),
             "GRID_GAP",
         )
         complete = bool(grid) and all(
@@ -184,7 +184,7 @@ def summarize(packets, product, policy=None):
         returns = []
         times = []
         if complete and len(grid) >= 3:
-            for a, b in zip(grid, grid[1:]):
+            for a, b in zip(grid[:-1], grid[1:], strict=True):
                 returns.append(float(d(b["equity"]) / d(a["equity"]) - 1))
                 times.append(b["time"])
         return report, {

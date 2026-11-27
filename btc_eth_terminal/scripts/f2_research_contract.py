@@ -25,7 +25,7 @@ def regular_returns(values, timestamps, interval_ms):
     need(2 <= len(timestamps) <= MAX_ROWS, "F2_ROW_BOUND")
     need(all(type(t) is int and 0 < t < 2**53 for t in timestamps),
          "F2_TIMESTAMP")
-    need(all(b - a == interval_ms for a, b in zip(timestamps, timestamps[1:])),
+    need(all(b - a == interval_ms for a, b in zip(timestamps[:-1], timestamps[1:], strict=True)),
          "F2_GRID_GAP_OR_DUPLICATE")
     r = np.asarray(values, dtype=float)
     need(r.ndim in (1, 2) and r.shape[0] == len(timestamps)

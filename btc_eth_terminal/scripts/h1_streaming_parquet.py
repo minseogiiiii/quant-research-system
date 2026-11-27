@@ -146,7 +146,7 @@ def verify_tables(folder, expected, witness, *, timings=None):
             prior = None
             while batch := cursor.fetchmany(256):
                 for values in batch:
-                    r = dict(zip(schema.names, values))
+                    r = dict(zip(schema.names, values, strict=True))
                     key = (
                         (r["sequence"],)
                         if name == "packets"

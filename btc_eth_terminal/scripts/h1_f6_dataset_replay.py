@@ -60,7 +60,7 @@ def replay_dataset(
         cursor = db.execute("SELECT * FROM read_parquet(?)", [str(f)])
         while batch := cursor.fetchmany(256):
             for values in batch:
-                p = dict(zip(PACKET.names, values))
+                p = dict(zip(PACKET.names, values, strict=True))
                 feed_hash(h, p)
                 need(
                     p["source_manifest_sha256"] == pin
