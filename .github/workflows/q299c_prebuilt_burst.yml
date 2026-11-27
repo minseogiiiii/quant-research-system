@@ -1,0 +1,85 @@
+name: Q299-C prebuilt exact-window burst (offline)
+on:
+  push:
+    branches: ['remediation/u1-ast-format-20261127']
+    paths: ['.github/workflows/q299c_prebuilt_burst.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  stress:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [burst]
+    env:
+      PYTHONPATH: ${{ github.workspace }}/btc_eth_terminal/backend:${{ github.workspace }}/btc_eth_terminal/scripts:${{ github.workspace }}/.github/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install ruff==0.15.22 pytest numpy==2.2.6 pandas==2.2.3 scipy==1.15.3 pyarrow==19.0.1 duckdb==1.2.2 scikit-learn==1.6.1
+      - run: ruff check .
+      - name: Pin unchanged production pipeline and Q298 reference evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git diff --exit-code 3478e9df180da0208cd39bc9bf743c783764bdf6 HEAD -- btc_eth_terminal/backend btc_eth_terminal/scripts/q292_dual_gateway.py btc_eth_terminal/scripts/q292_isolated_observer.py btc_eth_terminal/scripts/btc_eth_multiday_v20.mjs btc_eth_terminal/scripts/q292_resilient_gateway.py btc_eth_terminal/scripts/q292_stream_gateway.py
+          python - <<'PY'
+          import io, json, os, zipfile
+          from q29_artifact_transport import fetch_bytes
+          raw=fetch_bytes(os.environ["GITHUB_REPOSITORY"],os.environ["GH_TOKEN"],artifact_id=15231501128,name="q298-redacted-stress-receipt",run_id=46065718972,sha="3478e9df180da0208cd39bc9bf743c783764bdf6",zip_sha="75364d147590c7e6fd0f12ec2a7a6cfdabc2849a317427e49b6e1338f75842f8")
+          with zipfile.ZipFile(io.BytesIO(raw)) as z:
+              assert z.namelist()==["stress.json"] and z.testzip() is None
+              r=json.loads(z.read("stress.json"))
+          assert r["status"]=="PASS" and r["five_hour_approved"] is False
+          assert r["historical_burst"]["max_frame_bytes"]==4694042
+          assert r["historical_burst"]["windows"]==[{"window_ns":100000000,"max_bytes":4854848,"max_messages":35},{"window_ns":1000000000,"max_bytes":7298337,"max_messages":75}]
+          print("Q299_EXACT_Q298_REFERENCE_PASS")
+          PY
+      - name: Isolate network and replace only synthetic fixture in ephemeral checkout
+        env:
+          MODE: ${{ matrix.mode }}
+        run: |
+          set -euo pipefail
+          cp btc_eth_terminal/tests/q299_prebuilt_burst_mock.mjs btc_eth_terminal/tests/q292_dual_source_mock.mjs
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('btc_eth_terminal/scripts/q292_isolated_observer.py')
+          s=p.read_text(); old='def worker(args):\n'; assert s.count(old)==1
+          p.write_text(s.replace(old, old+'    from q299_phase_profile import install\n    install(args)\n'))
+          p=Path('btc_eth_terminal/scripts/q292_dual_gateway.py')
+          s=p.read_text(); old='        with self.engine._cv:\n'; assert s.count(old)==1
+          p.write_text(s.replace(old, '        from q299_phase_profile import timed_observation_lock\n        with timed_observation_lock(self.engine._cv):\n'))
+          PY
+          node --check btc_eth_terminal/tests/q292_dual_source_mock.mjs
+          mkdir -m 700 "$RUNNER_TEMP/q299-output"
+          PY="$(command -v python)"
+          RUNNER_USER="$(id -un)"
+          sudo --preserve-env=PATH,PYTHONPATH,GITHUB_SHA,GITHUB_RUN_ID unshare --net bash -c '
+            set -e
+            ip link set lo up
+            sudo --preserve-env=PATH,PYTHONPATH,GITHUB_SHA,GITHUB_RUN_ID -u "$1" timeout 180 "$2" -u btc_eth_terminal/scripts/q299_dual_observer_stress.py --mode "$4" --workdir "$3/q299" --output "$3/q299-output/receipt.json"
+          ' bash "$RUNNER_USER" "$PY" "$RUNNER_TEMP" "$MODE"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: q299c-prebuilt-redacted-receipt
+          path: ${{ runner.temp }}/q299-output/receipt.json
+          if-no-files-found: warn
+          retention-days: 14
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/q299" "$RUNNER_TEMP/q299-output"
+# No real market capture or five-hour approval.
+
+# Q299: repair nested-if lint and exercise the 100ms message-count target.
