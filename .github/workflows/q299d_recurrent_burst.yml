@@ -84,3 +84,5 @@ jobs:
 # No real market capture or five-hour approval.
 
 # Q299: repair nested-if lint and exercise the 100ms message-count target.
+
+# Retest: independent message-count bursts; preserve every original measured threshold.

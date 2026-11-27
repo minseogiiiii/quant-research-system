@@ -115,13 +115,13 @@ class Fixture {
    this.rateTicks=120;
   }
   if(this.rateTicks>0){
-   // One 80-message microburst plus normal 20-message batches.
-   // The measured trailing 100ms window must independently meet 70.
-   const n=this.rateTicks===120?80:20;
+   // Separate byte bursts from the message-count microbursts. Two stronger
+   // 160-message batches after the initial L2 burst has drained.
+   const n=[100,60].includes(this.rateTicks)?160:20;
    for(let i=0;i<n;i++)this.small();
    this.rateTicks--;
    if(this.rateTicks===0)this.receipt('q299_done_'+this.cycle+'.json',{
-    cycle:this.cycle,end_sequence:this.seq-1,rate_messages:2460,max_frame_bytes:this.maxFrame
+    cycle:this.cycle,end_sequence:this.seq-1,rate_messages:2680,max_frame_bytes:this.maxFrame
    });
   }else this.small();
   this.emit('heartbeats',[{heartbeat_counter:++this.hb}]);

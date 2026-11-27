@@ -65,7 +65,7 @@ def audit_cycles(archive, manifest, attempts):
              and offered["prebuilt"] is True
              and len(offered["frame_bytes"]) == 3
              and offered["first_burst_end"] == first + 2
-             and done["rate_messages"] == 2460
+             and done["rate_messages"] == 2680
              and first <= last and (not ranges or first > ranges[-1][1]),
              "Q299D_RECEIPT_ORDER")
         need(set(witnessed) == set(PRODUCTS)
@@ -322,13 +322,14 @@ def run(root, output):
                  and len(audit["epochs"]) == 1
                  and audit["epochs"][0]["both_books_initialized_and_updated"]
                  and audit["unsealed_entries_excluded"] == 0
-                 and len(cycles) == CYCLES and all(c["passed"] for c in cycles),
-                 "Q299D_CYCLE_AUDIT")
+                 and len(cycles) == CYCLES, "Q299D_ARCHIVE_INTEGRITY")
         report["source_ledger"] = audit_source_ledger(root/"source.jsonl")
         report["route_ledger"] = audit_ledger(root/"route.jsonl")
         need(len(report["archives"]) == 2
              and not report["source_ledger"]["torn_tail"]
              and not report["route_ledger"]["torn_tail"], "Q299D_LEDGER")
+        need(all(c["passed"] for a in report["archives"].values()
+                 for c in a["cycles"]), "Q299D_CYCLE_AUDIT")
     except Exception as exc:
         failure = failure or (str(exc) if isinstance(exc, ValueError)
                               and str(exc).startswith("Q299D_")
