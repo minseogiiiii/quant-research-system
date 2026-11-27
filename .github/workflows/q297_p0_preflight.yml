@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install ruff==0.15.22 pytest
+      - run: python -m pip install ruff==0.15.22 pytest pyarrow==19.0.1 duckdb==1.2.2 numpy==2.2.6 pandas==2.2.3 scipy==1.15.3 scikit-learn==1.6.1
       - run: python btc_eth_terminal/scripts/verify_fincept_vendor.py
       - run: ruff check .
       - name: Re-download both exact successful real pilots and audit capacity
@@ -30,7 +30,7 @@ jobs:
         env:
           Q297_RECEIPTS: ${{ runner.temp }}/q297-evidence
         run: |
-          python -m pytest -c /dev/null -q btc_eth_terminal/tests/test_q297_p0_preflight.py btc_eth_terminal/tests/test_q296_c2_policy.py --junitxml="$RUNNER_TEMP/q297-evidence/result.xml"
+          python -m pytest -c /dev/null -q .github/scripts/test_q297_p0_preflight.py btc_eth_terminal/tests/test_q296_c2_policy.py --junitxml="$RUNNER_TEMP/q297-evidence/result.xml"
           python - <<'PY'
           import os, xml.etree.ElementTree as ET
           from pathlib import Path

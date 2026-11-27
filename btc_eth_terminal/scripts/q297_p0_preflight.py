@@ -31,7 +31,7 @@ HORIZON = 18000
 MARGIN = 2
 ALLOWED_DIFF = {
     "btc_eth_terminal/scripts/q297_p0_preflight.py",
-    "btc_eth_terminal/tests/test_q297_p0_preflight.py",
+    ".github/scripts/test_q297_p0_preflight.py",
     ".github/workflows/q297_p0_preflight.yml",
 }
 

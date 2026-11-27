@@ -10,7 +10,6 @@ from pathlib import Path
 from q297_p0_preflight import audit
 
 
-@unittest.skipUnless(os.environ.get("Q297_RECEIPTS"), "requires exact private-run receipts")
 class PreflightEvidence(unittest.TestCase):
     def setUp(self):
         root = Path(os.environ["Q297_RECEIPTS"])
