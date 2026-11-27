@@ -1,0 +1,113 @@
+name: U1 guarded first-party lint remediation
+on:
+  push:
+    branches: ['remediation/u1-ast-format-20261127']
+    paths: ['.github/workflows/u1_guarded_lint.yml']
+permissions:
+  contents: write
+concurrency:
+  group: u1-guarded-lint
+  cancel-in-progress: false
+jobs:
+  repair:
+    if: github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install ruff==0.15.22 pytest pyarrow==19.0.1 duckdb==1.2.2 numpy==2.2.6 pandas==2.2.3 scipy==1.15.3 scikit-learn==1.6.1
+      - name: Fix reviewed first-party rules only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/u1-lint"
+          python btc_eth_terminal/scripts/verify_fincept_vendor.py
+          python - <<'PY'
+          import hashlib, json, subprocess
+          from collections import Counter
+          from pathlib import Path
+          scopes = ["btc_eth_terminal/backend", "btc_eth_terminal/scripts", "btc_eth_terminal/tests", ".github/scripts"]
+          def lint():
+              p = subprocess.run(["ruff", "check", "--output-format=json", *scopes], capture_output=True, check=False)
+              if p.returncode not in (0, 1):
+                  raise SystemExit("RUFF_EXECUTION_ERROR")
+              return json.loads(p.stdout)
+          def pinned(path, raw):
+              blob = hashlib.sha1(b"blob "+str(len(raw)).encode()+b"\0"+raw).hexdigest()
+              digest = hashlib.sha256(raw).hexdigest()
+              for key in (blob, digest):
+                  p = subprocess.run(["git","grep","-l","-F",key,"--",".",f":(exclude){path}"], capture_output=True)
+                  if p.returncode == 0:
+                      return True
+                  if p.returncode != 1:
+                      raise SystemExit("GIT_GREP_ERROR")
+              return False
+          before = lint()
+          selected = sorted({Path(r["filename"]).relative_to(Path.cwd()) for r in before})
+          kept = []
+          for p in selected:
+              if pinned(p, p.read_bytes()):
+                  kept.append(str(p))
+                  continue
+              old = p.read_bytes()
+              result = subprocess.run(["ruff","check","--fix","--select","I001,F401,SIM117,UP017,UP035",str(p)], capture_output=True)
+              if result.returncode not in (0,1):
+                  p.write_bytes(old)
+                  raise SystemExit("SAFE_FIX_FAILED")
+              if old != p.read_bytes() or any(r["code"]=="E501" and Path(r["filename"]).resolve()==p.resolve() for r in before):
+                  result = subprocess.run(["ruff","format",str(p)], capture_output=True)
+                  if result.returncode:
+                      p.write_bytes(old)
+                      raise SystemExit("FORMAT_FAILED")
+          after = lint()
+          def inventory(rows):
+              return [{"path":str(Path(r["filename"]).relative_to(Path.cwd())), "code":r["code"], "line":r["location"]["row"],"message":r["message"]} for r in rows]
+          import os
+          out = Path(os.environ["RUNNER_TEMP"])/"u1-lint"
+          report = {"before":len(before),"after":len(after),"counts":dict(Counter(r["code"] for r in after)),"remaining":inventory(after),"pinned":kept}
+          (out/"lint.json").write_text(json.dumps(report,indent=2)+"\n")
+          print("U1_LINT_RESULT",len(before),len(after),report["counts"])
+          if Counter(r["code"] for r in after)-Counter(r["code"] for r in before):
+              raise SystemExit("NEW_LINT_DIAGNOSTIC")
+          PY
+          git diff --check
+          python btc_eth_terminal/scripts/verify_fincept_vendor.py
+          git diff --exit-code -- btc_eth_terminal/vendor
+          python -m compileall -q btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests .github/scripts
+          git diff --binary > "$RUNNER_TEMP/u1-lint/candidate.patch"
+      - name: Confirm changed code behavior before publishing candidate
+        env:
+          PYTHONPATH: src:btc_eth_terminal:btc_eth_terminal/backend:btc_eth_terminal/scripts:btc_eth_terminal/tests:.github/scripts
+        run: |
+          python -m pip install pydantic pydantic-settings
+          python -m pytest -c /dev/null -q btc_eth_terminal/tests/test_f2_research_contract.py btc_eth_terminal/tests/test_f5_predictive_diagnostics.py btc_eth_terminal/tests/test_h1_streaming_parquet.py btc_eth_terminal/tests/test_h5_experiment_registry.py btc_eth_terminal/tests/test_h10_feature_cache.py btc_eth_terminal/tests/test_h11_risk.py btc_eth_terminal/tests/test_h12_rebalance.py
+      - name: Publish guarded candidate and local exact-source verification bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = 'remediation/u1-ast-format-20261127'
+          if ! git diff --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add -u -- btc_eth_terminal/backend btc_eth_terminal/scripts btc_eth_terminal/tests .github/scripts
+            if ! git diff --cached --quiet; then
+              git commit -m 'U1: guarded reviewed first-party lint corrections'
+              git push origin HEAD:refs/heads/remediation/u1-ast-format-20261127
+            fi
+          fi
+          git rev-parse HEAD > "$RUNNER_TEMP/u1-lint/candidate_sha.txt"
+          git archive --format=zip --output="$RUNNER_TEMP/u1-lint/v35_test_source.zip" HEAD btc_eth_terminal/backend/v35_archive_ingress.py btc_eth_terminal/scripts/v35_restore_frozen_source.py btc_eth_terminal/tests/test_v35_archive_ingress.py btc_eth_terminal/tests/test_v35_restore_frozen_source.py
+          git ls-tree -r HEAD -- btc_eth_terminal/backend/v35_archive_ingress.py btc_eth_terminal/scripts/v35_restore_frozen_source.py btc_eth_terminal/tests/test_v35_archive_ingress.py btc_eth_terminal/tests/test_v35_restore_frozen_source.py > "$RUNNER_TEMP/u1-lint/v35_blobs.txt"
+      - name: First-party global lint gate
+        run: ruff check .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: u1-guarded-lint-report
+          path: ${{ runner.temp }}/u1-lint/
+          if-no-files-found: error
