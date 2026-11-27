@@ -126,10 +126,9 @@ class RecoveryMonitor:
         if self.outage_since is not None:
             need(elapsed - self.outage_since <= MAX_OUTAGE_SECONDS,
                  "C2_OUTAGE_TIMEOUT")
-        if not both or changed is not None:
-            if self.degraded_since is None:
-                self.degraded_since = elapsed - dt
-                need(len(self.incidents) < MAX_INCIDENTS, "C2_INCIDENT_BUDGET")
+        if (not both or changed is not None) and self.degraded_since is None:
+            self.degraded_since = elapsed - dt
+            need(len(self.incidents) < MAX_INCIDENTS, "C2_INCIDENT_BUDGET")
         if self.degraded_since is not None:
             recovery = elapsed - self.degraded_since
             need(recovery <= MAX_RECOVERY_SECONDS, "C2_RECOVERY_TIMEOUT")

@@ -320,3 +320,5 @@ jobs:
 
 
 # Exact lint correction and requalification, no five-hour activation.
+
+# C2 policy lint correction; all gates remain strict.
